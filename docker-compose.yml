@@ -1,0 +1,62 @@
+name: etp
+
+# Phase 1 services. Redis, worker and mailpit are added in later phases.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-etp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-etp}
+      TZ: UTC
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # -h 127.0.0.1 forces TCP. During first-time init, the image runs a
+      # temporary server on the unix socket only; checking over TCP avoids
+      # reporting "healthy" before the real server is up.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # One-shot: applies migrations, then exits. The API starts only after it
+  # succeeds, so several API replicas never race to migrate.
+  migrate:
+    build: ./backend
+    command: ["npm", "run", "migrate:up"]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-etp}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-etp}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build: ./backend
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      LOG_LEVEL: info
+      DATABASE_URL: postgres://${POSTGRES_USER:-etp}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-etp}
+    ports:
+      - "${API_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      # The slim image has no curl; Node's built-in fetch does the job.
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  pgdata:
