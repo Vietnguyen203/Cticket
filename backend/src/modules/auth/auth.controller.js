@@ -1,19 +1,11 @@
 const { sendSuccess } = require('../../utils/response');
+const { requestContext } = require('../../utils/requestContext');
 const { getProfile } = require('../users');
 const authService = require('./auth.service');
 
 const HTTP_CREATED = 201;
 const HTTP_ACCEPTED = 202;
 const HTTP_NO_CONTENT = 204;
-const MAX_USER_AGENT_LENGTH = 500;
-
-/** Stored with each refresh token so users can later see their active sessions. */
-function requestMeta(req) {
-  return {
-    ip: req.ip ?? null,
-    userAgent: req.get('user-agent')?.slice(0, MAX_USER_AGENT_LENGTH) ?? null,
-  };
-}
 
 async function register(req, res) {
   const user = await authService.register(req.valid.body);
@@ -34,12 +26,14 @@ async function verifyOtp(req, res) {
   return sendSuccess(res, { purpose: req.valid.body.purpose, verified: true });
 }
 
+// The request context (IP, user agent) is stored with each refresh token so
+// users can later see their active sessions.
 async function login(req, res) {
-  return sendSuccess(res, await authService.login(req.valid.body, requestMeta(req)));
+  return sendSuccess(res, await authService.login(req.valid.body, requestContext(req)));
 }
 
 async function refresh(req, res) {
-  return sendSuccess(res, await authService.refresh(req.valid.body, requestMeta(req)));
+  return sendSuccess(res, await authService.refresh(req.valid.body, requestContext(req)));
 }
 
 async function logout(req, res) {

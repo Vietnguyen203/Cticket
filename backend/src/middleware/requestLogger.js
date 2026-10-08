@@ -31,6 +31,7 @@ const requestLogger = pinoHttp({
     return {
       userId: req.user?.id,
       errorCode: res.locals?.errorCode,
+      errorDetails: res.locals?.errorDetails,
     };
   },
   serializers: {

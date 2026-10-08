@@ -1,0 +1,1370 @@
+{
+  "info": {
+    "name": "ETP — Catalog (Phase 3)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Luồng Phase 3, chạy lần lượt từ trên xuống (hoặc Run collection).\nTrước khi chạy: tab Variables → điền \"email\" và \"password\" = tài khoản Gmail ĐÃ XÁC THỰC của bạn (tài khoản này sẽ trở thành organizer).\nMọi id (category, venue, event, schedule) và token được tự lưu vào biến.\nToken hết hạn sau 15 phút: script của collection tự đăng nhập lại (admin) / tự refresh (bạn) trước mỗi request."
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "(function () {",
+          "  const path = pm.request.url.getPath();",
+          "  if (path.endsWith('/auth/login') || path.endsWith('/auth/refresh')) {",
+          "    return; // these requests manage tokens themselves",
+          "  }",
+          "  const SAFETY_SECONDS = 30;",
+          "  const expiresAt = (token) => {",
+          "    try {",
+          "      const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');",
+          "      return JSON.parse(require('atob')(payload)).exp || 0;",
+          "    } catch (e) {",
+          "      return 0;",
+          "    }",
+          "  };",
+          "  const isFresh = (name) => {",
+          "    const token = pm.variables.get(name);",
+          "    return Boolean(token) && expiresAt(token) > Date.now() / 1000 + SAFETY_SECONDS;",
+          "  };",
+          "  const post = (url, body, onSuccess) => pm.sendRequest({",
+          "    url: pm.variables.get('host') + url,",
+          "    method: 'POST',",
+          "    header: [{ key: 'Content-Type', value: 'application/json' }],",
+          "    body: { mode: 'raw', raw: JSON.stringify(body) },",
+          "  }, (err, res) => {",
+          "    if (!err && res.code === 200) onSuccess(res.json().data);",
+          "  });",
+          "  const auth = JSON.stringify(pm.request.auth ? pm.request.auth.toJSON() : {});",
+          "  ",
+          "  if (auth.includes('adminToken') && !isFresh('adminToken') && pm.variables.get('adminPassword')) {",
+          "    post('/api/v1/auth/login', {",
+          "      email: pm.variables.get('adminEmail'),",
+          "      password: pm.variables.get('adminPassword'),",
+          "    }, (data) => {",
+          "      pm.collectionVariables.set('adminToken', data.accessToken);",
+          "      console.log('Token admin đã hết hạn → tự đăng nhập lại');",
+          "    });",
+          "  }",
+          "  if (auth.includes('userToken') && !isFresh('userToken') && pm.variables.get('userRefreshToken')) {",
+          "    post('/api/v1/auth/refresh', { refreshToken: pm.variables.get('userRefreshToken') }, (data) => {",
+          "      pm.collectionVariables.set('userToken', data.accessToken);",
+          "      pm.collectionVariables.set('userRefreshToken', data.refreshToken);",
+          "      console.log('Token của bạn đã hết hạn → tự refresh');",
+          "    });",
+          "  }",
+          "})();"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "host",
+      "value": "http://localhost:3001"
+    },
+    {
+      "key": "email",
+      "value": ""
+    },
+    {
+      "key": "password",
+      "value": ""
+    },
+    {
+      "key": "adminEmail",
+      "value": "admin@etp.local"
+    },
+    {
+      "key": "adminPassword",
+      "value": "Admin@123456"
+    },
+    {
+      "key": "adminToken",
+      "value": ""
+    },
+    {
+      "key": "userToken",
+      "value": ""
+    },
+    {
+      "key": "userRefreshToken",
+      "value": ""
+    },
+    {
+      "key": "organizerId",
+      "value": ""
+    },
+    {
+      "key": "categoryId",
+      "value": ""
+    },
+    {
+      "key": "venueId",
+      "value": ""
+    },
+    {
+      "key": "eventId",
+      "value": ""
+    },
+    {
+      "key": "eventSlug",
+      "value": ""
+    },
+    {
+      "key": "scheduleId",
+      "value": ""
+    },
+    {
+      "key": "startAt",
+      "value": ""
+    },
+    {
+      "key": "endAt",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Đăng nhập",
+      "item": [
+        {
+          "name": "Admin đăng nhập",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  const data = (pm.response.json() || {}).data || {};",
+                  "  if (data.accessToken !== undefined) pm.collectionVariables.set('adminToken', data.accessToken);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{host}}/api/v1/auth/login"
+          }
+        },
+        {
+          "name": "Bạn đăng nhập (tài khoản Gmail đã xác thực)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  if (!pm.variables.get('email') || !pm.variables.get('password')) {",
+                  "    throw new Error('Điền biến \"email\" và \"password\" (tab Variables) bằng tài khoản Gmail đã xác thực của bạn.');",
+                  "  }",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  const data = (pm.response.json() || {}).data || {};",
+                  "  if (data.accessToken !== undefined) pm.collectionVariables.set('userToken', data.accessToken);",
+                  "  if (data.refreshToken !== undefined) pm.collectionVariables.set('userRefreshToken', data.refreshToken);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{host}}/api/v1/auth/login"
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Admin chuẩn bị dữ liệu",
+      "item": [
+        {
+          "name": "Tạo danh mục",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                  "  const data = (pm.response.json() || {}).data || {};",
+                  "  if (data.category && data.category.id !== undefined) pm.collectionVariables.set('categoryId', data.category && data.category.id);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Âm nhạc {{$timestamp}}\",\n  \"description\": \"Concert, liveshow\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{host}}/api/v1/categories",
+            "description": "Slug được tạo tự động từ tên tiếng Việt: \"Âm nhạc 123\" → \"am-nhac-123\"."
+          }
+        },
+        {
+          "name": "Xem danh mục (công khai)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/categories"
+          }
+        },
+        {
+          "name": "Tạo địa điểm",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                  "  const data = (pm.response.json() || {}).data || {};",
+                  "  if (data.venue && data.venue.id !== undefined) pm.collectionVariables.set('venueId', data.venue && data.venue.id);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Nhà hát Lớn {{$timestamp}}\",\n  \"addressLine\": \"1 Tràng Tiền\",\n  \"city\": \"Hà Nội\",\n  \"capacity\": 600\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{host}}/api/v1/venues"
+          }
+        },
+        {
+          "name": "Tìm địa điểm không dấu (\"nha hat lon\")",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  pm.test('Tìm thấy ít nhất 1 địa điểm', () => pm.expect(pm.response.json().data.venues.length).to.be.above(0));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/venues?q=nha hat lon&city=ha noi"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Trở thành organizer",
+      "item": [
+        {
+          "name": "Bạn nộp đơn làm organizer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 201 hoặc 409', () => pm.expect(pm.response.code).to.be.oneOf([201, 409]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"organizationName\": \"Công ty Sự kiện ABC\",\n  \"description\": \"Tổ chức concert\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{host}}/api/v1/organizers",
+            "description": "Mỗi tài khoản chỉ có 1 hồ sơ: lần chạy sau sẽ trả 409 ORGANIZER_ALREADY_EXISTS, vẫn đúng."
+          }
+        },
+        {
+          "name": "Xem hồ sơ organizer của bạn",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  const data = (pm.response.json() || {}).data || {};",
+                  "  if (data.organizer && data.organizer.id !== undefined) pm.collectionVariables.set('organizerId', data.organizer && data.organizer.id);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{host}}/api/v1/organizers/me"
+          }
+        },
+        {
+          "name": "Admin xem đơn chờ duyệt",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{host}}/api/v1/organizers?status=PENDING"
+          }
+        },
+        {
+          "name": "Admin duyệt organizer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200 hoặc 409', () => pm.expect(pm.response.code).to.be.oneOf([200, 409]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ACTIVE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{host}}/api/v1/organizers/{{organizerId}}/status",
+            "description": "Duyệt xong, tài khoản được cấp role ORGANIZER. 409 = đã duyệt từ lần chạy trước."
+          }
+        },
+        {
+          "name": "Bạn refresh token để nhận role ORGANIZER",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  if (!pm.variables.get('userRefreshToken')) {",
+                  "    throw new Error('Biến userRefreshToken đang trống. Chạy lại request \"Bạn đăng nhập\" trước, rồi gửi request này.');",
+                  "  }",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  const data = (pm.response.json() || {}).data || {};",
+                  "  if (data.accessToken !== undefined) pm.collectionVariables.set('userToken', data.accessToken);",
+                  "  if (data.refreshToken !== undefined) pm.collectionVariables.set('userRefreshToken', data.refreshToken);",
+                  "  if (pm.response.code === 200) {",
+                  "    const payload = pm.response.json().data.accessToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');",
+                  "    const roles = JSON.parse(require('atob')(payload)).roles;",
+                  "    pm.test('Token mới có role ORGANIZER', () => pm.expect(roles).to.include('ORGANIZER'));",
+                  "  } else {",
+                  "    console.log('Refresh thất bại: ' + pm.response.json().error.code + '. Chạy lại \"Bạn đăng nhập\" để lấy refresh token mới.');",
+                  "  }",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{userRefreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{host}}/api/v1/auth/refresh",
+            "description": "Role nằm trong access token, nên phải lấy token mới thì role ORGANIZER mới có hiệu lực. Mỗi refresh token chỉ dùng được 1 lần; biến userRefreshToken tự cập nhật sau mỗi lần thành công."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Tạo sự kiện & suất diễn",
+      "item": [
+        {
+          "name": "Tạo sự kiện (DRAFT)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                  "  const data = (pm.response.json() || {}).data || {};",
+                  "  if (data.event && data.event.id !== undefined) pm.collectionVariables.set('eventId', data.event && data.event.id);",
+                  "  if (data.event && data.event.slug !== undefined) pm.collectionVariables.set('eventSlug', data.event && data.event.slug);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Đêm nhạc Mùa Thu {{$timestamp}}\",\n  \"description\": \"Liveshow acoustic\",\n  \"categoryIds\": [\n    \"{{categoryId}}\"\n  ],\n  \"ageRestriction\": 16\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{host}}/api/v1/events"
+          }
+        },
+        {
+          "name": "Thêm suất diễn",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  // 30 ngày nữa, 19:00 → 21:00 giờ Việt Nam (12:00 → 14:00 UTC).",
+                  "  const start = new Date();",
+                  "  start.setUTCDate(start.getUTCDate() + 30);",
+                  "  start.setUTCHours(12, 0, 0, 0);",
+                  "  const end = new Date(start.getTime() + 2 * 60 * 60 * 1000);",
+                  "  pm.collectionVariables.set('startAt', start.toISOString());",
+                  "  pm.collectionVariables.set('endAt', end.toISOString());",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                  "  const data = (pm.response.json() || {}).data || {};",
+                  "  if (data.schedule && data.schedule.id !== undefined) pm.collectionVariables.set('scheduleId', data.schedule && data.schedule.id);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"venueId\": \"{{venueId}}\",\n  \"startAt\": \"{{startAt}}\",\n  \"endAt\": \"{{endAt}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{host}}/api/v1/events/{{eventId}}/schedules"
+          }
+        },
+        {
+          "name": "Thử thêm suất TRÙNG GIỜ cùng địa điểm (409)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  if (!pm.variables.get('startAt') || !pm.variables.get('endAt')) {",
+                  "    throw new Error('Chưa có giờ diễn. Chạy request \"Thêm suất diễn\" trước (request đó tự tính startAt/endAt).');",
+                  "  }",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 409', () => pm.expect(pm.response.code).to.be.oneOf([409]));",
+                  "  pm.test('Error code SCHEDULE_CONFLICT', () => pm.expect(pm.response.json().error.code).to.eql('SCHEDULE_CONFLICT'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"venueId\": \"{{venueId}}\",\n  \"startAt\": \"{{startAt}}\",\n  \"endAt\": \"{{endAt}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{host}}/api/v1/events/{{eventId}}/schedules",
+            "description": "Database (exclusion constraint) tự chặn 2 suất diễn trùng giờ ở cùng một địa điểm. Dùng đúng giờ của request \"Thêm suất diễn\", nên phải chạy request đó trước."
+          }
+        },
+        {
+          "name": "Gửi duyệt",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PENDING_APPROVAL\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{host}}/api/v1/events/{{eventId}}/status"
+          }
+        },
+        {
+          "name": "Thử sửa khi đang chờ duyệt (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 422', () => pm.expect(pm.response.code).to.be.oneOf([422]));",
+                  "  pm.test('Error code EVENT_NOT_EDITABLE', () => pm.expect(pm.response.json().error.code).to.eql('EVENT_NOT_EDITABLE'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Đổi tên khi đang chờ duyệt\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{host}}/api/v1/events/{{eventId}}"
+          }
+        },
+        {
+          "name": "Admin từ chối (bắt buộc lý do)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  pm.test('Quay về DRAFT', () => pm.expect(pm.response.json().data.event.status).to.eql('DRAFT'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"DRAFT\",\n  \"reason\": \"Thiếu ảnh banner\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{host}}/api/v1/events/{{eventId}}/status"
+          }
+        },
+        {
+          "name": "Bổ sung banner",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bannerUrl\": \"https://picsum.photos/1200/400\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{host}}/api/v1/events/{{eventId}}"
+          }
+        },
+        {
+          "name": "Gửi duyệt lại",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PENDING_APPROVAL\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{host}}/api/v1/events/{{eventId}}/status"
+          }
+        },
+        {
+          "name": "Admin duyệt (PUBLISHED)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  pm.test('Đã PUBLISHED', () => pm.expect(pm.response.json().data.event.status).to.eql('PUBLISHED'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PUBLISHED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{host}}/api/v1/events/{{eventId}}/status"
+          }
+        },
+        {
+          "name": "Admin duyệt lần nữa (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 409', () => pm.expect(pm.response.code).to.be.oneOf([409]));",
+                  "  pm.test('Error code INVALID_STATE_TRANSITION', () => pm.expect(pm.response.json().error.code).to.eql('INVALID_STATE_TRANSITION'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PUBLISHED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{host}}/api/v1/events/{{eventId}}/status"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Khách xem sự kiện (không cần đăng nhập)",
+      "item": [
+        {
+          "name": "Danh sách sự kiện",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  pm.test('Có sự kiện vừa đăng', () =>",
+                  "    pm.expect(pm.response.json().data.events.map((e) => e.id)).to.include(pm.variables.get('eventId')));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/events?categoryId={{categoryId}}"
+          }
+        },
+        {
+          "name": "Tìm không dấu (\"dem nhac mua thu\")",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/events?q=dem nhac mua thu"
+          }
+        },
+        {
+          "name": "Lọc theo thành phố không dấu (\"ha noi\")",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/events?city=ha noi&sort=startAt"
+          }
+        },
+        {
+          "name": "Chi tiết theo slug",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/events/{{eventSlug}}"
+          }
+        },
+        {
+          "name": "Các suất diễn",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/events/{{eventId}}/schedules"
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Sau khi đăng",
+      "item": [
+        {
+          "name": "Sửa mô tả (được phép)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Cập nhật: có thêm khách mời\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{host}}/api/v1/events/{{eventId}}"
+          }
+        },
+        {
+          "name": "Sửa tiêu đề (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 422', () => pm.expect(pm.response.code).to.be.oneOf([422]));",
+                  "  pm.test('Error code EVENT_NOT_EDITABLE', () => pm.expect(pm.response.json().error.code).to.eql('EVENT_NOT_EDITABLE'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Tiêu đề mới\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{host}}/api/v1/events/{{eventId}}",
+            "description": "Sau khi đăng, chỉ được sửa mô tả và ảnh."
+          }
+        },
+        {
+          "name": "Sự kiện của tôi (mine=true)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{host}}/api/v1/events?mine=true"
+          }
+        },
+        {
+          "name": "Hủy sự kiện (bắt buộc lý do)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  pm.test('Mọi suất diễn đã bị hủy', () =>",
+                  "    pm.expect(pm.response.json().data.event.schedules.every((s) => s.status === 'CANCELLED')).to.eql(true));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"CANCELLED\",\n  \"reason\": \"Ca sĩ bị ốm\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{host}}/api/v1/events/{{eventId}}/status",
+            "description": "Hủy sự kiện cũng hủy mọi suất diễn và giải phóng khung giờ của địa điểm."
+          }
+        }
+      ]
+    }
+  ]
+}

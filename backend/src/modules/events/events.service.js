@@ -1,0 +1,233 @@
+const { pool } = require('../../database/pool');
+const { withTransaction } = require('../../database/transaction');
+const { PG_ERROR } = require('../../database/errors');
+const { EVENT_STATUS } = require('../../config/constants');
+const AppError = require('../../utils/AppError');
+const { uniqueSlug } = require('../../utils/slug');
+const { toLimitOffset, toPageMeta } = require('../../utils/pagination');
+const { recordAudit } = require('../audit');
+const eventsRepository = require('./events.repository');
+const schedulesRepository = require('./schedules.repository');
+const { PUBLIC_STATUSES, canManage, canView, eventNotFound, lockManageableEvent } = require('./event-access');
+const { findTransition } = require('./event-status');
+const { toPublicSchedule } = require('./schedules.mapper');
+
+const SLUG_CONSTRAINT = 'events_slug_key';
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Fields an organizer may still change after the event is PUBLISHED. */
+const EDITABLE_WHEN_PUBLISHED = ['description', 'bannerUrl', 'thumbnailUrl'];
+
+function toEventSummary(row) {
+  return {
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    thumbnailUrl: row.thumbnail_url,
+    status: row.status,
+    publishedAt: row.published_at,
+    nextStartAt: row.next_start_at,
+    cities: row.cities,
+    organizer: { id: row.organizer_id, name: row.organizer_name },
+    categories: row.categories,
+  };
+}
+
+function toEventDetail(row, schedules) {
+  return {
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    description: row.description,
+    bannerUrl: row.banner_url,
+    thumbnailUrl: row.thumbnail_url,
+    ageRestriction: row.age_restriction,
+    status: row.status,
+    publishedAt: row.published_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    organizer: { id: row.organizer_id, name: row.organizer_name },
+    categories: row.categories,
+    schedules: schedules.map(toPublicSchedule),
+  };
+}
+
+async function loadDetail(db, eventId) {
+  const row = await eventsRepository.findDetail(db, { id: eventId });
+  return toEventDetail(row, await schedulesRepository.listByEvent(db, eventId));
+}
+
+// ---------------------------------------------------------------------------
+// Commands
+// ---------------------------------------------------------------------------
+
+async function createEvent(context, actor, body) {
+  if (!actor.organizerId) {
+    throw new AppError('ORGANIZER_PROFILE_REQUIRED');
+  }
+  const insert = () =>
+    withTransaction(async (client) => {
+      const eventId = await eventsRepository.insertEvent(client, {
+        ...body,
+        organizerId: actor.organizerId,
+        slug: uniqueSlug(body.title),
+      });
+      await eventsRepository.replaceCategories(client, eventId, body.categoryIds);
+      return loadDetail(client, eventId);
+    });
+
+  try {
+    return await insert();
+  } catch (err) {
+    // The random slug suffix makes a collision very unlikely; if it happens,
+    // the UNIQUE constraint caught it and one retry with a new suffix is enough.
+    if (err.code === PG_ERROR.UNIQUE_VIOLATION && err.constraint === SLUG_CONSTRAINT) {
+      return insert();
+    }
+    throw err;
+  }
+}
+
+/**
+ * DRAFT: every field. PUBLISHED: only description and images (buyers rely on
+ * the title, times and categories they saw). Other statuses: nothing.
+ */
+async function updateEvent(context, actor, eventId, changes) {
+  return withTransaction(async (client) => {
+    const event = await lockManageableEvent(client, actor, eventId);
+
+    if (event.status === EVENT_STATUS.PUBLISHED) {
+      const locked = Object.keys(changes).filter((key) => !EDITABLE_WHEN_PUBLISHED.includes(key));
+      if (locked.length > 0) {
+        throw new AppError('EVENT_NOT_EDITABLE', 'Only description and images can change after publishing.', {
+          details: locked.map((field) => ({ field: `body.${field}`, message: 'cannot change after publishing' })),
+        });
+      }
+    } else if (event.status !== EVENT_STATUS.DRAFT) {
+      throw new AppError('EVENT_NOT_EDITABLE');
+    }
+
+    const { categoryIds, ...fields } = changes;
+    await eventsRepository.updateEvent(client, eventId, fields);
+    if (categoryIds) {
+      await eventsRepository.replaceCategories(client, eventId, categoryIds);
+    }
+    return loadDetail(client, eventId);
+  });
+}
+
+/** Only a DRAFT can be deleted (nothing was ever sold or visible). */
+async function deleteEvent(context, actor, eventId) {
+  await withTransaction(async (client) => {
+    const event = await lockManageableEvent(client, actor, eventId);
+    if (event.status !== EVENT_STATUS.DRAFT) {
+      throw new AppError('EVENT_NOT_EDITABLE', 'Only DRAFT events can be deleted. Cancel it instead.');
+    }
+    await schedulesRepository.removeByEvent(client, eventId);
+    await eventsRepository.deleteEvent(client, eventId);
+  });
+}
+
+/**
+ * Move the event through its state machine (see event-status.js).
+ *
+ * The event row is locked FOR UPDATE before the rules are checked. If two
+ * admins approve at the same moment, the second waits for the first to
+ * commit, then sees PUBLISHED and gets 409 INVALID_STATE_TRANSITION.
+ */
+async function changeStatus(context, actor, eventId, { status, reason }) {
+  return withTransaction(async (client) => {
+    const event = await eventsRepository.findById(client, eventId, { forUpdate: true });
+    if (!event || !(canManage(actor, event) || actor.canApprove)) {
+      throw eventNotFound();
+    }
+
+    const result = findTransition(actor, event, status);
+    if (!result.ok) {
+      throw new AppError(result.error, result.error === 'INVALID_STATE_TRANSITION'
+        ? `Cannot change an event from ${event.status} to ${status}.`
+        : undefined);
+    }
+    const { transition } = result;
+    if (transition.reasonRequired && !reason) {
+      throw new AppError('REASON_REQUIRED');
+    }
+    if (transition.requiresUpcomingSchedule && (await schedulesRepository.countUpcoming(client, eventId)) === 0) {
+      throw new AppError('EVENT_HAS_NO_SCHEDULES');
+    }
+
+    await eventsRepository.updateStatus(client, eventId, { from: event.status, to: status });
+    if (status === EVENT_STATUS.CANCELLED) {
+      await schedulesRepository.cancelByEvent(client, eventId);
+    }
+    await recordAudit(client, {
+      context,
+      action: transition.action,
+      entityType: 'event',
+      entityId: eventId,
+      oldValue: { status: event.status },
+      newValue: { status, reason: reason ?? null },
+    });
+    return loadDetail(client, eventId);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Queries
+// ---------------------------------------------------------------------------
+
+async function getEvent(actor, idOrSlug) {
+  const lookup = UUID_PATTERN.test(idOrSlug) ? { id: idOrSlug } : { slug: idOrSlug };
+  const row = await eventsRepository.findDetail(pool, lookup);
+  if (!row || !canView(actor, row)) {
+    throw eventNotFound();
+  }
+  return toEventDetail(row, await schedulesRepository.listByEvent(pool, row.id));
+}
+
+/**
+ * Three ways to list:
+ *  - public (default): PUBLISHED events with an upcoming schedule, soonest first
+ *  - mine=true: the organizer's own events in any status, newest first
+ *  - status=X: admins/approvers browse by status (e.g. the approval queue)
+ */
+async function listEvents(actor, query) {
+  const { mine, status, q, categoryId, city, dateFrom, dateTo, sort, page, pageSize } = query;
+  const hasScheduleFilter = Boolean(city || dateFrom || dateTo);
+  let scope;
+
+  if (mine) {
+    if (!actor.organizerId) {
+      throw new AppError('ORGANIZER_PROFILE_REQUIRED');
+    }
+    scope = {
+      statuses: status ? [status] : Object.values(EVENT_STATUS),
+      organizerId: actor.organizerId,
+      requireSchedule: hasScheduleFilter,
+      defaultSort: '-createdAt',
+    };
+  } else if (status) {
+    if (!(actor.canManageAny || actor.canApprove) && !PUBLIC_STATUSES.includes(status)) {
+      throw new AppError('FORBIDDEN', 'Only administrators can list events by this status.');
+    }
+    scope = { statuses: [status], requireSchedule: hasScheduleFilter, defaultSort: '-createdAt' };
+  } else {
+    scope = { statuses: [EVENT_STATUS.PUBLISHED], requireSchedule: true, defaultSort: 'startAt' };
+  }
+
+  const { rows, total } = await eventsRepository.listEvents(pool, {
+    statuses: scope.statuses,
+    organizerId: scope.organizerId,
+    q,
+    categoryId,
+    city,
+    dateFrom,
+    dateTo,
+    requireSchedule: scope.requireSchedule,
+    sort: sort ?? scope.defaultSort,
+    ...toLimitOffset({ page, pageSize }),
+  });
+  return { events: rows.map(toEventSummary), meta: toPageMeta({ page, pageSize }, total) };
+}
+
+module.exports = { createEvent, updateEvent, deleteEvent, changeStatus, getEvent, listEvents };
