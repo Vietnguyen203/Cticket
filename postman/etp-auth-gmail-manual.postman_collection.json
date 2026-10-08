@@ -1,0 +1,715 @@
+{
+  "info": {
+    "name": "ETP — Auth (test thủ công, Gmail thật)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Test bằng email THẬT của bạn. Trước khi bắt đầu:\n1. Collection → tab Variables → điền \"email\" = Gmail của bạn (mẹo: dùng ten+test1@gmail.com, ten+test2@gmail.com… để đăng ký nhiều lần mà thư vẫn về cùng hộp thư).\n2. Sau mỗi bước gửi OTP: mở Gmail (kể cả thư mục Spam), copy mã 6 số vào biến \"otp\".\n3. Token tự lưu sau Đăng nhập / Refresh."
+  },
+  "variable": [
+    {
+      "key": "host",
+      "value": "http://localhost:3001"
+    },
+    {
+      "key": "email",
+      "value": ""
+    },
+    {
+      "key": "password",
+      "value": "Matkhau123"
+    },
+    {
+      "key": "newPassword",
+      "value": "Matkhau456"
+    },
+    {
+      "key": "otp",
+      "value": ""
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    },
+    {
+      "key": "adminEmail",
+      "value": "admin@etp.local"
+    },
+    {
+      "key": "adminPassword",
+      "value": "Admin@123456"
+    },
+    {
+      "key": "adminAccessToken",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Health",
+      "item": [
+        {
+          "name": "Health ready (API + DB)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/health/ready"
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Đăng ký & xác thực email",
+      "item": [
+        {
+          "name": "Đăng ký → OTP gửi về Gmail",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  if (!pm.collectionVariables.get('email')) {",
+                  "    throw new Error('Chưa đặt biến \"email\". Mở collection → tab Variables → điền Gmail của bạn vào cột Current value.');",
+                  "  }",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "  if (pm.response.code === 409) {",
+                  "    console.log('Email đã đăng ký. Đổi biến email, ví dụ thêm +test2 trước @gmail.com');",
+                  "  }",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"firstName\": \"Lan\",\n  \"lastName\": \"Nguyen\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{host}}/api/v1/auth/register",
+            "description": "Sau khi gửi: mở Gmail, tìm thư \"Mã xác thực tài khoản\", copy mã 6 số vào biến otp."
+          }
+        },
+        {
+          "name": "Xác thực email bằng OTP",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  if (!/^\\d{6}$/.test(pm.collectionVariables.get('otp') || '')) {",
+                  "    throw new Error('Chưa đặt biến \"otp\". Mở Gmail, copy mã 6 số, dán vào biến otp (tab Variables của collection).');",
+                  "  }",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"purpose\": \"EMAIL_VERIFICATION\",\n  \"otp\": \"{{otp}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{host}}/api/v1/auth/otp/verify",
+            "description": "Dùng mã 6 số trong Gmail (biến otp). Sai 5 lần thì mã bị hủy, phải gửi lại."
+          }
+        },
+        {
+          "name": "Gửi lại OTP xác thực (luôn 202)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 202', () => pm.response.to.have.status(202));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"purpose\": \"EMAIL_VERIFICATION\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{host}}/api/v1/auth/otp",
+            "description": "Dùng khi mã hết hạn (10 phút). Hai lần gửi phải cách nhau ít nhất 60 giây, tối đa 5 mã/giờ."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Đăng nhập & phiên",
+      "item": [
+        {
+          "name": "Đăng nhập",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "  const data = pm.response.json().data || {};",
+                  "  if (data.accessToken) {",
+                  "    pm.collectionVariables.set('accessToken', data.accessToken);",
+                  "    pm.collectionVariables.set('refreshToken', data.refreshToken);",
+                  "    console.log('Đã lưu accessToken và refreshToken vào biến collection');",
+                  "  }",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{host}}/api/v1/auth/login"
+          }
+        },
+        {
+          "name": "Thông tin của tôi (/me)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{host}}/api/v1/auth/me"
+          }
+        },
+        {
+          "name": "Làm mới token (refresh)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "  const data = pm.response.json().data || {};",
+                  "  if (data.accessToken) {",
+                  "    pm.collectionVariables.set('accessToken', data.accessToken);",
+                  "    pm.collectionVariables.set('refreshToken', data.refreshToken);",
+                  "    console.log('Đã lưu accessToken và refreshToken vào biến collection');",
+                  "  }",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{host}}/api/v1/auth/refresh"
+          }
+        },
+        {
+          "name": "Đăng xuất",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 204', () => pm.response.to.have.status(204));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{host}}/api/v1/auth/logout"
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Quên mật khẩu",
+      "item": [
+        {
+          "name": "Yêu cầu OTP đặt lại mật khẩu → Gmail",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 202', () => pm.response.to.have.status(202));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"purpose\": \"PASSWORD_RESET\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{host}}/api/v1/auth/otp",
+            "description": "Mở Gmail, tìm thư \"Mã đặt lại mật khẩu\", copy mã mới vào biến otp."
+          }
+        },
+        {
+          "name": "Đặt lại mật khẩu bằng OTP",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  if (!/^\\d{6}$/.test(pm.collectionVariables.get('otp') || '')) {",
+                  "    throw new Error('Chưa đặt biến \"otp\". Mở Gmail, copy mã 6 số, dán vào biến otp (tab Variables của collection).');",
+                  "  }",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "  // Đổi chỗ 2 biến mật khẩu để request \"Đăng nhập\" dùng mật khẩu mới.",
+                  "  if (pm.response.code === 200) {",
+                  "    const oldPassword = pm.collectionVariables.get('password');",
+                  "    pm.collectionVariables.set('password', pm.collectionVariables.get('newPassword'));",
+                  "    pm.collectionVariables.set('newPassword', oldPassword);",
+                  "  }",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"purpose\": \"PASSWORD_RESET\",\n  \"otp\": \"{{otp}}\",\n  \"newPassword\": \"{{newPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{host}}/api/v1/auth/otp/verify"
+          }
+        },
+        {
+          "name": "Đăng nhập bằng mật khẩu mới",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "  const data = pm.response.json().data || {};",
+                  "  if (data.accessToken) {",
+                  "    pm.collectionVariables.set('accessToken', data.accessToken);",
+                  "    pm.collectionVariables.set('refreshToken', data.refreshToken);",
+                  "    console.log('Đã lưu accessToken và refreshToken vào biến collection');",
+                  "  }",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{host}}/api/v1/auth/login"
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Admin",
+      "item": [
+        {
+          "name": "Đăng nhập admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "  pm.collectionVariables.set('adminAccessToken', pm.response.json().data.accessToken);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{host}}/api/v1/auth/login"
+          }
+        },
+        {
+          "name": "Thông tin admin (/me)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{host}}/api/v1/auth/me"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Thử các lỗi",
+      "item": [
+        {
+          "name": "Sai mật khẩu (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "  pm.test('Error code INVALID_CREDENTIALS', () => pm.expect(pm.response.json().error.code).to.eql('INVALID_CREDENTIALS'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"SaiMatKhau1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{host}}/api/v1/auth/login"
+          }
+        },
+        {
+          "name": "Gọi /me không có token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "  pm.test('Error code UNAUTHENTICATED', () => pm.expect(pm.response.json().error.code).to.eql('UNAUTHENTICATED'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/auth/me"
+          }
+        },
+        {
+          "name": "Đăng ký sai dữ liệu (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "  pm.test('Error code VALIDATION_ERROR', () => pm.expect(pm.response.json().error.code).to.eql('VALIDATION_ERROR'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"khong-phai-email\",\n  \"password\": \"123\",\n  \"firstName\": \"\",\n  \"lastName\": \"Nguyen\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{host}}/api/v1/auth/register"
+          }
+        },
+        {
+          "name": "Đăng ký email đã tồn tại (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 409', () => pm.response.to.have.status(409));",
+                  "  pm.test('Error code EMAIL_TAKEN', () => pm.expect(pm.response.json().error.code).to.eql('EMAIL_TAKEN'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"firstName\": \"Lan\",\n  \"lastName\": \"Nguyen\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{host}}/api/v1/auth/register"
+          }
+        }
+      ]
+    }
+  ]
+}

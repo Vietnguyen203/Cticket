@@ -6,6 +6,7 @@ const requestLogger = require('./middleware/requestLogger');
 const notFound = require('./middleware/notFound');
 const errorHandler = require('./middleware/errorHandler');
 const healthRoutes = require('./modules/health/health.routes');
+const apiRouter = require('./routes');
 
 const JSON_BODY_LIMIT = '100kb';
 
@@ -26,8 +27,7 @@ function createApp() {
   // Infrastructure endpoints are deliberately unversioned.
   app.use('/health', healthRoutes);
 
-  // Versioned API routes are mounted here from Phase 2 on:
-  // app.use('/api/v1', apiRouter);
+  app.use('/api/v1', apiRouter);
 
   app.use(notFound);
   app.use(errorHandler);

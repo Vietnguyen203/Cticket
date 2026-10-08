@@ -13,11 +13,17 @@ const PG_ERROR = Object.freeze({
 
 /**
  * Constraint name → specific business error code. Filled in as modules are
- * built (e.g. users_email_key → EMAIL_TAKEN in Phase 2). Unlisted constraints
- * fall back to the generic code for their SQLSTATE.
+ * built. Unlisted constraints fall back to the generic code for their SQLSTATE.
+ *
+ * Mapping the constraint (instead of checking "does this email exist?" before
+ * inserting) is what makes duplicates race-free: two concurrent registrations
+ * cannot both pass, the UNIQUE index rejects the second one.
  * @type {Record<string, string>}
  */
-const CONSTRAINT_ERROR_CODES = {};
+const CONSTRAINT_ERROR_CODES = {
+  users_email_key: 'EMAIL_TAKEN',
+  users_phone_key: 'PHONE_TAKEN',
+};
 
 const GENERIC_CODE_BY_SQLSTATE = {
   [PG_ERROR.UNIQUE_VIOLATION]: 'DUPLICATE_RESOURCE',

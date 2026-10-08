@@ -12,6 +12,7 @@ const REDACT_PATHS = [
   '*.token',
   '*.accessToken',
   '*.refreshToken',
+  '*.otp',
   '*.qrToken',
 ];
 

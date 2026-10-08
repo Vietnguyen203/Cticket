@@ -1,6 +1,6 @@
 name: etp
 
-# Phase 1 services. Redis, worker and mailpit are added in later phases.
+# Redis and the queue worker are added in later phases.
 services:
   postgres:
     image: postgres:17-alpine
@@ -22,6 +22,16 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+    restart: unless-stopped
+
+  # Development SMTP server: accepts every email and shows it in a web inbox
+  # at http://localhost:8025. Nothing is delivered to real addresses.
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+    restart: unless-stopped
 
   # One-shot: applies migrations, then exits. The API starts only after it
   # succeeds, so several API replicas never race to migrate.
@@ -42,6 +52,15 @@ services:
       PORT: 3000
       LOG_LEVEL: info
       DATABASE_URL: postgres://${POSTGRES_USER:-etp}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-etp}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?Set JWT_ACCESS_SECRET in .env}
+      OTP_SECRET: ${OTP_SECRET:?Set OTP_SECRET in .env}
+      # Defaults to the local Mailpit inbox; set SMTP_* in .env to send real email.
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-Event Tickets <no-reply@etp.local>}
     ports:
       - "${API_PORT:-3000}:3000"
     depends_on:
@@ -49,6 +68,8 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      mailpit:
+        condition: service_started
     healthcheck:
       # The slim image has no curl; Node's built-in fetch does the job.
       test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]

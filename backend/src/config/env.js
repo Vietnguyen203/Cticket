@@ -12,6 +12,10 @@ const csv = (value) =>
     .map((item) => item.trim())
     .filter(Boolean);
 
+const booleanString = z.enum(['true', 'false']).transform((value) => value === 'true');
+const MIN_SECRET_LENGTH = 32;
+const secret = z.string().min(MIN_SECRET_LENGTH, `must be at least ${MIN_SECRET_LENGTH} characters`);
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
@@ -27,6 +31,30 @@ const envSchema = z.object({
 
   CORS_ORIGINS: z.string().default('').transform(csv),
   SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+
+  // Auth
+  JWT_ACCESS_SECRET: secret,
+  JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().positive().default(900),
+  JWT_ISSUER: z.string().default('etp-api'),
+  JWT_AUDIENCE: z.string().default('etp-app'),
+  REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
+  // Server-side key for hashing OTP codes (HMAC). Without it, a leaked
+  // database would let an attacker brute-force all 1,000,000 codes offline.
+  OTP_SECRET: secret,
+  // bcrypt work factor: each +1 doubles hashing time. 12 ≈ 250 ms per hash.
+  BCRYPT_COST: z.coerce.number().int().min(4).max(15).default(12),
+
+  // Email (SMTP). In development this points to the Mailpit container.
+  SMTP_HOST: z.string().default('localhost'),
+  SMTP_PORT: z.coerce.number().int().positive().default(1025),
+  SMTP_SECURE: booleanString.default(false),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  MAIL_FROM: z.string().default('Event Tickets <no-reply@etp.local>'),
+
+  // Used only by `npm run seed:admin`.
+  ADMIN_EMAIL: z.string().optional(),
+  ADMIN_PASSWORD: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
