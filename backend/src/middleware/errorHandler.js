@@ -27,6 +27,9 @@ function errorHandler(err, req, res, next) {
 
   const appError = toAppError(err);
   res.locals.errorCode = appError.code;
+  // Field names and rule messages only (never the submitted values), so a
+  // 400/422 can be diagnosed from the logs without leaking passwords.
+  res.locals.errorDetails = appError.details;
 
   if (appError.status >= SERVER_ERROR_STATUS) {
     // Full error (with stack and the original cause) goes to the log only.

@@ -17,4 +17,16 @@ function authenticate(req, res, next) {
   next();
 }
 
+/**
+ * For public routes that show more to logged-in users (e.g. an organizer can
+ * see their own DRAFT event). No header → anonymous. A header that is present
+ * but invalid is still rejected: silently ignoring it would hide client bugs.
+ */
+authenticate.optional = function optionalAuthenticate(req, res, next) {
+  if (!req.get('authorization')) {
+    return next();
+  }
+  return authenticate(req, res, next);
+};
+
 module.exports = authenticate;
