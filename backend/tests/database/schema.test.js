@@ -132,8 +132,8 @@ describe('schedule_seats — seat availability is per schedule', () => {
       await expectPgError(
         client,
         () => client.query(
-          `INSERT INTO schedule_seats (schedule_id, seat_id, price) VALUES ($1, $2, 1000)`,
-          [s1.id, venue.zones.A.seats.A01],
+          `INSERT INTO schedule_seats (schedule_id, seat_id, ticket_type_id, price) VALUES ($1, $2, $3, 1000)`,
+          [s1.id, venue.zones.A.seats.A01, s1.seats.A01.ticket_type_id],
         ),
         { code: PG_ERROR.UNIQUE_VIOLATION, constraint: 'uq_schedule_seats_schedule_seat' },
       );

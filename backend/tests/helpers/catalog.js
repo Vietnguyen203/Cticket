@@ -84,14 +84,30 @@ function changeStatus(app, token, eventId, status, reason) {
   return request(app).patch(`/api/v1/events/${eventId}/status`).set(bearer(token)).send({ status, reason });
 }
 
-/** DRAFT with one schedule → submitted → approved. */
+function addTicketType(app, token, scheduleId, body) {
+  return request(app).post(`/api/v1/schedules/${scheduleId}/ticket-types`).set(bearer(token)).send(body);
+}
+
+/** The simplest sellable configuration: one general admission ticket type. */
+function addGaTicketType(app, token, scheduleId, { code = 'GA', capacity = 100, price = 500_000 } = {}) {
+  return addTicketType(app, token, scheduleId, {
+    code,
+    name: `Ticket ${code}`,
+    price,
+    inventoryMode: 'GENERAL_ADMISSION',
+    capacity,
+  });
+}
+
+/** DRAFT with one schedule (+ one GA ticket type) → submitted → approved. */
 async function createPublishedEvent(app, { organizer, adminToken, categoryIds, venueId, daysFromNow = 30, title }) {
   const event = await createEvent(app, organizer.token, { categoryIds, title });
-  await addSchedule(app, organizer.token, event.id, {
+  const schedule = await addSchedule(app, organizer.token, event.id, {
     venueId,
     startAt: at(daysFromNow, 12),
     endAt: at(daysFromNow, 14),
   }).expect(201);
+  await addGaTicketType(app, organizer.token, schedule.body.data.schedule.id).expect(201);
   await changeStatus(app, organizer.token, event.id, 'PENDING_APPROVAL').expect(200);
   const published = await changeStatus(app, adminToken, event.id, 'PUBLISHED').expect(200);
   return published.body.data.event;
@@ -108,5 +124,7 @@ module.exports = {
   createEvent,
   addSchedule,
   changeStatus,
+  addTicketType,
+  addGaTicketType,
   createPublishedEvent,
 };

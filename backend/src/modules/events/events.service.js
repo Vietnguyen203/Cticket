@@ -11,6 +11,7 @@ const schedulesRepository = require('./schedules.repository');
 const { PUBLIC_STATUSES, canManage, canView, eventNotFound, lockManageableEvent } = require('./event-access');
 const { findTransition } = require('./event-status');
 const { toPublicSchedule } = require('./schedules.mapper');
+const inventoryService = require('./inventory.service');
 
 const SLUG_CONSTRAINT = 'events_slug_key';
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -155,6 +156,9 @@ async function changeStatus(context, actor, eventId, { status, reason }) {
     if (transition.requiresUpcomingSchedule && (await schedulesRepository.countUpcoming(client, eventId)) === 0) {
       throw new AppError('EVENT_HAS_NO_SCHEDULES');
     }
+    if (transition.requiresSellableConfiguration) {
+      await inventoryService.assertSellable(client, eventId);
+    }
 
     await eventsRepository.updateStatus(client, eventId, { from: event.status, to: status });
     if (status === EVENT_STATUS.CANCELLED) {
@@ -168,6 +172,16 @@ async function changeStatus(context, actor, eventId, { status, reason }) {
       oldValue: { status: event.status },
       newValue: { status, reason: reason ?? null },
     });
+    if (transition.generatesInventory) {
+      const created = await inventoryService.generateInventory(client, eventId);
+      await recordAudit(client, {
+        context,
+        action: 'INVENTORY_GENERATED',
+        entityType: 'event',
+        entityId: eventId,
+        newValue: { ...created, trigger: 'approval' },
+      });
+    }
     return loadDetail(client, eventId);
   });
 }

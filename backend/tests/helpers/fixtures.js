@@ -95,8 +95,8 @@ async function createTicketType(client, { scheduleId, zoneId, code, price = DEFA
  */
 async function generateScheduleSeats(client, scheduleId) {
   const { rows } = await client.query(
-    `INSERT INTO schedule_seats (schedule_id, seat_id, price, currency)
-     SELECT tt.schedule_id, s.id, tt.price, tt.currency
+    `INSERT INTO schedule_seats (schedule_id, seat_id, ticket_type_id, price, currency)
+     SELECT tt.schedule_id, s.id, tt.id, tt.price, tt.currency
      FROM ticket_types tt
      JOIN seats s ON s.venue_zone_id = tt.venue_zone_id
      WHERE tt.schedule_id = $1

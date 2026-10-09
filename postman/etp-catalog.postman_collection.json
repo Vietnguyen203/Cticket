@@ -758,6 +758,51 @@
           }
         },
         {
+          "name": "Thêm hạng vé (bắt buộc từ Phase 4)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/schedules/{{scheduleId}}/ticket-types",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"GA\",\n  \"name\": \"Vé phổ thông\",\n  \"price\": 500000,\n  \"inventoryMode\": \"GENERAL_ADMISSION\",\n  \"capacity\": 300\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
           "name": "Gửi duyệt",
           "event": [
             {
