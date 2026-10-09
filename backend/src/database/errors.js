@@ -30,6 +30,12 @@ const CONSTRAINT_ERROR_CODES = {
   event_categories_category_id_fkey: 'CATEGORY_NOT_FOUND',
   event_schedules_venue_id_fkey: 'VENUE_NOT_AVAILABLE',
   excl_event_schedules_venue_overlap: 'SCHEDULE_CONFLICT',
+  venue_zones_venue_id_code_key: 'ZONE_CODE_TAKEN',
+  seats_venue_zone_id_seat_code_key: 'SEAT_CODE_TAKEN',
+  ticket_types_schedule_id_code_key: 'TICKET_TYPE_CODE_TAKEN',
+  // Over-capacity on GA counters is normally prevented by conditional UPDATEs;
+  // if a bug ever tries it, the CHECK fires and the client gets a clear 409.
+  chk_ga_inventory_capacity: 'INSUFFICIENT_INVENTORY',
 };
 
 const GENERIC_CODE_BY_SQLSTATE = {

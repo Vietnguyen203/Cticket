@@ -8,6 +8,7 @@ function toPublicSchedule(row) {
     salesStartAt: row.sales_start_at,
     salesEndAt: row.sales_end_at,
     status: row.status,
+    inventoryGeneratedAt: row.inventory_generated_at,
     venue: { id: row.venue_id, name: row.venue_name, city: row.venue_city, addressLine: row.venue_address },
   };
 }

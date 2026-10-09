@@ -4,14 +4,17 @@ const authenticate = require('../../middleware/authenticate');
 const authorize = require('../../middleware/authorize');
 const schemas = require('./events.schemas');
 const scheduleSchemas = require('./schedules.schemas');
+const inventorySchemas = require('./inventory.schemas');
 const controller = require('./events.controller');
 const schedulesController = require('./schedules.controller');
+const inventoryController = require('./inventory.controller');
 
 // ":own" permissions let an organizer act on THEIR events (checked in the
 // service); ":any" / approve lets an admin act on all of them.
 const canEdit = [authenticate, authorize.any('event:update:own', 'event:manage:any')];
 const canChangeStatus = [authenticate, authorize.any('event:update:own', 'event:approve')];
 const canManageSchedules = [authenticate, authorize.any('schedule:manage:own', 'event:manage:any')];
+const canBlockInventory = [authenticate, authorize.any('seat:block:own', 'event:manage:any')];
 
 /** Mounted at /api/v1/events */
 const eventsRouter = Router();
@@ -52,4 +55,54 @@ schedulesRouter.patch(
 );
 schedulesRouter.delete('/:id', ...canManageSchedules, validate({ params: scheduleSchemas.idParams }), schedulesController.remove);
 
-module.exports = { eventsRouter, schedulesRouter };
+// Sales configuration of a schedule (DRAFT event): ticket types and seat plan.
+const scheduleParams = { params: inventorySchemas.idParams };
+schedulesRouter.get('/:id/ticket-types', authenticate.optional, validate(scheduleParams), inventoryController.listTicketTypes);
+schedulesRouter.post(
+  '/:id/ticket-types',
+  ...canManageSchedules,
+  validate({ ...scheduleParams, body: inventorySchemas.createTicketType }),
+  inventoryController.createTicketType,
+);
+schedulesRouter.get('/:id/seat-plan', ...canManageSchedules, validate(scheduleParams), inventoryController.getSeatPlan);
+schedulesRouter.put(
+  '/:id/seat-plan',
+  ...canManageSchedules,
+  validate({ ...scheduleParams, body: inventorySchemas.seatPlan }),
+  inventoryController.replaceSeatPlan,
+);
+
+// Inventory (generated when the event is approved).
+schedulesRouter.get('/:id/availability', authenticate.optional, validate(scheduleParams), inventoryController.getAvailability);
+schedulesRouter.get('/:id/seat-map', authenticate.optional, validate(scheduleParams), inventoryController.getSeatMap);
+schedulesRouter.post(
+  '/:id/inventory/block',
+  ...canBlockInventory,
+  validate({ ...scheduleParams, body: inventorySchemas.blockInventory }),
+  inventoryController.changeBlocks,
+);
+schedulesRouter.post(
+  '/:id/inventory/generate',
+  authenticate,
+  authorize('event:manage:any'),
+  validate(scheduleParams),
+  inventoryController.regenerateInventory,
+);
+
+/** Mounted at /api/v1/ticket-types */
+const ticketTypesRouter = Router();
+
+ticketTypesRouter.patch(
+  '/:id',
+  ...canManageSchedules,
+  validate({ params: inventorySchemas.idParams, body: inventorySchemas.updateTicketType }),
+  inventoryController.updateTicketType,
+);
+ticketTypesRouter.delete(
+  '/:id',
+  ...canManageSchedules,
+  validate({ params: inventorySchemas.idParams }),
+  inventoryController.deleteTicketType,
+);
+
+module.exports = { eventsRouter, schedulesRouter, ticketTypesRouter };

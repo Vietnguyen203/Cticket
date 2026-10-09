@@ -68,6 +68,35 @@ const VENUE_STATUS = Object.freeze({
   INACTIVE: 'INACTIVE',
 });
 
+const ZONE_KIND = Object.freeze({
+  SEATED: 'SEATED', // contains physical, numbered seats
+  STANDING: 'STANDING', // capacity only, no seat rows
+});
+
+const INVENTORY_MODE = Object.freeze({
+  RESERVED: 'RESERVED', // customer gets a specific seat
+  GENERAL_ADMISSION: 'GENERAL_ADMISSION', // customer buys a quantity
+});
+
+const TICKET_TYPE_STATUS = Object.freeze({
+  ACTIVE: 'ACTIVE',
+  INACTIVE: 'INACTIVE', // sales paused
+  // SOLD_OUT exists in the enum but is never stored: it is computed from inventory.
+});
+
+const SEAT_STATUS = Object.freeze({
+  AVAILABLE: 'AVAILABLE',
+  HELD: 'HELD',
+  SOLD: 'SOLD',
+  BLOCKED: 'BLOCKED',
+});
+
+const INVENTORY_LIMITS = Object.freeze({
+  MAX_SEATS_PER_BULK_CREATE: 2000,
+  DEFAULT_MAX_PER_ORDER: 10, // CTicket example: 10 tickets per transaction
+  SEAT_SPACING: 30, // default seat-map spacing (layout units)
+});
+
 const PAGINATION = Object.freeze({
   DEFAULT_PAGE_SIZE: 20,
   MAX_PAGE_SIZE: 50,
@@ -87,6 +116,11 @@ module.exports = {
   EVENT_STATUS,
   SCHEDULE_STATUS,
   VENUE_STATUS,
+  ZONE_KIND,
+  INVENTORY_MODE,
+  TICKET_TYPE_STATUS,
+  SEAT_STATUS,
+  INVENTORY_LIMITS,
   PAGINATION,
   EVENT_LIMITS,
 };

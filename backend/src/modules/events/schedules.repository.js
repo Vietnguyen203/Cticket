@@ -1,7 +1,7 @@
 const { buildSetClause } = require('../../utils/sql');
 
 const SCHEDULE_COLUMNS = `es.id, es.event_id, es.venue_id, es.start_at, es.end_at, es.sales_start_at, es.sales_end_at,
-  es.status, es.created_at, es.updated_at`;
+  es.status, es.inventory_generated_at, es.created_at, es.updated_at`;
 
 // Venue summary for display (read model join).
 const WITH_VENUE = `${SCHEDULE_COLUMNS}, v.name AS venue_name, v.city AS venue_city, v.address_line AS venue_address`;

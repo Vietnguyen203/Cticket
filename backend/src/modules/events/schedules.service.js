@@ -6,6 +6,7 @@ const venues = require('../venues');
 const { recordAudit } = require('../audit');
 const eventsRepository = require('./events.repository');
 const schedulesRepository = require('./schedules.repository');
+const ticketTypesRepository = require('./ticket-types.repository');
 const { canView, eventNotFound, lockManageableEvent } = require('./event-access');
 const { toPublicSchedule } = require('./schedules.mapper');
 
@@ -111,7 +112,11 @@ async function updateSchedule(context, actor, scheduleId, body) {
         Object.entries(TIME_COLUMNS).map(([field, column]) => [field, changes[field] ?? schedule[column]]),
       );
       assertValidTimes(merged);
-      if (changes.venueId) {
+      if (changes.venueId && changes.venueId !== schedule.venue_id) {
+        // Ticket types and the seat plan point at zones/seats of the CURRENT venue.
+        if ((await ticketTypesRepository.countBySchedule(client, scheduleId)) > 0) {
+          throw new AppError('VENUE_CHANGE_BLOCKED');
+        }
         await assertActiveVenue(client, changes.venueId);
       }
     }

@@ -21,8 +21,23 @@ const ACTOR = Object.freeze({
  * matching rule wins (an admin moving PENDING → DRAFT is a rejection).
  */
 const TRANSITIONS = [
-  { from: [DRAFT], to: PENDING_APPROVAL, by: ACTOR.OWNER, action: 'EVENT_SUBMITTED', requiresUpcomingSchedule: true },
-  { from: [PENDING_APPROVAL], to: PUBLISHED, by: ACTOR.APPROVER, action: 'EVENT_APPROVED' },
+  {
+    from: [DRAFT],
+    to: PENDING_APPROVAL,
+    by: ACTOR.OWNER,
+    action: 'EVENT_SUBMITTED',
+    requiresUpcomingSchedule: true,
+    requiresSellableConfiguration: true,
+  },
+  {
+    from: [PENDING_APPROVAL],
+    to: PUBLISHED,
+    by: ACTOR.APPROVER,
+    action: 'EVENT_APPROVED',
+    requiresSellableConfiguration: true,
+    // Schedule inventory is created in the same transaction as the approval.
+    generatesInventory: true,
+  },
   { from: [PENDING_APPROVAL], to: DRAFT, by: ACTOR.APPROVER, action: 'EVENT_REJECTED', reasonRequired: true },
   { from: [PENDING_APPROVAL], to: DRAFT, by: ACTOR.OWNER, action: 'EVENT_WITHDRAWN' },
   { from: [DRAFT, PENDING_APPROVAL, PUBLISHED], to: CANCELLED, by: ACTOR.APPROVER, action: 'EVENT_CANCELLED', reasonRequired: true },

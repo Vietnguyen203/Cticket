@@ -13,6 +13,7 @@ const {
   createEvent,
   addSchedule,
   changeStatus,
+  addGaTicketType,
   createPublishedEvent,
 } = require('../helpers/catalog');
 
@@ -153,7 +154,13 @@ describe('event status machine', () => {
     const empty = await changeStatus(app, organizerA.token, event.id, 'PENDING_APPROVAL');
     expect(empty.body.error.code).toBe('EVENT_HAS_NO_SCHEDULES');
 
-    await addSchedule(app, organizerA.token, event.id, { venueId: venue.id, startAt: at(20), endAt: at(20, 14) }).expect(201);
+    const schedule = await addSchedule(app, organizerA.token, event.id, { venueId: venue.id, startAt: at(20), endAt: at(20, 14) }).expect(201);
+
+    // A schedule without ticket types cannot be sold, so it cannot be submitted.
+    const noTickets = await changeStatus(app, organizerA.token, event.id, 'PENDING_APPROVAL');
+    expect(noTickets.body.error.code).toBe('TICKET_TYPES_REQUIRED');
+
+    await addGaTicketType(app, organizerA.token, schedule.body.data.schedule.id).expect(201);
     await changeStatus(app, organizerA.token, event.id, 'PENDING_APPROVAL').expect(200);
 
     // Frozen while under review; the owner cannot approve their own event.
@@ -170,16 +177,24 @@ describe('event status machine', () => {
     expect(published.body.data.event.publishedAt).not.toBeNull();
 
     const { rows } = await query(
-      `SELECT action FROM audit_logs WHERE entity_type = 'event' AND entity_id = $1 ORDER BY created_at`,
+      // created_at is the transaction time: actions of one transaction tie, so action breaks the tie.
+      `SELECT action FROM audit_logs WHERE entity_type = 'event' AND entity_id = $1 ORDER BY created_at, action`,
       [event.id],
     );
-    expect(rows.map((r) => r.action)).toEqual(['EVENT_SUBMITTED', 'EVENT_REJECTED', 'EVENT_SUBMITTED', 'EVENT_APPROVED']);
+    expect(rows.map((r) => r.action)).toEqual([
+      'EVENT_SUBMITTED',
+      'EVENT_REJECTED',
+      'EVENT_SUBMITTED',
+      'EVENT_APPROVED',
+      'INVENTORY_GENERATED', // same transaction as the approval
+    ]);
   });
 
   test('two admins approving at the same moment: one 200, one 409', async () => {
     const venue = await createVenue(app, admin.token);
     const event = await createEvent(app, organizerA.token, { categoryIds: [category.id] });
-    await addSchedule(app, organizerA.token, event.id, { venueId: venue.id, startAt: at(21), endAt: at(21, 14) }).expect(201);
+    const schedule = await addSchedule(app, organizerA.token, event.id, { venueId: venue.id, startAt: at(21), endAt: at(21, 14) }).expect(201);
+    await addGaTicketType(app, organizerA.token, schedule.body.data.schedule.id).expect(201);
     await changeStatus(app, organizerA.token, event.id, 'PENDING_APPROVAL').expect(200);
 
     const results = await Promise.all([

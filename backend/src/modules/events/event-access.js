@@ -3,6 +3,7 @@ const AppError = require('../../utils/AppError');
 const users = require('../users');
 const organizers = require('../organizers');
 const eventsRepository = require('./events.repository');
+const schedulesRepository = require('./schedules.repository');
 
 /** Statuses anyone may see. Others are visible only to the owner and admins. */
 const PUBLIC_STATUSES = [EVENT_STATUS.PUBLISHED, EVENT_STATUS.FINISHED];
@@ -59,6 +60,27 @@ async function lockManageableEvent(client, actor, eventId) {
   return event;
 }
 
+const scheduleNotFound = () => new AppError('NOT_FOUND', 'Schedule not found.');
+
+/**
+ * For work on one schedule of a manageable event: lock the EVENT row first,
+ * then the schedule row (the module-wide lock order events → event_schedules),
+ * so configuration changes and the approval that generates inventory can
+ * never interleave.
+ */
+async function lockScheduleOfManageableEvent(client, actor, scheduleId) {
+  const found = await schedulesRepository.findById(client, scheduleId);
+  if (!found) {
+    throw scheduleNotFound();
+  }
+  const event = await lockManageableEvent(client, actor, found.event_id);
+  const schedule = await schedulesRepository.findById(client, scheduleId, { forUpdate: true });
+  if (!schedule) {
+    throw scheduleNotFound();
+  }
+  return { event, schedule };
+}
+
 module.exports = {
   PUBLIC_STATUSES,
   resolveActor,
@@ -66,5 +88,7 @@ module.exports = {
   canManage,
   canView,
   eventNotFound,
+  scheduleNotFound,
   lockManageableEvent,
+  lockScheduleOfManageableEvent,
 };
