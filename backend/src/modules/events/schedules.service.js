@@ -4,6 +4,7 @@ const { EVENT_STATUS, SCHEDULE_STATUS } = require('../../config/constants');
 const AppError = require('../../utils/AppError');
 const venues = require('../venues');
 const { recordAudit } = require('../audit');
+const orders = require('../orders');
 const eventsRepository = require('./events.repository');
 const schedulesRepository = require('./schedules.repository');
 const ticketTypesRepository = require('./ticket-types.repository');
@@ -123,13 +124,14 @@ async function updateSchedule(context, actor, scheduleId, body) {
 
     await schedulesRepository.update(client, scheduleId, { ...changes, status });
     if (status === SCHEDULE_STATUS.CANCELLED) {
+      const heldOrdersCancelled = await orders.cancelHeldOrdersOfSchedule(client, scheduleId);
       await recordAudit(client, {
         context,
         action: 'SCHEDULE_CANCELLED',
         entityType: 'event_schedule',
         entityId: scheduleId,
         oldValue: { status: schedule.status },
-        newValue: { status },
+        newValue: { status, heldOrdersCancelled },
       });
     }
     return toPublicSchedule(await schedulesRepository.findWithVenue(client, scheduleId));

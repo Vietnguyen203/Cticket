@@ -81,6 +81,21 @@ async function lockScheduleOfManageableEvent(client, actor, scheduleId) {
   return { event, schedule };
 }
 
+/**
+ * For a booking: lock the event and the schedule FOR SHARE (same order as
+ * above). Many bookings run side by side, but an event cancellation or an
+ * inventory block (FOR UPDATE) waits for them, and they wait for it, so no new
+ * hold can slip into an event that is being cancelled.
+ * @returns {Promise<{ event: object, schedule: object } | null>}
+ */
+async function lockScheduleForSale(client, scheduleId) {
+  const found = await schedulesRepository.findById(client, scheduleId);
+  if (!found) return null;
+  const event = await eventsRepository.findById(client, found.event_id, { forShare: true });
+  const schedule = await schedulesRepository.findById(client, scheduleId, { forShare: true });
+  return event && schedule ? { event, schedule } : null;
+}
+
 module.exports = {
   PUBLIC_STATUSES,
   resolveActor,
@@ -91,4 +106,5 @@ module.exports = {
   scheduleNotFound,
   lockManageableEvent,
   lockScheduleOfManageableEvent,
+  lockScheduleForSale,
 };

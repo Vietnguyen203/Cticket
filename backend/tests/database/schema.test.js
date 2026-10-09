@@ -381,7 +381,7 @@ describe('tickets and check-ins — last line of defence', () => {
                               event_id, schedule_id, schedule_seat_id)
          SELECT 'TKT-RETRY', 'retry-hash', order_id, id, $2, event_id, schedule_id, schedule_seat_id
          FROM order_items WHERE id = $1
-         ON CONFLICT (order_item_id) DO NOTHING`,
+         ON CONFLICT (order_item_id, admission_no) DO NOTHING`,
         [paid.item.id, paid.order.user_id],
       );
       expect(rowCount).toBe(0);

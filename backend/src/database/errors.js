@@ -36,6 +36,7 @@ const CONSTRAINT_ERROR_CODES = {
   // Over-capacity on GA counters is normally prevented by conditional UPDATEs;
   // if a bug ever tries it, the CHECK fires and the client gets a clear 409.
   chk_ga_inventory_capacity: 'INSUFFICIENT_INVENTORY',
+  uq_orders_active_cart: 'ACTIVE_ORDER_EXISTS',
 };
 
 const GENERIC_CODE_BY_SQLSTATE = {

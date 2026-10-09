@@ -130,10 +130,10 @@ async function createOrder(client, { userId, scheduleId, status = 'HELD', subtot
 
 async function createOrderItem(client, { order, eventId, scheduleSeat, seatId = scheduleSeat.seat_id }) {
   const { rows } = await client.query(
-    `INSERT INTO order_items (order_id, schedule_seat_id, event_id, schedule_id, seat_id,
+    `INSERT INTO order_items (order_id, schedule_seat_id, ticket_type_id, event_id, schedule_id, seat_id,
                               seat_label, unit_price, quantity, total_amount)
-     VALUES ($1, $2, $3, $4, $5, 'A01', $6, 1, $6) RETURNING *`,
-    [order.id, scheduleSeat.id, eventId, order.schedule_id, seatId, scheduleSeat.price],
+     VALUES ($1, $2, $3, $4, $5, $6, 'A01', $7, 1, $7) RETURNING *`,
+    [order.id, scheduleSeat.id, scheduleSeat.ticket_type_id, eventId, order.schedule_id, seatId, scheduleSeat.price],
   );
   return rows[0];
 }

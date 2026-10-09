@@ -16,6 +16,7 @@
     "migrate:create": "npm run migrate -- create",
     "seed:admin": "node src/scripts/seedAdmin.js",
     "mail:test": "node src/scripts/sendTestEmail.js",
+    "inventory:check": "node src/scripts/checkInventory.js",
     "test": "jest --runInBand"
   },
   "license": "UNLICENSED",
