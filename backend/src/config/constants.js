@@ -97,6 +97,37 @@ const INVENTORY_LIMITS = Object.freeze({
   SEAT_SPACING: 30, // default seat-map spacing (layout units)
 });
 
+const ORDER_STATUS = Object.freeze({
+  PENDING: 'PENDING',
+  HELD: 'HELD', // inventory is held, waiting for payment (Phase 8)
+  PAYMENT_PENDING: 'PAYMENT_PENDING',
+  PAID: 'PAID',
+  COMPLETED: 'COMPLETED',
+  EXPIRED: 'EXPIRED',
+  CANCELLED: 'CANCELLED',
+  PAYMENT_FAILED: 'PAYMENT_FAILED',
+  REFUNDED: 'REFUNDED',
+});
+
+/** Orders that still hold inventory (same list as the uq_orders_active_cart index). */
+const ACTIVE_ORDER_STATUSES = Object.freeze([
+  ORDER_STATUS.HELD,
+  ORDER_STATUS.PAYMENT_PENDING,
+  ORDER_STATUS.PAYMENT_FAILED,
+]);
+
+const CANCEL_REASON = Object.freeze({
+  USER_CANCELLED: 'USER_CANCELLED',
+  ADMIN_CANCELLED: 'ADMIN_CANCELLED',
+  EVENT_CANCELLED: 'EVENT_CANCELLED',
+  SCHEDULE_CANCELLED: 'SCHEDULE_CANCELLED',
+});
+
+const ORDER_LIMITS = Object.freeze({
+  MAX_TICKETS_PER_ORDER: 10, // on top of each ticket type's max_per_order (CTicket: 6-10 per transaction)
+  EXPIRE_BATCH_SIZE: 100, // orders expired per sweep / per lazy clean-up
+});
+
 const PAGINATION = Object.freeze({
   DEFAULT_PAGE_SIZE: 20,
   MAX_PAGE_SIZE: 50,
@@ -121,6 +152,10 @@ module.exports = {
   TICKET_TYPE_STATUS,
   SEAT_STATUS,
   INVENTORY_LIMITS,
+  ORDER_STATUS,
+  ACTIVE_ORDER_STATUSES,
+  CANCEL_REASON,
+  ORDER_LIMITS,
   PAGINATION,
   EVENT_LIMITS,
 };

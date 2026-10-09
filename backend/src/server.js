@@ -3,6 +3,7 @@ const env = require('./config/env');
 const logger = require('./utils/logger');
 const { createApp } = require('./app');
 const { closePool } = require('./database/pool');
+const { startOrderSweeper } = require('./modules/orders/orders.sweeper');
 
 const server = http.createServer(createApp());
 
@@ -10,13 +11,16 @@ server.listen(env.PORT, () => {
   logger.info({ port: env.PORT, env: env.NODE_ENV }, 'API server listening');
 });
 
+const orderSweeper = startOrderSweeper();
+
 let shuttingDown = false;
 
 /**
  * Graceful shutdown (Docker sends SIGTERM on `docker compose stop`):
  *  1. stop accepting new connections and let in-flight requests finish,
- *  2. close the PostgreSQL pool,
- *  3. exit. A timer forces exit if something hangs.
+ *  2. stop the order sweeper (letting a sweep in progress finish),
+ *  3. close the PostgreSQL pool,
+ *  4. exit. A timer forces exit if something hangs.
  */
 async function shutdown(signal, exitCode = 0) {
   if (shuttingDown) return;
@@ -31,6 +35,7 @@ async function shutdown(signal, exitCode = 0) {
 
   try {
     await new Promise((resolve, reject) => server.close((err) => (err ? reject(err) : resolve())));
+    await orderSweeper.stop();
     await closePool();
     logger.info('Shutdown complete');
   } catch (err) {

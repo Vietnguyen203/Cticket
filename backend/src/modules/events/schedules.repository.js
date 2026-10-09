@@ -27,9 +27,9 @@ async function listByEvent(db, eventId) {
   return rows;
 }
 
-async function findById(db, id, { forUpdate = false } = {}) {
+async function findById(db, id, { forUpdate = false, forShare = false } = {}) {
   const { rows } = await db.query(
-    `SELECT ${SCHEDULE_COLUMNS} FROM event_schedules es WHERE es.id = $1 ${forUpdate ? 'FOR UPDATE' : ''}`,
+    `SELECT ${SCHEDULE_COLUMNS} FROM event_schedules es WHERE es.id = $1 ${forUpdate ? 'FOR UPDATE' : forShare ? 'FOR SHARE' : ''}`,
     [id],
   );
   return rows[0] ?? null;

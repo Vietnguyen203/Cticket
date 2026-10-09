@@ -213,6 +213,78 @@ async function unblockGa(db, { ticketTypeId, quantity }) {
   return rows[0] ?? null;
 }
 
+// ---------------------------------------------------------------------------
+// Holds (booking flow). Lock order everywhere: orders → schedule_seats (by
+// seat_id) → ga_inventory (by ticket_type_id). Sorting the locks is what makes
+// two requests for [A01, A02] and [A02, A01] queue up instead of deadlocking.
+// ---------------------------------------------------------------------------
+
+/**
+ * Lock the requested seats of a schedule with everything the booking needs
+ * to check and snapshot (status, price, ticket type, label).
+ */
+async function lockSeatsForHold(db, scheduleId, seatIds) {
+  const { rows } = await db.query(
+    `SELECT s.id AS schedule_seat_id, s.seat_id, s.status, s.price, s.currency, s.ticket_type_id,
+            se.seat_code, z.name AS zone_name,
+            tt.name AS ticket_type_name, tt.status AS ticket_type_status, tt.max_per_order
+     FROM schedule_seats s
+     JOIN seats se ON se.id = s.seat_id
+     JOIN venue_zones z ON z.id = se.venue_zone_id
+     JOIN ticket_types tt ON tt.id = s.ticket_type_id
+     WHERE s.schedule_id = $1 AND s.seat_id = ANY($2::uuid[])
+     ORDER BY s.seat_id
+     FOR UPDATE OF s`,
+    [scheduleId, seatIds],
+  );
+  return rows;
+}
+
+/** @returns {Promise<number>} seats actually moved AVAILABLE → HELD */
+async function holdSeats(db, { scheduleId, seatIds, orderId, expiresAt }) {
+  const { rowCount } = await db.query(
+    `UPDATE schedule_seats SET status = 'HELD', held_by_order_id = $3, hold_expires_at = $4
+     WHERE schedule_id = $1 AND seat_id = ANY($2::uuid[]) AND status = 'AVAILABLE'`,
+    [scheduleId, seatIds, orderId, expiresAt],
+  );
+  return rowCount;
+}
+
+/** Put the seats held by an order back on sale (locks them in seat_id order first). */
+async function releaseSeatsOfOrder(db, orderId) {
+  await db.query(
+    `SELECT 1 FROM schedule_seats WHERE held_by_order_id = $1 AND status = 'HELD' ORDER BY seat_id FOR UPDATE`,
+    [orderId],
+  );
+  const { rowCount } = await db.query(
+    `UPDATE schedule_seats SET status = 'AVAILABLE', held_by_order_id = NULL, hold_expires_at = NULL
+     WHERE held_by_order_id = $1 AND status = 'HELD'`,
+    [orderId],
+  );
+  return rowCount;
+}
+
+/** Conditional hold on a GA counter. @returns {Promise<boolean>} false when not enough are left */
+async function holdGa(db, { ticketTypeId, quantity }) {
+  const { rowCount } = await db.query(
+    `UPDATE ga_inventory SET held_quantity = held_quantity + $2
+     WHERE ticket_type_id = $1
+       AND capacity - held_quantity - sold_quantity - blocked_quantity >= $2`,
+    [ticketTypeId, quantity],
+  );
+  return rowCount === 1;
+}
+
+/** @returns {Promise<boolean>} false if fewer were held than released (a bug: never expected) */
+async function releaseGa(db, { ticketTypeId, quantity }) {
+  const { rowCount } = await db.query(
+    `UPDATE ga_inventory SET held_quantity = held_quantity - $2
+     WHERE ticket_type_id = $1 AND held_quantity >= $2`,
+    [ticketTypeId, quantity],
+  );
+  return rowCount === 1;
+}
+
 module.exports = {
   replacePlan,
   listPlan,
@@ -228,4 +300,9 @@ module.exports = {
   unblockSeats,
   blockGa,
   unblockGa,
+  lockSeatsForHold,
+  holdSeats,
+  releaseSeatsOfOrder,
+  holdGa,
+  releaseGa,
 };

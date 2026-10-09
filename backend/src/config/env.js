@@ -52,6 +52,11 @@ const envSchema = z.object({
   SMTP_PASS: z.string().optional(),
   MAIL_FROM: z.string().default('Event Tickets <no-reply@etp.local>'),
 
+  // Booking: how long a HELD order keeps its seats, and how often expired
+  // holds are swept back into stock (in-process until BullMQ in Phase 9).
+  HOLD_TTL_MINUTES: z.coerce.number().int().min(1).max(60).default(10),
+  ORDER_SWEEP_INTERVAL_SECONDS: z.coerce.number().int().min(5).max(3600).default(30),
+
   // Used only by `npm run seed:admin`.
   ADMIN_EMAIL: z.string().optional(),
   ADMIN_PASSWORD: z.string().optional(),
