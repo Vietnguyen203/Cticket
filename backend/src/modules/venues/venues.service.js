@@ -2,6 +2,7 @@ const { pool } = require('../../database/pool');
 const { VENUE_STATUS } = require('../../config/constants');
 const AppError = require('../../utils/AppError');
 const { toLimitOffset, toPageMeta } = require('../../utils/pagination');
+const { invalidatesAfter, NAMESPACE } = require('../../redis/cache');
 const venuesRepository = require('./venues.repository');
 
 // NUMERIC columns arrive as strings. Coordinates are not money, so a JS
@@ -66,4 +67,11 @@ async function findActiveVenue(db, id) {
   return row && row.status === VENUE_STATUS.ACTIVE ? row : null;
 }
 
-module.exports = { listVenues, getVenue, createVenue, updateVenue, findActiveVenue };
+module.exports = {
+  listVenues,
+  getVenue,
+  createVenue,
+  // The venue name is shown on event pages and in its cached layout.
+  updateVenue: invalidatesAfter([NAMESPACE.VENUES, NAMESPACE.CATALOG], updateVenue),
+  findActiveVenue,
+};

@@ -124,7 +124,7 @@ const CANCEL_REASON = Object.freeze({
 });
 
 const ORDER_LIMITS = Object.freeze({
-  MAX_TICKETS_PER_ORDER: 10, // on top of each ticket type's max_per_order (CTicket: 6-10 per transaction)
+  MAX_TICKETS_PER_ORDER: 8, // requirements sheet (BKG-03); each ticket type's max_per_order applies too
   EXPIRE_BATCH_SIZE: 100, // orders expired per sweep / per lazy clean-up
 });
 

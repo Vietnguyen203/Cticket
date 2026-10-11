@@ -1,8 +1,8 @@
 const { z } = require('zod');
+const { personName, phoneNumber } = require('../../utils/schemas');
 const { OTP, OTP_PURPOSE, PASSWORD } = require('../../config/constants');
 
 const MAX_EMAIL_LENGTH = 255;
-const MAX_NAME_LENGTH = 100;
 // Login accepts any stored password, but caps the input so nobody can make
 // the server hash megabytes of data.
 const MAX_LOGIN_PASSWORD_LENGTH = 1024;
@@ -22,8 +22,8 @@ const newPassword = z
     message: 'must contain at least one letter and one digit',
   });
 
-const name = z.string().trim().min(1).max(MAX_NAME_LENGTH);
-const phone = z.string().trim().regex(/^\+?\d{8,15}$/, 'must be 8-15 digits, optionally starting with +');
+const name = personName;
+const phone = phoneNumber;
 const otp = z.string().regex(new RegExp(`^\\d{${OTP.LENGTH}}$`), `must be ${OTP.LENGTH} digits`);
 const purpose = z.enum([OTP_PURPOSE.EMAIL_VERIFICATION, OTP_PURPOSE.PASSWORD_RESET]);
 const refreshToken = z.string().min(MIN_REFRESH_TOKEN_LENGTH).max(MAX_REFRESH_TOKEN_LENGTH);

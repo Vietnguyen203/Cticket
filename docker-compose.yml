@@ -1,6 +1,6 @@
 name: etp
 
-# Redis and the queue worker are added in later phases.
+# The queue worker is added in Phase 9.
 services:
   postgres:
     image: postgres:17-alpine
@@ -19,6 +19,27 @@ services:
       # temporary server on the unix socket only; checking over TCP avoids
       # reporting "healthy" before the real server is up.
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  # Cache, rate limits, OTP codes and short seat locks. Everything in it has a
+  # TTL and may be lost (PostgreSQL stays the source of truth), so nothing is
+  # written to disk. noeviction is required by BullMQ (Phase 9).
+  redis:
+    image: redis:7.4-alpine
+    command:
+      - sh
+      - -c
+      - exec redis-server --requirepass "$$REDIS_PASSWORD" --maxmemory 256mb --maxmemory-policy noeviction --save "" --appendonly no
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
+    ports:
+      # Bound to localhost only: reachable by the tests on this machine, not the network.
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=$$REDIS_PASSWORD redis-cli ping | grep -q PONG"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -61,6 +82,7 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       MAIL_FROM: ${MAIL_FROM:-Event Tickets <no-reply@etp.local>}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
     ports:
       - "${API_PORT:-3000}:3000"
     depends_on:
@@ -68,6 +90,8 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
       mailpit:
         condition: service_started
     healthcheck:

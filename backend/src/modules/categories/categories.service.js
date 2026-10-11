@@ -2,6 +2,7 @@ const { pool } = require('../../database/pool');
 const { PG_ERROR } = require('../../database/errors');
 const AppError = require('../../utils/AppError');
 const { slugify } = require('../../utils/slug');
+const { remember, invalidatesAfter, NAMESPACE, TTL } = require('../../redis/cache');
 const categoriesRepository = require('./categories.repository');
 
 const CATEGORY_USAGE_FK = 'event_categories_category_id_fkey';
@@ -18,7 +19,9 @@ function toPublicCategory(row) {
 }
 
 async function listCategories() {
-  return (await categoriesRepository.listAll(pool)).map(toPublicCategory);
+  return remember(NAMESPACE.CATEGORIES, 'list', TTL.CATEGORIES, async () =>
+    (await categoriesRepository.listAll(pool)).map(toPublicCategory),
+  );
 }
 
 async function createCategory({ name, slug, description }) {
@@ -55,4 +58,12 @@ async function deleteCategory(id) {
   }
 }
 
-module.exports = { listCategories, createCategory, updateCategory, deleteCategory };
+// Category names also appear in event lists and pages.
+const changesCategories = [NAMESPACE.CATEGORIES, NAMESPACE.CATALOG];
+
+module.exports = {
+  listCategories,
+  createCategory: invalidatesAfter(changesCategories, createCategory),
+  updateCategory: invalidatesAfter(changesCategories, updateCategory),
+  deleteCategory: invalidatesAfter(changesCategories, deleteCategory),
+};

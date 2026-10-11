@@ -3,6 +3,8 @@ const jwt = require('jsonwebtoken');
 const env = require('../../src/config/env');
 const { createApp } = require('../../src/app');
 const { query, closePool } = require('../../src/database/pool');
+const { redis } = require('../../src/redis/client');
+const { otpKeys } = require('../../src/modules/auth/otp.service');
 const {
   DEFAULT_PASSWORD,
   useFakeMailbox,
@@ -27,22 +29,17 @@ async function findUser(email) {
   return rows[0];
 }
 
-async function findActiveOtpRow(email, type) {
-  const { rows } = await query(
-    `SELECT ut.* FROM user_tokens ut JOIN users u ON u.id = ut.user_id
-     WHERE u.email = $1 AND ut.type = $2 ORDER BY ut.created_at DESC LIMIT 1`,
-    [email, type],
-  );
-  return rows[0];
+/** The pending code of a user in Redis: { hash, attempts } or null once it is used up / revoked. */
+async function findActiveOtp(email, purpose) {
+  const { code } = otpKeys((await findUser(email)).id, purpose);
+  const stored = await redis.hgetall(code);
+  return Object.keys(stored).length > 0 ? { ...stored, attempts: Number(stored.attempts) } : null;
 }
 
 /** Pretend the last code was issued long ago, to step past the resend cooldown. */
-function ageOtps(email) {
-  return query(
-    `UPDATE user_tokens SET created_at = created_at - interval '2 minutes'
-     WHERE user_id = (SELECT id FROM users WHERE email = $1)`,
-    [email],
-  );
+async function skipOtpCooldown(email) {
+  const user = await findUser(email);
+  await redis.del(otpKeys(user.id, 'EMAIL_VERIFICATION').cooldown, otpKeys(user.id, 'PASSWORD_RESET').cooldown);
 }
 
 describe('POST /auth/register', () => {
@@ -113,7 +110,7 @@ describe('email verification with a 6-digit OTP', () => {
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('INVALID_OTP');
     // The request failed, yet the counter was committed (not rolled back).
-    expect((await findActiveOtpRow(email, 'EMAIL_VERIFICATION')).attempts).toBe(1);
+    expect((await findActiveOtp(email, 'EMAIL_VERIFICATION')).attempts).toBe(1);
   });
 
   test('after 5 wrong guesses the code is revoked, even the right code stops working', async () => {
@@ -124,7 +121,7 @@ describe('email verification with a 6-digit OTP', () => {
       await verifyEmail(app, email, wrongOtpFor(otp)).expect(400);
     }
     await verifyEmail(app, email, otp).expect(400);
-    expect((await findActiveOtpRow(email, 'EMAIL_VERIFICATION')).revoked_at).not.toBeNull();
+    expect(await findActiveOtp(email, 'EMAIL_VERIFICATION')).toBeNull(); // deleted at the 5th wrong guess
   });
 
   test('a code works only once', async () => {
@@ -137,11 +134,10 @@ describe('email verification with a 6-digit OTP', () => {
 
   test('an expired code is rejected', async () => {
     const { email } = await registerUser(app);
-    await query(
-      `UPDATE user_tokens SET expires_at = now() - interval '1 minute'
-       WHERE user_id = (SELECT id FROM users WHERE email = $1)`,
-      [email],
-    );
+    // Redis drops the key when its 10-minute TTL ends; make that happen now.
+    const { code } = otpKeys((await findUser(email)).id, 'EMAIL_VERIFICATION');
+    await redis.pexpire(code, 1);
+    await new Promise((resolve) => setTimeout(resolve, 20));
     await verifyEmail(app, email, mailbox.latestOtp(email)).expect(400);
   });
 
@@ -153,7 +149,7 @@ describe('email verification with a 6-digit OTP', () => {
     await resend().expect(202);
     expect(mailbox.count(email)).toBe(1); // still within the 60 s cooldown: nothing sent
 
-    await ageOtps(email);
+    await skipOtpCooldown(email);
     await resend().expect(202);
     expect(mailbox.count(email)).toBe(2);
 

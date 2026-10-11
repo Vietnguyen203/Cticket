@@ -3,6 +3,7 @@ const { withTransaction } = require('../../database/transaction');
 const { EVENT_STATUS, INVENTORY_MODE, ZONE_KIND, INVENTORY_LIMITS } = require('../../config/constants');
 const AppError = require('../../utils/AppError');
 const venues = require('../venues');
+const { invalidatesAfter, NAMESPACE } = require('../../redis/cache');
 const ticketTypesRepository = require('./ticket-types.repository');
 const inventoryRepository = require('./inventory.repository');
 const schedulesRepository = require('./schedules.repository');
@@ -217,9 +218,9 @@ async function replaceSeatPlan(context, actor, scheduleId, { assignments }) {
 
 module.exports = {
   listTicketTypes,
-  createTicketType,
-  updateTicketType,
-  deleteTicketType,
+  createTicketType: invalidatesAfter([NAMESPACE.CATALOG], createTicketType),
+  updateTicketType: invalidatesAfter([NAMESPACE.CATALOG], updateTicketType),
+  deleteTicketType: invalidatesAfter([NAMESPACE.CATALOG], deleteTicketType),
   getSeatPlan,
-  replaceSeatPlan,
+  replaceSeatPlan: invalidatesAfter([NAMESPACE.CATALOG], replaceSeatPlan),
 };

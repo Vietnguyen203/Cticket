@@ -37,7 +37,7 @@ const envSchema = z.object({
   JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().positive().default(900),
   JWT_ISSUER: z.string().default('etp-api'),
   JWT_AUDIENCE: z.string().default('etp-app'),
-  REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
+  REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(7),
   // Server-side key for hashing OTP codes (HMAC). Without it, a leaked
   // database would let an attacker brute-force all 1,000,000 codes offline.
   OTP_SECRET: secret,
@@ -51,6 +51,15 @@ const envSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   MAIL_FROM: z.string().default('Event Tickets <no-reply@etp.local>'),
+
+  // Redis: cache, rate limits, OTP codes, seat locks, token denylist.
+  // Everything there has a TTL; PostgreSQL stays the source of truth.
+  REDIS_URL: z.string().min(1, 'REDIS_URL is required'),
+  // A slow Redis must not make the API slow: give up on a command after this.
+  REDIS_COMMAND_TIMEOUT_MS: z.coerce.number().int().positive().default(200),
+  RATE_LIMIT_ENABLED: booleanString.default(true),
+  // Behind a reverse proxy: number of proxy hops to trust for the client IP.
+  TRUST_PROXY: z.coerce.number().int().min(0).default(0),
 
   // Booking: how long a HELD order keeps its seats, and how often expired
   // holds are swept back into stock (in-process until BullMQ in Phase 9).

@@ -1,19 +1,24 @@
 const AppError = require('../utils/AppError');
-const { verifyAccessToken } = require('../modules/auth');
+const { verifyAccessToken, isRevoked } = require('../modules/auth');
 
 const BEARER_PATTERN = /^Bearer\s+(\S+)$/i;
 
 /**
  * Require a valid access token: `Authorization: Bearer <jwt>`.
- * Stateless: only the signature and claims are checked, no database query.
- * On success, req.user = { id, roles }.
+ * The signature and claims are checked locally; then one Redis lookup tells
+ * whether the token was logged out or revoked (skipped if Redis is down).
+ * On success, req.user = { id, roles, jti, issuedAt, expiresAt }.
  */
-function authenticate(req, res, next) {
+async function authenticate(req, res, next) {
   const match = BEARER_PATTERN.exec(req.get('authorization') ?? '');
   if (!match) {
     throw new AppError('UNAUTHENTICATED');
   }
-  req.user = verifyAccessToken(match[1]);
+  const user = verifyAccessToken(match[1]);
+  if (await isRevoked(user)) {
+    throw new AppError('TOKEN_REVOKED');
+  }
+  req.user = user;
   next();
 }
 

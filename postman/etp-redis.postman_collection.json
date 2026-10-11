@@ -1,0 +1,610 @@
+{
+  "info": {
+    "name": "ETP — Redis (Phase 6)",
+    "description": "Điền email/password ở tab Variables rồi Run từ trên xuống. Folder 5 cố tình làm IP của bạn bị chặn đăng nhập khoảng 1 phút (5 lần/phút): chạy nó cuối cùng.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "(function () {",
+          "  const path = pm.request.url.getPath();",
+          "  if (path.endsWith('/auth/login') || path.endsWith('/auth/refresh')) {",
+          "    return; // these requests manage tokens themselves",
+          "  }",
+          "  const SAFETY_SECONDS = 30;",
+          "  const expiresAt = (token) => {",
+          "    try {",
+          "      const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');",
+          "      return JSON.parse(require('atob')(payload)).exp || 0;",
+          "    } catch (e) {",
+          "      return 0;",
+          "    }",
+          "  };",
+          "  const isFresh = (name) => {",
+          "    const token = pm.variables.get(name);",
+          "    return Boolean(token) && expiresAt(token) > Date.now() / 1000 + SAFETY_SECONDS;",
+          "  };",
+          "  const post = (url, body, onSuccess) => pm.sendRequest({",
+          "    url: pm.variables.get('host') + url,",
+          "    method: 'POST',",
+          "    header: [{ key: 'Content-Type', value: 'application/json' }],",
+          "    body: { mode: 'raw', raw: JSON.stringify(body) },",
+          "  }, (err, res) => {",
+          "    if (!err && res.code === 200) onSuccess(res.json().data);",
+          "  });",
+          "  const auth = JSON.stringify(pm.request.auth ? pm.request.auth.toJSON() : {});",
+          "  ",
+          "  if (auth.includes('adminToken') && !isFresh('adminToken') && pm.variables.get('adminPassword')) {",
+          "    post('/api/v1/auth/login', {",
+          "      email: pm.variables.get('adminEmail'),",
+          "      password: pm.variables.get('adminPassword'),",
+          "    }, (data) => {",
+          "      pm.collectionVariables.set('adminToken', data.accessToken);",
+          "      console.log('Token admin đã hết hạn → tự đăng nhập lại');",
+          "    });",
+          "  }",
+          "  if (auth.includes('userToken') && !isFresh('userToken') && pm.variables.get('userRefreshToken')) {",
+          "    post('/api/v1/auth/refresh', { refreshToken: pm.variables.get('userRefreshToken') }, (data) => {",
+          "      pm.collectionVariables.set('userToken', data.accessToken);",
+          "      pm.collectionVariables.set('userRefreshToken', data.refreshToken);",
+          "      console.log('Token của bạn đã hết hạn → tự refresh');",
+          "    });",
+          "  }",
+          "})();"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "host",
+      "value": "http://localhost:3001"
+    },
+    {
+      "key": "adminEmail",
+      "value": "admin@etp.local"
+    },
+    {
+      "key": "adminPassword",
+      "value": "Admin@123456"
+    },
+    {
+      "key": "email",
+      "value": ""
+    },
+    {
+      "key": "password",
+      "value": ""
+    },
+    {
+      "key": "adminToken",
+      "value": ""
+    },
+    {
+      "key": "userToken",
+      "value": ""
+    },
+    {
+      "key": "userRefreshToken",
+      "value": ""
+    },
+    {
+      "key": "phoneToken",
+      "value": ""
+    },
+    {
+      "key": "phoneRefreshToken",
+      "value": ""
+    },
+    {
+      "key": "wrongLoginCount",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Kiểm tra hệ thống",
+      "item": [
+        {
+          "name": "Health: database + Redis",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  pm.test('Redis up', () => pm.expect(data.checks.redis).to.eql('up'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/health/ready",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Đăng nhập",
+      "item": [
+        {
+          "name": "Bạn đăng nhập",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  try { const v = data.accessToken; if (v !== undefined) pm.collectionVariables.set('userToken', v); } catch (e) {}",
+                  "  try { const v = data.refreshToken; if (v !== undefined) pm.collectionVariables.set('userRefreshToken', v); } catch (e) {}",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Hồ sơ (USR-01)",
+      "item": [
+        {
+          "name": "Xem hồ sơ",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/users/me",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Sửa tên",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  pm.test('Đã đổi tên', () => pm.expect(data.user.firstName).to.eql('Việt'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/users/me",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Việt\",\n  \"lastName\": \"Nguyễn\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Thử sửa email qua hồ sơ (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 400', () => pm.expect(pm.response.code).to.be.oneOf([400]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/users/me",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"khac@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Đăng xuất là token mất hiệu lực ngay (AUTH-05)",
+      "item": [
+        {
+          "name": "Đăng nhập thêm một phiên (\"điện thoại\")",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  try { const v = data.accessToken; if (v !== undefined) pm.collectionVariables.set('phoneToken', v); } catch (e) {}",
+                  "  try { const v = data.refreshToken; if (v !== undefined) pm.collectionVariables.set('phoneRefreshToken', v); } catch (e) {}",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Phiên điện thoại gọi /auth/me",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/auth/me",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{phoneToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Đăng xuất phiên điện thoại (kèm access token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 204', () => pm.expect(pm.response.code).to.be.oneOf([204]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/auth/logout",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{phoneRefreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{phoneToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Token vừa đăng xuất bị từ chối ngay (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 401', () => pm.expect(pm.response.code).to.be.oneOf([401]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  pm.test('error.code = TOKEN_REVOKED', () => pm.expect((json.error || {}).code).to.eql('TOKEN_REVOKED'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/auth/me",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{phoneToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Phiên chính vẫn dùng được",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/auth/me",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Giới hạn số request (chạy CUỐI CÙNG)",
+      "item": [
+        {
+          "name": "Đăng nhập sai liên tục (tự lặp tới khi bị 429)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  if (pm.info.iteration === 0 && !pm.variables.get('wrongLoginCount')) pm.collectionVariables.set('wrongLoginCount', 0);",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 401/429', () => pm.expect(pm.response.code).to.be.oneOf([401,429]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  const count = Number(pm.variables.get('wrongLoginCount') || 0) + 1;",
+                  "  pm.collectionVariables.set('wrongLoginCount', count);",
+                  "  console.log('Lần ' + count + ': ' + pm.response.code + ', còn lại ' + pm.response.headers.get('RateLimit-Remaining'));",
+                  "  // Trong Collection Runner: gửi lại chính request này cho tới khi bị chặn (tối đa 6 lần).",
+                  "  if (pm.response.code === 401 && count < 6 && typeof postman !== 'undefined') postman.setNextRequest(pm.info.requestName);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"khong-ton-tai@example.com\",\n  \"password\": \"SaiMatKhau1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Đã bị chặn: 429 kèm Retry-After",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 429', () => pm.expect(pm.response.code).to.be.oneOf([429]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  pm.test('error.code = RATE_LIMITED', () => pm.expect((json.error || {}).code).to.eql('RATE_LIMITED'));",
+                  "  pm.test('Có Retry-After (giây)', () => pm.expect(Number(pm.response.headers.get('Retry-After'))).to.be.within(1, 60));",
+                  "  pm.collectionVariables.set('wrongLoginCount', 0);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"khong-ton-tai@example.com\",\n  \"password\": \"SaiMatKhau1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

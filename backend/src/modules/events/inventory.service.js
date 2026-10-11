@@ -8,6 +8,7 @@ const schedulesRepository = require('./schedules.repository');
 const eventsRepository = require('./events.repository');
 const ticketTypesRepository = require('./ticket-types.repository');
 const { canView, canManage, eventNotFound, scheduleNotFound, lockScheduleOfManageableEvent } = require('./event-access');
+const { remember, invalidatesAfter, NAMESPACE, TTL } = require('../../redis/cache');
 
 const toNumberOrNull = (value) => (value === null ? null : Number(value));
 
@@ -107,42 +108,60 @@ async function getAvailability(actor, scheduleId) {
   return { scheduleId: schedule.id, ticketTypes: visible.map(toAvailability) };
 }
 
-/** Seat map: zones with seat status (SEATED) or GA availability (STANDING). */
+/** Zones and seats of a schedule without any status: cacheable, it does not change after publishing. */
+async function loadSeatMapLayout(scheduleId) {
+  const [zones, seats] = await Promise.all([
+    inventoryRepository.zonesForSchedule(pool, scheduleId),
+    inventoryRepository.seatLayoutRows(pool, scheduleId),
+  ]);
+  return zones.map((zone) => ({
+    id: zone.id,
+    code: zone.code,
+    name: zone.name,
+    kind: zone.kind,
+    capacity: zone.capacity,
+    seats:
+      zone.kind === ZONE_KIND.SEATED
+        ? seats
+            .filter((seat) => seat.venue_zone_id === zone.id)
+            .map((seat) => ({
+              seatId: seat.seat_id,
+              code: seat.seat_code,
+              rowLabel: seat.row_label,
+              seatNumber: seat.seat_number,
+              seatType: seat.seat_type,
+              x: toNumberOrNull(seat.x),
+              y: toNumberOrNull(seat.y),
+              ticketTypeId: seat.ticket_type_id,
+              price: seat.price,
+            }))
+        : [],
+  }));
+}
+
+/**
+ * Seat map = layout from the cache (1 hour) + seat statuses and remaining
+ * tickets from PostgreSQL (always fresh).
+ */
 async function getSeatMap(actor, scheduleId) {
   const { schedule } = await loadViewableSchedule(actor, scheduleId);
-  const [zones, seats, availability] = await Promise.all([
-    inventoryRepository.zonesForSchedule(pool, scheduleId),
-    inventoryRepository.seatMapRows(pool, scheduleId),
+  const [layout, statuses, availability] = await Promise.all([
+    remember(NAMESPACE.CATALOG, `seatmap:${scheduleId}`, TTL.SEAT_MAP_LAYOUT, () => loadSeatMapLayout(scheduleId)),
+    inventoryRepository.seatStatuses(pool, scheduleId),
     inventoryRepository.availabilityBySchedule(pool, scheduleId),
   ]);
+  const statusBySeat = new Map(statuses.map((row) => [row.seat_id, row]));
 
   return {
     scheduleId: schedule.id,
     ticketTypes: availability.map(toAvailability),
-    zones: zones.map((zone) => ({
-      id: zone.id,
-      code: zone.code,
-      name: zone.name,
-      kind: zone.kind,
-      capacity: zone.capacity,
-      seats:
-        zone.kind === ZONE_KIND.SEATED
-          ? seats
-              .filter((seat) => seat.venue_zone_id === zone.id)
-              .map((seat) => ({
-                seatId: seat.seat_id,
-                code: seat.seat_code,
-                rowLabel: seat.row_label,
-                seatNumber: seat.seat_number,
-                seatType: seat.seat_type,
-                x: toNumberOrNull(seat.x),
-                y: toNumberOrNull(seat.y),
-                ticketTypeId: seat.ticket_type_id,
-                price: seat.price,
-                status: seat.status,
-                version: seat.version, // lets real-time clients drop out-of-order updates (Phase 7)
-              }))
-          : [],
+    zones: layout.map((zone) => ({
+      ...zone,
+      seats: zone.seats.map((seat) => ({
+        ...seat,
+        status: statusBySeat.get(seat.seatId)?.status,
+        version: statusBySeat.get(seat.seatId)?.version, // lets real-time clients drop out-of-order updates (Phase 7)
+      })),
       generalAdmission:
         zone.kind === ZONE_KIND.STANDING
           ? availability
@@ -233,7 +252,7 @@ async function changeBlocks(context, actor, scheduleId, body) {
 module.exports = {
   assertSellable,
   generateInventory,
-  regenerateInventory,
+  regenerateInventory: invalidatesAfter([NAMESPACE.CATALOG], regenerateInventory),
   getAvailability,
   getSeatMap,
   changeBlocks,

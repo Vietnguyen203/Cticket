@@ -137,15 +137,30 @@ async function zonesForSchedule(db, scheduleId) {
   return rows;
 }
 
-async function seatMapRows(db, scheduleId) {
+/** The fixed part of a seat map: where each seat is, its ticket type and price (frozen once published). */
+async function seatLayoutRows(db, scheduleId) {
   const { rows } = await db.query(
     `SELECT s.seat_id, se.venue_zone_id, se.seat_code, se.row_label, se.seat_number, se.seat_type, se.x, se.y,
-            s.ticket_type_id, s.price, s.version,
-            CASE WHEN s.status = 'HELD' AND s.hold_expires_at <= now() THEN 'AVAILABLE' ELSE s.status::text END AS status
+            s.ticket_type_id, s.price
      FROM schedule_seats s
      JOIN seats se ON se.id = s.seat_id
      WHERE s.schedule_id = $1
      ORDER BY se.row_label, se.seat_number, se.seat_code`,
+    [scheduleId],
+  );
+  return rows;
+}
+
+/**
+ * The live part: status of every seat. Never cached. One index range scan on
+ * (schedule_id, …) without joins, so it stays cheap under load.
+ */
+async function seatStatuses(db, scheduleId) {
+  const { rows } = await db.query(
+    `SELECT seat_id, version,
+            CASE WHEN status = 'HELD' AND hold_expires_at <= now() THEN 'AVAILABLE' ELSE status::text END AS status
+     FROM schedule_seats
+     WHERE schedule_id = $1`,
     [scheduleId],
   );
   return rows;
@@ -275,6 +290,16 @@ async function holdGa(db, { ticketTypeId, quantity }) {
   return rowCount === 1;
 }
 
+/** Tickets still available on a GA counter (for the Redis "sold out" hint). */
+async function gaAvailable(db, ticketTypeId) {
+  const { rows } = await db.query(
+    `SELECT capacity - held_quantity - sold_quantity - blocked_quantity AS available
+     FROM ga_inventory WHERE ticket_type_id = $1`,
+    [ticketTypeId],
+  );
+  return rows[0]?.available ?? 0;
+}
+
 /** @returns {Promise<boolean>} false if fewer were held than released (a bug: never expected) */
 async function releaseGa(db, { ticketTypeId, quantity }) {
   const { rowCount } = await db.query(
@@ -294,7 +319,8 @@ module.exports = {
   markGenerated,
   availabilityBySchedule,
   zonesForSchedule,
-  seatMapRows,
+  seatLayoutRows,
+  seatStatuses,
   lockScheduleSeats,
   blockSeats,
   unblockSeats,
@@ -305,4 +331,5 @@ module.exports = {
   releaseSeatsOfOrder,
   holdGa,
   releaseGa,
+  gaAvailable,
 };

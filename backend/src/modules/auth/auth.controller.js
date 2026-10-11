@@ -2,6 +2,7 @@ const { sendSuccess } = require('../../utils/response');
 const { requestContext } = require('../../utils/requestContext');
 const { getProfile } = require('../users');
 const authService = require('./auth.service');
+const { verifyAccessToken } = require('./auth.tokens');
 
 const HTTP_CREATED = 201;
 const HTTP_ACCEPTED = 202;
@@ -36,8 +37,21 @@ async function refresh(req, res) {
   return sendSuccess(res, await authService.refresh(req.valid.body, requestContext(req)));
 }
 
+const BEARER_PATTERN = /^Bearer\s+(\S+)$/i;
+
+/** The access token sent with a logout, if any and still valid; logout itself never fails because of it. */
+function accessTokenOf(req) {
+  const match = BEARER_PATTERN.exec(req.get('authorization') ?? '');
+  if (!match) return null;
+  try {
+    return verifyAccessToken(match[1]);
+  } catch {
+    return null; // expired or invalid: nothing left to revoke
+  }
+}
+
 async function logout(req, res) {
-  await authService.logout(req.valid.body);
+  await authService.logout(req.valid.body, accessTokenOf(req));
   return res.status(HTTP_NO_CONTENT).end();
 }
 

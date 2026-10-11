@@ -4,5 +4,6 @@
  * here, to avoid a require cycle (routes → authenticate → this file).
  */
 const { verifyAccessToken } = require('./auth.tokens');
+const { isRevoked, revokeAllTokensOfUser } = require('./denylist');
 
-module.exports = { verifyAccessToken };
+module.exports = { verifyAccessToken, isRevoked, revokeAllTokensOfUser };

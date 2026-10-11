@@ -8,8 +8,9 @@ const orders = require('../orders');
 const eventsRepository = require('./events.repository');
 const schedulesRepository = require('./schedules.repository');
 const ticketTypesRepository = require('./ticket-types.repository');
-const { canView, eventNotFound, lockManageableEvent } = require('./event-access');
+const { PUBLIC_STATUSES, canView, eventNotFound, lockManageableEvent } = require('./event-access');
 const { toPublicSchedule } = require('./schedules.mapper');
+const { remember, invalidatesAfter, NAMESPACE, TTL } = require('../../redis/cache');
 
 /** Request field → schedule row column, for merging a partial update with stored values. */
 const TIME_COLUMNS = {
@@ -45,6 +46,14 @@ async function assertActiveVenue(client, venueId) {
 }
 
 async function listSchedules(actor, eventId) {
+  // Schedules of a public event come from the cache; others are read fresh.
+  const cached = await remember(NAMESPACE.CATALOG, `schedules:${eventId}`, TTL.SCHEDULES, async () => {
+    const publicEvent = await eventsRepository.findById(pool, eventId);
+    if (!publicEvent || !PUBLIC_STATUSES.includes(publicEvent.status)) return null;
+    return (await schedulesRepository.listByEvent(pool, eventId)).map(toPublicSchedule);
+  });
+  if (cached) return cached;
+
   const event = await eventsRepository.findById(pool, eventId);
   if (!event || !canView(actor, event)) {
     throw eventNotFound();
@@ -152,4 +161,9 @@ async function deleteSchedule(context, actor, scheduleId) {
   });
 }
 
-module.exports = { listSchedules, createSchedule, updateSchedule, deleteSchedule };
+module.exports = {
+  listSchedules,
+  createSchedule: invalidatesAfter([NAMESPACE.CATALOG], createSchedule),
+  updateSchedule: invalidatesAfter([NAMESPACE.CATALOG], updateSchedule),
+  deleteSchedule: invalidatesAfter([NAMESPACE.CATALOG], deleteSchedule),
+};

@@ -19,6 +19,7 @@ const events = require('../events');
 const ordersRepository = require('./orders.repository');
 const { releaseHeldOrder, expireOrder, expireDueOrders } = require('./order-release');
 const { generateOrderCode } = require('./order-code');
+const fastPath = require('./fast-path');
 
 const ACTIVE_CART_CONSTRAINT = 'uq_orders_active_cart';
 const ORDER_CODE_CONSTRAINT = 'orders_order_code_key';
@@ -177,9 +178,11 @@ function placeOrder(actor, scheduleId, { seatIds = [], items = [] }) {
     }
     for (const { ticketType, quantity } of gaItems) {
       if (!(await events.holdGa(client, { ticketTypeId: ticketType.id, quantity }))) {
-        throw new AppError('INSUFFICIENT_INVENTORY', `Not enough "${ticketType.name}" tickets left.`, {
+        const error = new AppError('INSUFFICIENT_INVENTORY', `Not enough "${ticketType.name}" tickets left.`, {
           details: [{ field: 'body.items', message: `${ticketType.id} has fewer than ${quantity} left` }],
         });
+        error.gaLeft = { ticketTypeId: ticketType.id, left: await events.gaAvailable(client, ticketType.id) };
+        throw error;
       }
     }
 
@@ -218,9 +221,12 @@ async function activeOrderExists(userId, scheduleId, cause) {
 /**
  * Hold seats and/or GA tickets of one schedule for `HOLD_TTL_MINUTES`.
  *
- * Tx 1 first expires holds of this schedule whose time is already up, so a
- * seat that the seat map shows as free (its hold expired) can be booked now
- * instead of after the next sweep.
+ * 1. Redis fast path: short seat locks and the GA "sold out" hint reject
+ *    requests that cannot succeed, without using a PostgreSQL connection.
+ * 2. Tx 1 expires holds of this schedule whose time is already up, so a seat
+ *    that the seat map shows as free (its hold expired) can be booked now
+ *    instead of after the next sweep.
+ * 3. Tx 2 (placeOrder) decides, exactly as without Redis.
  */
 async function createOrder(context, actor, scheduleId, body) {
   const ticketCount = (body.seatIds?.length ?? 0) + (body.items ?? []).reduce((sum, item) => sum + item.quantity, 0);
@@ -228,13 +234,15 @@ async function createOrder(context, actor, scheduleId, body) {
     throw new AppError('ORDER_LIMIT_EXCEEDED', `At most ${ORDER_LIMITS.MAX_TICKETS_PER_ORDER} tickets per order.`);
   }
 
-  await expireDueOrders({ scheduleId });
-  // Fast path for the common case; uq_orders_active_cart is the real guard.
-  if (await ordersRepository.findActiveForUser(pool, { userId: actor.userId, scheduleId })) {
-    throw await activeOrderExists(actor.userId, scheduleId);
-  }
-
+  // Redis fast path (Phase 6): refuse early what PostgreSQL would refuse anyway.
+  await fastPath.assertGaHint(body.items ?? []);
+  const releaseSeatLocks = await fastPath.lockSeats(scheduleId, body.seatIds ?? []);
   try {
+    await expireDueOrders({ scheduleId });
+    // Fast path for the common case; uq_orders_active_cart is the real guard.
+    if (await ordersRepository.findActiveForUser(pool, { userId: actor.userId, scheduleId })) {
+      throw await activeOrderExists(actor.userId, scheduleId);
+    }
     return await placeOrder(actor, scheduleId, body);
   } catch (err) {
     if (isUniqueViolation(err, ACTIVE_CART_CONSTRAINT)) {
@@ -244,7 +252,12 @@ async function createOrder(context, actor, scheduleId, body) {
     if (isUniqueViolation(err, ORDER_CODE_CONSTRAINT)) {
       return placeOrder(actor, scheduleId, body);
     }
+    if (err.gaLeft) {
+      await fastPath.rememberGaLeft(err.gaLeft.ticketTypeId, err.gaLeft.left);
+    }
     throw err;
+  } finally {
+    await releaseSeatLocks();
   }
 }
 

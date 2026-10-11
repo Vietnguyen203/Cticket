@@ -1,5 +1,5 @@
 /**
- * SQL for refresh_tokens and user_tokens (OTP codes).
+ * SQL for refresh_tokens. (OTP codes moved to Redis in Phase 6: see otp.service.js.)
  * Expiry times are computed by PostgreSQL (now() + interval), so issuing and
  * checking use the same clock even if the API server's clock drifts.
  */
@@ -65,68 +65,6 @@ async function revokeAllRefreshTokensOfUser(db, userId) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// OTP codes (user_tokens)
-// ---------------------------------------------------------------------------
-
-/** How many codes were issued in the last hour, and is the latest still in cooldown? */
-async function getOtpIssueStats(db, { userId, type, cooldownSeconds }) {
-  const { rows } = await db.query(
-    `SELECT count(*) AS issued_last_hour,
-            count(*) FILTER (WHERE created_at > now() - make_interval(secs => $3)) > 0 AS in_cooldown
-     FROM user_tokens
-     WHERE user_id = $1 AND type = $2 AND created_at > now() - interval '1 hour'`,
-    [userId, type, cooldownSeconds],
-  );
-  return { issuedLastHour: rows[0].issued_last_hour, inCooldown: rows[0].in_cooldown };
-}
-
-async function revokeActiveOtps(db, { userId, type }) {
-  await db.query(
-    `UPDATE user_tokens SET revoked_at = now()
-     WHERE user_id = $1 AND type = $2 AND used_at IS NULL AND revoked_at IS NULL`,
-    [userId, type],
-  );
-}
-
-async function insertOtp(db, { userId, type, tokenHash, ttlMinutes }) {
-  await db.query(
-    `INSERT INTO user_tokens (user_id, type, token_hash, expires_at)
-     VALUES ($1, $2, $3, now() + make_interval(mins => $4))`,
-    [userId, type, tokenHash, ttlMinutes],
-  );
-}
-
-async function findActiveOtpForUpdate(db, { userId, type }) {
-  const { rows } = await db.query(
-    `SELECT id, token_hash, attempts, expires_at <= now() AS expired
-     FROM user_tokens
-     WHERE user_id = $1 AND type = $2 AND used_at IS NULL AND revoked_at IS NULL
-     FOR UPDATE`,
-    [userId, type],
-  );
-  return rows[0] ?? null;
-}
-
-/** Count a wrong guess; revoke the code once the limit is reached. */
-async function recordFailedOtpAttempt(db, { tokenId, maxAttempts }) {
-  await db.query(
-    `UPDATE user_tokens
-     SET attempts = attempts + 1,
-         revoked_at = CASE WHEN attempts + 1 >= $2 THEN now() ELSE revoked_at END
-     WHERE id = $1`,
-    [tokenId, maxAttempts],
-  );
-}
-
-async function revokeOtp(db, tokenId) {
-  await db.query(`UPDATE user_tokens SET revoked_at = now() WHERE id = $1`, [tokenId]);
-}
-
-async function markOtpUsed(db, tokenId) {
-  await db.query(`UPDATE user_tokens SET used_at = now() WHERE id = $1`, [tokenId]);
-}
-
 module.exports = {
   insertRefreshToken,
   findRefreshTokenForUpdate,
@@ -134,11 +72,4 @@ module.exports = {
   revokeRefreshTokenFamily,
   revokeFamilyByTokenHash,
   revokeAllRefreshTokensOfUser,
-  getOtpIssueStats,
-  revokeActiveOtps,
-  insertOtp,
-  findActiveOtpForUpdate,
-  recordFailedOtpAttempt,
-  revokeOtp,
-  markOtpUsed,
 };

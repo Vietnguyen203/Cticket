@@ -1,11 +1,13 @@
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { Client } = require('pg');
+const Redis = require('ioredis');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env'), quiet: true });
 
 const MIGRATE_BIN = path.resolve(__dirname, '../../node_modules/node-pg-migrate/bin/node-pg-migrate.js');
 const MIGRATIONS_DIR = path.resolve(__dirname, '../../migrations');
 const ALL_MIGRATIONS = '9999';
+const TEST_REDIS_DB = '15';
 
 function runMigrations(databaseUrl, ...args) {
   execFileSync(process.execPath, [MIGRATE_BIN, '-m', MIGRATIONS_DIR, '--no-verbose', ...args], {
@@ -16,7 +18,7 @@ function runMigrations(databaseUrl, ...args) {
 
 /**
  * Runs once before the whole test suite:
- *  1. wipe the test database schema,
+ *  1. wipe the test database schema and the test Redis database,
  *  2. migrate up, all the way down, and up again — so every run also proves
  *     that each Down Migration really reverses its Up Migration.
  */
@@ -37,6 +39,20 @@ module.exports = async function globalSetup() {
     await client.query('CREATE SCHEMA public');
   } finally {
     await client.end();
+  }
+
+  // Redis: the tests own database 15 and start from an empty one.
+  const redisUrl = process.env.TEST_REDIS_URL;
+  if (!redisUrl) throw new Error('TEST_REDIS_URL is not set');
+  if (new URL(redisUrl).pathname.slice(1) !== TEST_REDIS_DB) {
+    throw new Error(`Refusing to flush Redis: TEST_REDIS_URL must use database ${TEST_REDIS_DB}`);
+  }
+  const redis = new Redis(redisUrl, { lazyConnect: true });
+  try {
+    await redis.connect();
+    await redis.flushdb();
+  } finally {
+    redis.disconnect();
   }
 
   try {

@@ -1119,7 +1119,7 @@
           }
         },
         {
-          "name": "Thử đặt quá 10 vé/đơn (422)",
+          "name": "Thử đặt quá 8 vé/đơn (422)",
           "event": [
             {
               "listen": "test",
@@ -1147,7 +1147,7 @@
             "url": "{{host}}/api/v1/schedules/{{scheduleId}}/orders",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"seatIds\": [\n    \"{{seatB01}}\"\n  ],\n  \"items\": [\n    {\n      \"ticketTypeId\": \"{{gaId}}\",\n      \"quantity\": 10\n    }\n  ]\n}",
+              "raw": "{\n  \"seatIds\": [\n    \"{{seatB01}}\"\n  ],\n  \"items\": [\n    {\n      \"ticketTypeId\": \"{{gaId}}\",\n      \"quantity\": 8\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"

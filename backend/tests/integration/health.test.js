@@ -1,5 +1,6 @@
 const request = require('supertest');
 const { createApp } = require('../../src/app');
+const { redis } = require('../../src/redis/client');
 const { closePool } = require('../../src/database/pool');
 
 const app = createApp();
@@ -12,9 +13,16 @@ describe('health endpoints', () => {
     expect(res.body).toMatchObject({ success: true, data: { status: 'ok' } });
   });
 
-  test('GET /health/ready reports the database as up', async () => {
+  test('GET /health/ready reports the database and Redis as up', async () => {
     const res = await request(app).get('/health/ready').expect(200);
-    expect(res.body.data.checks).toEqual({ database: 'up' });
+    expect(res.body.data).toEqual({ status: 'ok', checks: { database: 'up', redis: 'up' } });
+  });
+
+  test('without Redis the API is degraded but still ready (only PostgreSQL is required)', async () => {
+    const ping = jest.spyOn(redis, 'ping').mockRejectedValueOnce(new Error('Connection is closed.'));
+    const res = await request(app).get('/health/ready').expect(200);
+    expect(res.body.data).toEqual({ status: 'degraded', checks: { database: 'up', redis: 'down' } });
+    ping.mockRestore();
   });
 
   test('echoes a safe X-Request-Id and replaces an unsafe one', async () => {

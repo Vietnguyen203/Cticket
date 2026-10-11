@@ -10,6 +10,7 @@ const ERROR_CODES = Object.freeze({
   UNAUTHENTICATED: { status: 401, message: 'Authentication is required.' },
   INVALID_CREDENTIALS: { status: 401, message: 'Email or password is incorrect.' },
   TOKEN_EXPIRED: { status: 401, message: 'The access token has expired.' },
+  TOKEN_REVOKED: { status: 401, message: 'This session has ended. Please log in again.' },
   INVALID_REFRESH_TOKEN: { status: 401, message: 'The session is invalid or has expired. Please log in again.' },
   REFRESH_TOKEN_REUSED: { status: 401, message: 'The session was revoked for security reasons. Please log in again.' },
   FORBIDDEN: { status: 403, message: 'You do not have permission to perform this action.' },
