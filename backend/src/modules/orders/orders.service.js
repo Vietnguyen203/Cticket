@@ -20,6 +20,8 @@ const ordersRepository = require('./orders.repository');
 const { releaseHeldOrder, expireOrder, expireDueOrders } = require('./order-release');
 const { generateOrderCode } = require('./order-code');
 const fastPath = require('./fast-path');
+const { publishAfterCommit } = require('../../realtime/publisher');
+const { MESSAGE, scheduleRoom, seatUpdate, inventoryUpdate } = require('../../realtime/messages');
 
 const ACTIVE_CART_CONSTRAINT = 'uq_orders_active_cart';
 const ORDER_CODE_CONSTRAINT = 'orders_order_code_key';
@@ -172,18 +174,20 @@ function placeOrder(actor, scheduleId, { seatIds = [], items = [] }) {
     const seats = seatIds.length > 0 ? await lockRequestedSeats(client, scheduleId, seatIds) : [];
     assertPerTypeLimits(seats, gaItems);
 
-    if (seats.length > 0) {
-      const held = await events.holdSeats(client, { scheduleId, seatIds, orderId: order.id, expiresAt: order.expires_at });
-      if (held !== seats.length) throw new Error('Locked seats changed status inside the booking transaction');
-    }
+    const heldSeats =
+      seats.length > 0 ? await events.holdSeats(client, { scheduleId, seatIds, orderId: order.id, expiresAt: order.expires_at }) : [];
+    if (heldSeats.length !== seats.length) throw new Error('Locked seats changed status inside the booking transaction');
+    const counters = [];
     for (const { ticketType, quantity } of gaItems) {
-      if (!(await events.holdGa(client, { ticketTypeId: ticketType.id, quantity }))) {
+      const counter = await events.holdGa(client, { ticketTypeId: ticketType.id, quantity });
+      if (!counter) {
         const error = new AppError('INSUFFICIENT_INVENTORY', `Not enough "${ticketType.name}" tickets left.`, {
           details: [{ field: 'body.items', message: `${ticketType.id} has fewer than ${quantity} left` }],
         });
         error.gaLeft = { ticketTypeId: ticketType.id, left: await events.gaAvailable(client, ticketType.id) };
         throw error;
       }
+      counters.push(counter);
     }
 
     // Prices are snapshots: a later change to the ticket type never changes this order.
@@ -206,6 +210,11 @@ function placeOrder(actor, scheduleId, { seatIds = [], items = [] }) {
     ];
     await ordersRepository.insertItems(client, { orderId: order.id, eventId: event.id, scheduleId }, lines);
     await ordersRepository.recalculateTotals(client, order.id);
+
+    // Live seat maps update once this commits (never for a rolled-back attempt).
+    const room = scheduleRoom(scheduleId);
+    if (heldSeats.length > 0) publishAfterCommit(client, room, seatUpdate(MESSAGE.SEAT_HELD, scheduleId, heldSeats));
+    if (counters.length > 0) publishAfterCommit(client, room, inventoryUpdate(scheduleId, counters));
     return loadOrder(client, order.id);
   });
 }

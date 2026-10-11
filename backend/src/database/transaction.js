@@ -19,6 +19,11 @@ const logger = require('../utils/logger');
  * Rule: no network calls other than this client inside `fn` (no Redis, HTTP,
  * queue, WebSocket). Row locks are held until COMMIT/ROLLBACK, so any slow
  * call inside the transaction makes every other request wait on those locks.
+ * Code that must talk to the outside world registers it with
+ * `client.afterCommit(callback)` instead: callbacks run only after a
+ * successful COMMIT (and after the connection is back in the pool), never
+ * after a ROLLBACK. Their errors are logged, never thrown: the data is
+ * already committed, so the request has succeeded.
  *
  * @template T
  * @param {(client: import('pg').PoolClient) => Promise<T>} fn
@@ -38,11 +43,14 @@ async function withTransaction(fn) {
   };
   client.on('error', onClientError);
 
+  const afterCommit = [];
+  client.afterCommit = (callback) => afterCommit.push(callback);
+
+  let result;
   try {
     await client.query('BEGIN');
-    const result = await fn(client);
+    result = await fn(client);
     await client.query('COMMIT');
-    return result;
   } catch (err) {
     try {
       await client.query('ROLLBACK');
@@ -52,10 +60,20 @@ async function withTransaction(fn) {
     }
     throw err;
   } finally {
+    delete client.afterCommit; // pooled clients are reused by other requests
     client.off('error', onClientError);
     // release(true) destroys the connection instead of returning it to the pool.
     client.release(clientIsBroken);
   }
+
+  for (const callback of afterCommit) {
+    try {
+      await callback();
+    } catch (err) {
+      logger.error({ err }, 'After-commit callback failed');
+    }
+  }
+  return result;
 }
 
 module.exports = { withTransaction };

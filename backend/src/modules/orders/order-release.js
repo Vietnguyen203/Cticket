@@ -2,6 +2,8 @@ const { pool } = require('../../database/pool');
 const { withTransaction } = require('../../database/transaction');
 const { ORDER_STATUS, CANCEL_REASON, ORDER_LIMITS } = require('../../config/constants');
 const events = require('../events');
+const { publishAfterCommit } = require('../../realtime/publisher');
+const { MESSAGE, scheduleRoom, userRoom, seatUpdate, inventoryUpdate } = require('../../realtime/messages');
 const ordersRepository = require('./orders.repository');
 
 /**
@@ -18,14 +20,27 @@ async function releaseHeldOrder(client, orderId, { to, cancelReason = null }) {
   const changed = await ordersRepository.transition(client, { orderId, from: ORDER_STATUS.HELD, to, cancelReason });
   if (!changed) return false;
 
-  await events.releaseSeatsOfOrder(client, orderId);
+  const seats = await events.releaseSeatsOfOrder(client, orderId);
+  const counters = [];
   for (const line of await ordersRepository.gaLines(client, orderId)) {
-    if (!(await events.releaseGa(client, line))) {
+    const counter = await events.releaseGa(client, line);
+    if (!counter) {
       // held_quantity smaller than this order's hold: the counters are out of
       // sync. Roll back rather than hide it; inventory:check will show where.
       throw new Error(`GA counter of ticket type ${line.ticketTypeId} is lower than the quantity being released`);
     }
+    counters.push(counter);
   }
+
+  // Live seat maps and the order's owner hear about it once this commits.
+  const room = scheduleRoom(changed.schedule_id);
+  if (seats.length > 0) publishAfterCommit(client, room, seatUpdate(MESSAGE.SEAT_RELEASED, changed.schedule_id, seats));
+  if (counters.length > 0) publishAfterCommit(client, room, inventoryUpdate(changed.schedule_id, counters));
+  publishAfterCommit(client, userRoom(changed.user_id), {
+    type: to === ORDER_STATUS.EXPIRED ? MESSAGE.ORDER_EXPIRED : MESSAGE.ORDER_CANCELLED,
+    orderId,
+    reason: cancelReason,
+  });
   return true;
 }
 
