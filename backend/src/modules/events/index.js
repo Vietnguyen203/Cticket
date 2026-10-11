@@ -6,9 +6,25 @@
 const { lockScheduleForSale, PUBLIC_STATUSES } = require('./event-access');
 const inventoryRepository = require('./inventory.repository');
 const ticketTypesRepository = require('./ticket-types.repository');
+const schedulesRepository = require('./schedules.repository');
+const eventsRepository = require('./events.repository');
+const { pool } = require('../../database/pool');
+
+/**
+ * A schedule whose seat map anyone may watch live (WebSocket SUBSCRIBE):
+ * its event is public and its inventory exists. Otherwise null, so a DRAFT
+ * event's schedules cannot even be confirmed to exist.
+ */
+async function findWatchableSchedule(scheduleId) {
+  const schedule = await schedulesRepository.findById(pool, scheduleId);
+  if (!schedule || !schedule.inventory_generated_at) return null;
+  const event = await eventsRepository.findById(pool, schedule.event_id);
+  return event && PUBLIC_STATUSES.includes(event.status) ? schedule : null;
+}
 
 module.exports = {
   PUBLIC_STATUSES,
+  findWatchableSchedule,
   lockScheduleForSale,
   listTicketTypes: ticketTypesRepository.listBySchedule,
   lockSeatsForHold: inventoryRepository.lockSeatsForHold,

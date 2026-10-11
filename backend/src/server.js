@@ -5,8 +5,12 @@ const { createApp } = require('./app');
 const { closePool } = require('./database/pool');
 const { redis, closeRedis } = require('./redis/client');
 const { startOrderSweeper } = require('./modules/orders/orders.sweeper');
+const { RealtimeHub } = require('./realtime/hub');
 
 const server = http.createServer(createApp());
+// WebSocket endpoint /ws on the same port as the REST API.
+const realtimeHub = new RealtimeHub();
+realtimeHub.attach(server).catch((err) => logger.error({ err }, 'Failed to start the WebSocket endpoint'));
 
 server.listen(env.PORT, () => {
   logger.info({ port: env.PORT, env: env.NODE_ENV }, 'API server listening');
@@ -23,7 +27,8 @@ let shuttingDown = false;
 
 /**
  * Graceful shutdown (Docker sends SIGTERM on `docker compose stop`):
- *  1. stop accepting new connections and let in-flight requests finish,
+ *  1. close WebSockets (clients reconnect elsewhere), stop accepting new
+ *     connections and let in-flight requests finish,
  *  2. stop the order sweeper (letting a sweep in progress finish),
  *  3. close the PostgreSQL pool and the Redis connection,
  *  4. exit. A timer forces exit if something hangs.
@@ -40,6 +45,8 @@ async function shutdown(signal, exitCode = 0) {
   forceExitTimer.unref();
 
   try {
+    // Open WebSockets would keep server.close() waiting forever: close them first.
+    await realtimeHub.close();
     await new Promise((resolve, reject) => server.close((err) => (err ? reject(err) : resolve())));
     await orderSweeper.stop();
     await closePool();

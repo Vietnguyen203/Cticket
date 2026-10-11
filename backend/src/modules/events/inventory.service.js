@@ -9,6 +9,8 @@ const eventsRepository = require('./events.repository');
 const ticketTypesRepository = require('./ticket-types.repository');
 const { canView, canManage, eventNotFound, scheduleNotFound, lockScheduleOfManageableEvent } = require('./event-access');
 const { remember, invalidatesAfter, NAMESPACE, TTL } = require('../../redis/cache');
+const { publishAfterCommit } = require('../../realtime/publisher');
+const { MESSAGE, scheduleRoom, seatUpdate, inventoryUpdate } = require('../../realtime/messages');
 
 const toNumberOrNull = (value) => (value === null ? null : Number(value));
 
@@ -188,8 +190,13 @@ async function changeSeatBlocks(client, { scheduleId, action, seatIds, reason })
     .map((id) => ({ seatId: id, status: statusById[id] ?? 'NOT_IN_INVENTORY' }));
 
   if (applied.length > 0) {
-    if (action === 'BLOCK') await inventoryRepository.blockSeats(client, scheduleId, applied, reason);
-    else await inventoryRepository.unblockSeats(client, scheduleId, applied);
+    const changed =
+      action === 'BLOCK'
+        ? await inventoryRepository.blockSeats(client, scheduleId, applied, reason)
+        : await inventoryRepository.unblockSeats(client, scheduleId, applied);
+    // One message for the whole batch: blocking 50 seats is one update, not 50.
+    const type = action === 'BLOCK' ? MESSAGE.SEAT_BLOCKED : MESSAGE.SEAT_RELEASED;
+    publishAfterCommit(client, scheduleRoom(scheduleId), seatUpdate(type, scheduleId, changed));
   }
   return { applied, rejected };
 }
@@ -211,10 +218,11 @@ async function changeGaBlock(client, { scheduleId, action, ticketTypeId, quantit
       ? 'Not enough available tickets to block.'
       : 'Not that many tickets are blocked.');
   }
+  publishAfterCommit(client, scheduleRoom(scheduleId), inventoryUpdate(scheduleId, [counters]));
   return {
     ticketTypeId,
     quantity,
-    available: counters.capacity - counters.held_quantity - counters.sold_quantity - counters.blocked_quantity,
+    available: counters.available,
     blocked: counters.blocked_quantity,
   };
 }

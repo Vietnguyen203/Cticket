@@ -134,7 +134,7 @@ async function transition(db, { orderId, from, to, cancelReason = null }) {
          cancelled_at = CASE WHEN $3::order_status = 'CANCELLED' THEN now() END,
          cancel_reason = $4
      WHERE id = $1 AND status = $2::order_status
-     RETURNING id`,
+     RETURNING id, user_id, schedule_id`,
     [orderId, from, to, cancelReason],
   );
   return rows[0] ?? null;

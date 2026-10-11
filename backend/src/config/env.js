@@ -61,6 +61,9 @@ const envSchema = z.object({
   // Behind a reverse proxy: number of proxy hops to trust for the client IP.
   TRUST_PROXY: z.coerce.number().int().min(0).default(0),
 
+  // WebSocket: ping every N seconds; a client that misses one ping is dropped.
+  WS_HEARTBEAT_SECONDS: z.coerce.number().int().min(1).max(300).default(30),
+
   // Booking: how long a HELD order keeps its seats, and how often expired
   // holds are swept back into stock (in-process until BullMQ in Phase 9).
   HOLD_TTL_MINUTES: z.coerce.number().int().min(1).max(60).default(10),
