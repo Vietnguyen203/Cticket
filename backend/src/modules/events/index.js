@@ -16,4 +16,5 @@ module.exports = {
   releaseSeatsOfOrder: inventoryRepository.releaseSeatsOfOrder,
   holdGa: inventoryRepository.holdGa,
   releaseGa: inventoryRepository.releaseGa,
+  gaAvailable: inventoryRepository.gaAvailable,
 };

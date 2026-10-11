@@ -12,6 +12,7 @@ const { PUBLIC_STATUSES, canManage, canView, eventNotFound, lockManageableEvent 
 const { findTransition } = require('./event-status');
 const { toPublicSchedule } = require('./schedules.mapper');
 const inventoryService = require('./inventory.service');
+const { remember, invalidatesAfter, keyOf, NAMESPACE, TTL } = require('../../redis/cache');
 const orders = require('../orders');
 
 const SLUG_CONSTRAINT = 'events_slug_key';
@@ -195,8 +196,20 @@ async function changeStatus(context, actor, eventId, { status, reason }) {
 // Queries
 // ---------------------------------------------------------------------------
 
+/**
+ * Public events come from the cache (10 minutes, refreshed on every change).
+ * Anything else (a DRAFT seen by its owner, an admin review) is read fresh.
+ */
 async function getEvent(actor, idOrSlug) {
-  const lookup = UUID_PATTERN.test(idOrSlug) ? { id: idOrSlug } : { slug: idOrSlug };
+  const isId = UUID_PATTERN.test(idOrSlug);
+  const lookup = isId ? { id: idOrSlug.toLowerCase() } : { slug: idOrSlug };
+  const cached = await remember(NAMESPACE.CATALOG, `event:${lookup.id ?? lookup.slug}`, TTL.EVENT_DETAIL, async () => {
+    const row = await eventsRepository.findDetail(pool, lookup);
+    if (!row || !PUBLIC_STATUSES.includes(row.status)) return null; // never cache a non-public event
+    return toEventDetail(row, await schedulesRepository.listByEvent(pool, row.id));
+  });
+  if (cached) return cached;
+
   const row = await eventsRepository.findDetail(pool, lookup);
   if (!row || !canView(actor, row)) {
     throw eventNotFound();
@@ -231,22 +244,38 @@ async function listEvents(actor, query) {
     }
     scope = { statuses: [status], requireSchedule: hasScheduleFilter, defaultSort: '-createdAt' };
   } else {
-    scope = { statuses: [EVENT_STATUS.PUBLISHED], requireSchedule: true, defaultSort: 'startAt' };
+    scope = { statuses: [EVENT_STATUS.PUBLISHED], requireSchedule: true, defaultSort: 'startAt', cacheable: true };
   }
 
-  const { rows, total } = await eventsRepository.listEvents(pool, {
-    statuses: scope.statuses,
-    organizerId: scope.organizerId,
-    q,
-    categoryId,
-    city,
-    dateFrom,
-    dateTo,
-    requireSchedule: scope.requireSchedule,
-    sort: sort ?? scope.defaultSort,
-    ...toLimitOffset({ page, pageSize }),
-  });
-  return { events: rows.map(toEventSummary), meta: toPageMeta({ page, pageSize }, total) };
+  const load = async () => {
+    const { rows, total } = await eventsRepository.listEvents(pool, {
+      statuses: scope.statuses,
+      organizerId: scope.organizerId,
+      q,
+      categoryId,
+      city,
+      dateFrom,
+      dateTo,
+      requireSchedule: scope.requireSchedule,
+      sort: sort ?? scope.defaultSort,
+      ...toLimitOffset({ page, pageSize }),
+    });
+    return { events: rows.map(toEventSummary), meta: toPageMeta({ page, pageSize }, total) };
+  };
+
+  // Only the public catalogue is cached: "mine" and status filters are per user.
+  if (!scope.cacheable) return load();
+  const key = keyOf('events', { q, categoryId, city, dateFrom, dateTo, sort, page, pageSize });
+  return remember(NAMESPACE.CATALOG, key, TTL.EVENT_LIST, load);
 }
 
-module.exports = { createEvent, updateEvent, deleteEvent, changeStatus, getEvent, listEvents };
+const changesCatalog = [NAMESPACE.CATALOG];
+
+module.exports = {
+  createEvent,
+  updateEvent: invalidatesAfter(changesCatalog, updateEvent),
+  deleteEvent: invalidatesAfter(changesCatalog, deleteEvent),
+  changeStatus: invalidatesAfter(changesCatalog, changeStatus),
+  getEvent,
+  listEvents,
+};

@@ -2,6 +2,7 @@ const { Router } = require('express');
 const validate = require('../../middleware/validate');
 const authenticate = require('../../middleware/authenticate');
 const authorize = require('../../middleware/authorize');
+const { rateLimit, LIMITS } = require('../../middleware/rateLimit');
 const schemas = require('./orders.schemas');
 const controller = require('./orders.controller');
 
@@ -22,6 +23,7 @@ const scheduleOrdersRouter = Router();
 scheduleOrdersRouter.post(
   '/:id/orders',
   authenticate,
+  rateLimit(LIMITS.booking), // per user: stops bots hammering the booking endpoint
   authorize('booking:create'),
   validate({ params: schemas.idParams, body: schemas.createOrder }),
   controller.create,

@@ -5,10 +5,12 @@ const { ROLES, USER_STATUS, OTP_PURPOSE } = require('../../config/constants');
 const { pool } = require('../../database/pool');
 const { withTransaction } = require('../../database/transaction');
 const AppError = require('../../utils/AppError');
+const logger = require('../../utils/logger');
 const users = require('../users');
 const authRepository = require('./auth.repository');
 const tokens = require('./auth.tokens');
 const otpService = require('./otp.service');
+const denylist = require('./denylist');
 
 /** Account status a user must have to receive / use a code for each purpose. */
 const REQUIRED_STATUS = {
@@ -58,11 +60,10 @@ async function register({ email, password, firstName, lastName, phone }) {
   // so we never hold a database connection while hashing.
   const passwordHash = await hashPassword(password);
 
-  // User, role and verification code are created together or not at all:
-  // there is never an account without a role or without a way to verify it.
-  // A duplicate email is rejected by the UNIQUE index (→ 409 EMAIL_TAKEN),
-  // which stays correct even when two registrations race each other.
-  const { user, code } = await withTransaction(async (client) => {
+  // User and role are created together or not at all. A duplicate email is
+  // rejected by the UNIQUE index (→ 409 EMAIL_TAKEN), even when two
+  // registrations race each other.
+  const user = await withTransaction(async (client) => {
     const created = await users.insertUser(client, {
       email,
       passwordHash,
@@ -72,66 +73,63 @@ async function register({ email, password, firstName, lastName, phone }) {
       status: USER_STATUS.PENDING_VERIFICATION,
     });
     await users.addRole(client, created.id, ROLES.CUSTOMER);
-    const otp = await otpService.issueOtp(client, created.id, OTP_PURPOSE.EMAIL_VERIFICATION);
-    return { user: created, code: otp };
+    return created;
   });
 
-  await otpService.sendOtpEmail(user, OTP_PURPOSE.EMAIL_VERIFICATION, code);
+  // The code lives in Redis, so it is created after COMMIT. If Redis fails
+  // here the account still exists and "resend code" fixes it.
+  try {
+    const code = await otpService.issueOtp(user.id, OTP_PURPOSE.EMAIL_VERIFICATION);
+    if (code) await otpService.sendOtpEmail(user, OTP_PURPOSE.EMAIL_VERIFICATION, code);
+  } catch (err) {
+    logger.error({ err, userId: user.id }, 'Account created but the verification code could not be issued');
+  }
   return users.toPublicUser(user, [ROLES.CUSTOMER]);
 }
 
 /**
  * Send (or re-send) a code. Never reveals whether the email exists, whether
  * the account is eligible, or whether a limit was hit: the caller always
- * gets the same 202 response.
+ * gets the same 202 response. The resend limits are enforced atomically in
+ * Redis, so no row lock is needed.
  */
 async function requestOtp({ email, purpose }) {
-  const issued = await withTransaction(async (client) => {
-    // Locking the user row serializes concurrent requests for the same user,
-    // so the cooldown / hourly limit cannot be bypassed by parallel calls.
-    const user = await users.findByEmail(client, email, { forUpdate: true });
-    if (!user || user.status !== REQUIRED_STATUS[purpose]) {
-      return null;
-    }
-    const code = await otpService.issueOtp(client, user.id, purpose);
-    return code ? { user, code } : null;
-  });
-
-  if (issued) {
-    await otpService.sendOtpEmail(issued.user, purpose, issued.code);
+  const user = await users.findByEmail(pool, email);
+  if (!user || user.status !== REQUIRED_STATUS[purpose]) {
+    return;
+  }
+  const code = await otpService.issueOtp(user.id, purpose);
+  if (code) {
+    await otpService.sendOtpEmail(user, purpose, code);
   }
 }
 
 /**
  * EMAIL_VERIFICATION: activates the account.
  * PASSWORD_RESET: sets the new password and logs the user out everywhere.
+ *
+ * The code is used up in Redis FIRST, then PostgreSQL is updated. If the
+ * database step fails, the code is gone and the user asks for a new one;
+ * an account is never activated without a correct code.
  */
 async function verifyOtp({ email, purpose, otp, newPassword }) {
+  const user = await users.findByEmail(pool, email);
+  if (!user || user.status !== REQUIRED_STATUS[purpose] || !(await otpService.consumeOtp(user.id, purpose, otp))) {
+    throw new AppError('INVALID_OTP');
+  }
+
   const newPasswordHash = purpose === OTP_PURPOSE.PASSWORD_RESET ? await hashPassword(newPassword) : null;
-
-  const verified = await withTransaction(async (client) => {
-    // Lock order users → user_tokens, the same as requestOtp, so the two
-    // can never deadlock each other.
-    const user = await users.findByEmail(client, email, { forUpdate: true });
-    if (!user || user.status !== REQUIRED_STATUS[purpose]) {
-      return false;
-    }
-    if (!(await otpService.consumeOtp(client, user.id, purpose, otp))) {
-      return false; // COMMIT anyway: the failed attempt must be counted
-    }
-
+  await withTransaction(async (client) => {
     if (purpose === OTP_PURPOSE.EMAIL_VERIFICATION) {
       await users.markEmailVerified(client, user.id);
     } else {
       await users.updatePasswordHash(client, user.id, newPasswordHash);
       await authRepository.revokeAllRefreshTokensOfUser(client, user.id);
     }
-    return true;
   });
-
-  // Thrown only after COMMIT, so the attempt counter is persisted.
-  if (!verified) {
-    throw new AppError('INVALID_OTP');
+  if (purpose === OTP_PURPOSE.PASSWORD_RESET) {
+    // Access tokens already handed out stop working now, not in 15 minutes.
+    await denylist.revokeAllTokensOfUser(user.id);
   }
 }
 
@@ -206,9 +204,16 @@ async function refresh({ refreshToken }, meta) {
   return buildTokenResponse(outcome);
 }
 
-/** Idempotent: an unknown or already-revoked token is not an error. */
-async function logout({ refreshToken }) {
+/**
+ * Idempotent: an unknown or already-revoked token is not an error.
+ * If the caller also sent its access token, that token stops working now
+ * (denylist) instead of staying valid until it expires.
+ */
+async function logout({ refreshToken }, accessToken) {
   await authRepository.revokeFamilyByTokenHash(pool, tokens.hashRefreshToken(refreshToken));
+  if (accessToken) {
+    await denylist.revokeToken(accessToken);
+  }
 }
 
 module.exports = { register, requestOtp, verifyOtp, login, refresh, logout, hashPassword };

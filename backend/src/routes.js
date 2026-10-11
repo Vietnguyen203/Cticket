@@ -1,5 +1,6 @@
 const { Router } = require('express');
 const authRoutes = require('./modules/auth/auth.routes');
+const usersRoutes = require('./modules/users/users.routes');
 const categoriesRoutes = require('./modules/categories/categories.routes');
 const { venuesRouter, zonesRouter, seatsRouter } = require('./modules/venues/venues.routes');
 const organizersRoutes = require('./modules/organizers/organizers.routes');
@@ -10,6 +11,7 @@ const { ordersRouter, scheduleOrdersRouter } = require('./modules/orders/orders.
 const apiRouter = Router();
 
 apiRouter.use('/auth', authRoutes);
+apiRouter.use('/users', usersRoutes);
 apiRouter.use('/categories', categoriesRoutes);
 apiRouter.use('/venues', venuesRouter);
 apiRouter.use('/zones', zonesRouter);

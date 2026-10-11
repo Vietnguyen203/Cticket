@@ -4,8 +4,12 @@
  * transaction client so the query joins the caller's transaction.
  */
 
+const { buildSetClause } = require('../../utils/sql');
+
 const USER_COLUMNS = `id, email, password_hash, first_name, last_name, phone, status,
   email_verified_at, created_at, updated_at`;
+
+const PROFILE_COLUMNS = { firstName: 'first_name', lastName: 'last_name', phone: 'phone' };
 
 async function insertUser(db, { email, passwordHash, firstName, lastName, phone = null, status, emailVerifiedAt = null }) {
   const { rows } = await db.query(
@@ -31,6 +35,19 @@ async function findByEmail(db, email, { forUpdate = false } = {}) {
 
 async function findById(db, userId) {
   const { rows } = await db.query(`SELECT ${USER_COLUMNS} FROM users WHERE id = $1`, [userId]);
+  return rows[0] ?? null;
+}
+
+/**
+ * Profile fields only (never email, password or status). A phone number
+ * that belongs to someone else fails users_phone_key → 409 PHONE_TAKEN.
+ */
+async function updateProfile(db, userId, changes) {
+  const { clause, params } = buildSetClause(changes, PROFILE_COLUMNS, 2);
+  const { rows } = await db.query(`UPDATE users SET ${clause} WHERE id = $1 RETURNING ${USER_COLUMNS}`, [
+    userId,
+    ...params,
+  ]);
   return rows[0] ?? null;
 }
 
@@ -80,6 +97,7 @@ async function findAllRolePermissions(db) {
 }
 
 module.exports = {
+  updateProfile,
   insertUser,
   findByEmail,
   findById,

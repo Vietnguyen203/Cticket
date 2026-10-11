@@ -5,6 +5,7 @@ const { ZONE_KIND, VENUE_STATUS, INVENTORY_LIMITS } = require('../../config/cons
 const AppError = require('../../utils/AppError');
 const venuesRepository = require('./venues.repository');
 const layoutRepository = require('./venue-layout.repository');
+const { remember, invalidatesAfter, NAMESPACE, TTL } = require('../../redis/cache');
 
 const SEAT_NUMBER_DIGITS = 2;
 
@@ -118,9 +119,21 @@ async function deleteSeat(seatId) {
 
 /** Physical layout: zones with their seats and coordinates (for drawing a seat map). */
 async function getLayout(venueId, { canManage }) {
-  const venue = await venuesRepository.findById(pool, venueId);
-  if (!venue || (venue.status !== VENUE_STATUS.ACTIVE && !canManage)) {
+  // An ACTIVE venue's layout comes from the cache (1 hour, refreshed on change).
+  const cached = await remember(NAMESPACE.VENUES, `layout:${venueId}`, TTL.VENUE_LAYOUT, () => loadLayout(venueId, false));
+  if (cached) return cached;
+
+  const layout = await loadLayout(venueId, canManage);
+  if (!layout) {
     throw new AppError('NOT_FOUND', 'Venue not found.');
+  }
+  return layout;
+}
+
+async function loadLayout(venueId, includeInactive) {
+  const venue = await venuesRepository.findById(pool, venueId);
+  if (!venue || (venue.status !== VENUE_STATUS.ACTIVE && !includeInactive)) {
+    return null;
   }
   const [zones, seats] = await Promise.all([
     layoutRepository.listZones(pool, venueId),
@@ -145,11 +158,14 @@ async function findPlannableSeats(db, query) {
   return layoutRepository.findPlannableSeats(db, query);
 }
 
+// Zone names and seats also appear in the cached seat maps of schedules.
+const changesLayout = [NAMESPACE.VENUES, NAMESPACE.CATALOG];
+
 module.exports = {
-  createZone,
-  updateZone,
-  createSeats,
-  deleteSeat,
+  createZone: invalidatesAfter(changesLayout, createZone),
+  updateZone: invalidatesAfter(changesLayout, updateZone),
+  createSeats: invalidatesAfter(changesLayout, createSeats),
+  deleteSeat: invalidatesAfter(changesLayout, deleteSeat),
   getLayout,
   findZone,
   findPlannableSeats,

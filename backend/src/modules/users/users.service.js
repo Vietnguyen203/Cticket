@@ -36,4 +36,13 @@ async function getProfile(userId) {
   return { ...toPublicUser(user, roles), permissions };
 }
 
-module.exports = { toPublicUser, getProfile };
+/** USR-01: the user edits their own name and phone number. */
+async function updateProfile(userId, changes) {
+  const updated = await usersRepository.updateProfile(pool, userId, changes);
+  if (!updated) {
+    throw new AppError('UNAUTHENTICATED');
+  }
+  return getProfile(userId);
+}
+
+module.exports = { toPublicUser, getProfile, updateProfile };

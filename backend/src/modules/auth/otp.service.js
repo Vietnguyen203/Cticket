@@ -1,10 +1,14 @@
 const env = require('../../config/env');
 const { OTP } = require('../../config/constants');
+const AppError = require('../../utils/AppError');
 const logger = require('../../utils/logger');
-const { hmacSha256, randomNumericCode, safeEqualHex } = require('../../utils/crypto');
+const { hmacSha256, randomNumericCode } = require('../../utils/crypto');
+const { redis } = require('../../redis/client');
 const mailer = require('../../mail/mailer');
 const { otpEmail } = require('../../mail/templates');
-const authRepository = require('./auth.repository');
+
+const SECONDS_PER_MINUTE = 60;
+const SECONDS_PER_HOUR = 3600;
 
 /**
  * The stored hash binds the code to one user and one purpose: the same
@@ -14,59 +18,65 @@ function hashOtp(userId, purpose, code) {
   return hmacSha256(env.OTP_SECRET, `${userId}:${purpose}:${code}`);
 }
 
-/**
- * Create a new code, revoking any previous one. Runs inside the caller's
- * transaction, which must already hold the user's row lock (so two concurrent
- * requests cannot both pass the limits below).
- *
- * @returns {Promise<string|null>} the plain code, or null when the resend
- *   cooldown or the hourly limit is reached
- */
-async function issueOtp(client, userId, purpose) {
-  const stats = await authRepository.getOtpIssueStats(client, {
-    userId,
-    type: purpose,
-    cooldownSeconds: OTP.RESEND_COOLDOWN_SECONDS,
-  });
-  if (stats.inCooldown || stats.issuedLastHour >= OTP.MAX_PER_HOUR) {
-    return null;
-  }
-
-  await authRepository.revokeActiveOtps(client, { userId, type: purpose });
-  const code = randomNumericCode(OTP.LENGTH);
-  await authRepository.insertOtp(client, {
-    userId,
-    type: purpose,
-    tokenHash: hashOtp(userId, purpose, code),
-    ttlMinutes: OTP.TTL_MINUTES,
-  });
-  return code;
+/** Redis keys of one user's code for one purpose (the client adds the "etp:" prefix). */
+function otpKeys(userId, purpose) {
+  return {
+    code: `otp:${purpose}:${userId}`,
+    cooldown: `otp:cooldown:${purpose}:${userId}`,
+    hourly: `otp:hourly:${purpose}:${userId}`,
+  };
 }
 
 /**
- * Check a code and mark it used. Runs inside the caller's transaction.
+ * Codes live only in Redis, so unlike cache or rate limits there is nothing
+ * to fall back to: report 503 and let the client retry.
+ */
+async function withRedis(operation) {
+  try {
+    return await operation();
+  } catch (err) {
+    throw new AppError('SERVICE_UNAVAILABLE', 'Verification codes are temporarily unavailable. Please try again.', {
+      cause: err,
+    });
+  }
+}
+
+/**
+ * Create a new code, replacing any previous one. The resend cooldown and the
+ * hourly cap are checked in the same atomic Lua script, so parallel requests
+ * cannot slip past them (no row lock needed any more).
  *
- * A wrong guess is RECORDED in the database, so the caller must COMMIT even
- * when this returns false. Throwing inside the transaction would roll the
- * counter back and give an attacker unlimited guesses.
- *
+ * @returns {Promise<string|null>} the plain code, or null when a limit applies
+ */
+async function issueOtp(userId, purpose) {
+  const code = randomNumericCode(OTP.LENGTH);
+  const keys = otpKeys(userId, purpose);
+  const issued = await withRedis(() =>
+    redis.otpIssue(
+      keys.code,
+      keys.cooldown,
+      keys.hourly,
+      hashOtp(userId, purpose, code),
+      OTP.TTL_MINUTES * SECONDS_PER_MINUTE,
+      OTP.RESEND_COOLDOWN_SECONDS,
+      SECONDS_PER_HOUR,
+      OTP.MAX_PER_HOUR,
+    ),
+  );
+  return issued === 1 ? code : null;
+}
+
+/**
+ * Check a code and use it up. A wrong guess is counted atomically; at
+ * MAX_ATTEMPTS the code is deleted, so even the right code stops working.
+ * Two concurrent requests with the right code: exactly one gets true.
  * @returns {Promise<boolean>}
  */
-async function consumeOtp(client, userId, purpose, code) {
-  const token = await authRepository.findActiveOtpForUpdate(client, { userId, type: purpose });
-  if (!token) {
-    return false;
-  }
-  if (token.expired) {
-    await authRepository.revokeOtp(client, token.id);
-    return false;
-  }
-  if (!safeEqualHex(hashOtp(userId, purpose, code), token.token_hash)) {
-    await authRepository.recordFailedOtpAttempt(client, { tokenId: token.id, maxAttempts: OTP.MAX_ATTEMPTS });
-    return false;
-  }
-  await authRepository.markOtpUsed(client, token.id);
-  return true;
+async function consumeOtp(userId, purpose, code) {
+  const result = await withRedis(() =>
+    redis.otpConsume(otpKeys(userId, purpose).code, hashOtp(userId, purpose, code), OTP.MAX_ATTEMPTS),
+  );
+  return result === 1;
 }
 
 /**
@@ -84,4 +94,4 @@ async function sendOtpEmail(user, purpose, code) {
   }
 }
 
-module.exports = { issueOtp, consumeOtp, sendOtpEmail };
+module.exports = { issueOtp, consumeOtp, sendOtpEmail, otpKeys };

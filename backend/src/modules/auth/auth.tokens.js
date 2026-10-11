@@ -25,7 +25,7 @@ function signAccessToken({ id, roles }) {
   return { accessToken, expiresIn: env.JWT_ACCESS_TTL_SECONDS };
 }
 
-/** @returns {{ id: string, roles: string[] }} */
+/** @returns {{ id: string, roles: string[], jti: string, issuedAt: number, expiresAt: number }} */
 function verifyAccessToken(token) {
   let claims;
   try {
@@ -45,7 +45,7 @@ function verifyAccessToken(token) {
   if (claims.typ !== ACCESS_TOKEN_TYPE || typeof claims.sub !== 'string' || !Array.isArray(claims.roles)) {
     throw new AppError('UNAUTHENTICATED');
   }
-  return { id: claims.sub, roles: claims.roles };
+  return { id: claims.sub, roles: claims.roles, jti: claims.jti, issuedAt: claims.iat, expiresAt: claims.exp };
 }
 
 /** Opaque refresh token: the client keeps `token`, the database keeps only `hash`. */

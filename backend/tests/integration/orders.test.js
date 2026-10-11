@@ -345,15 +345,28 @@ describe('concurrency: the database alone prevents over-selling', () => {
   test('one customer double-clicking 5 times gets one order', async () => {
     const { schedule, seat, standing } = await onSale();
     const [buyer] = await createCustomers(1);
+    const doubleClick = (body) => Promise.all(Array.from({ length: 5 }, () => book(app, buyer.token, schedule.id, body)));
 
-    const results = await Promise.all(
+    // GA only: the second request waits on uq_orders_active_cart, then is told about the first order.
+    const gaOnly = await doubleClick({ items: [{ ticketTypeId: standing.id, quantity: 1 }] });
+    expect(gaOnly.filter((r) => r.status === 201)).toHaveLength(1);
+    expect(gaOnly.filter((r) => r.status === 409).map((r) => r.body.error.code)).toEqual(Array(4).fill('ACTIVE_ORDER_EXISTS'));
+
+    // With a seat, the Redis seat lock usually stops the copies even earlier (status LOCKED).
+    const other = await onSale();
+    const [buyer2] = await createCustomers(1);
+    const withSeat = await Promise.all(
       Array.from({ length: 5 }, () =>
-        book(app, buyer.token, schedule.id, { seatIds: [seat.A01], items: [{ ticketTypeId: standing.id, quantity: 1 }] }),
+        book(app, buyer2.token, other.schedule.id, { seatIds: [other.seat.A01], items: [{ ticketTypeId: other.standing.id, quantity: 1 }] }),
       ),
     );
-    expect(results.filter((r) => r.status === 201)).toHaveLength(1);
-    expect(results.filter((r) => r.status === 409).map((r) => r.body.error.code)).toEqual(Array(4).fill('ACTIVE_ORDER_EXISTS'));
+    expect(withSeat.filter((r) => r.status === 201)).toHaveLength(1);
+    for (const refused of withSeat.filter((r) => r.status !== 201)) {
+      expect(refused.status).toBe(409);
+      expect(['ACTIVE_ORDER_EXISTS', 'SEATS_UNAVAILABLE']).toContain(refused.body.error.code);
+    }
     expect(await gaCounters(standing.id)).toMatchObject({ held_quantity: 1 });
+    expect(await gaCounters(other.standing.id)).toMatchObject({ held_quantity: 1 });
   });
 
   test('sweepers and a cancel racing on one due order release it exactly once', async () => {
