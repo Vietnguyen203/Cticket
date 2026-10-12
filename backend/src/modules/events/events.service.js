@@ -14,6 +14,7 @@ const { toPublicSchedule } = require('./schedules.mapper');
 const inventoryService = require('./inventory.service');
 const { remember, invalidatesAfter, keyOf, NAMESPACE, TTL } = require('../../redis/cache');
 const orders = require('../orders');
+const payments = require('../payments');
 
 const SLUG_CONSTRAINT = 'events_slug_key';
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -164,11 +165,16 @@ async function changeStatus(context, actor, eventId, { status, reason }) {
 
     await eventsRepository.updateStatus(client, eventId, { from: event.status, to: status });
     let heldOrdersCancelled;
+    let paidOrdersRefunded;
     if (status === EVENT_STATUS.CANCELLED) {
       await schedulesRepository.cancelByEvent(client, eventId);
-      // Same transaction: either the event is cancelled AND its holds are
-      // released, or neither. Paid orders are refunded in Phase 8.
+      // Same transaction: either the event is cancelled AND its open orders
+      // released AND its paid orders refunded (EVT-08), or nothing happened.
       heldOrdersCancelled = await orders.cancelHeldOrdersOfEvent(client, eventId);
+      paidOrdersRefunded = await payments.refundPaidOrdersOfEvent(client, eventId, {
+        reason: `Event cancelled: ${reason}`,
+        context,
+      });
     }
     await recordAudit(client, {
       context,
@@ -176,7 +182,7 @@ async function changeStatus(context, actor, eventId, { status, reason }) {
       entityType: 'event',
       entityId: eventId,
       oldValue: { status: event.status },
-      newValue: { status, reason: reason ?? null, heldOrdersCancelled },
+      newValue: { status, reason: reason ?? null, heldOrdersCancelled, paidOrdersRefunded },
     });
     if (transition.generatesInventory) {
       const created = await inventoryService.generateInventory(client, eventId);

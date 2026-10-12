@@ -33,4 +33,8 @@ const listQuery = z.object({
   status: z.enum(Object.values(ORDER_STATUS)).optional(),
 });
 
-module.exports = { idParams, createOrder, listQuery };
+const checkout = z.object({
+  promotionCode: z.string().trim().min(3).max(50).optional(),
+});
+
+module.exports = { idParams, createOrder, listQuery, checkout };

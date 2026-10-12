@@ -16,6 +16,14 @@ const ordersRouter = Router();
 ordersRouter.get('/', ...canRead, validate({ query: schemas.listQuery }), controller.list);
 ordersRouter.get('/:id', ...canRead, validate({ params: schemas.idParams }), controller.get);
 ordersRouter.post('/:id/cancel', ...canCancel, validate({ params: schemas.idParams }), controller.cancel);
+// ORD-03: only the buyer checks out their own order (checked in the service).
+ordersRouter.post(
+  '/:id/checkout',
+  authenticate,
+  authorize('booking:create'),
+  validate({ params: schemas.idParams, body: schemas.checkout }),
+  controller.checkout,
+);
 
 /** Mounted at /api/v1/schedules (next to the events module's schedule routes). */
 const scheduleOrdersRouter = Router();

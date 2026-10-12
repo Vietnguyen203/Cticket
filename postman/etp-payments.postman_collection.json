@@ -1,0 +1,2135 @@
+{
+  "info": {
+    "name": "ETP — Payments (Phase 8)",
+    "description": "Checkout, mã giảm giá, thanh toán giả lập (Idempotency-Key), hoàn tiền. Điền email/password ở tab Variables rồi Run từ trên xuống. Tài khoản của bạn phải là organizer ACTIVE.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "(function () {",
+          "  const path = pm.request.url.getPath();",
+          "  if (path.endsWith('/auth/login') || path.endsWith('/auth/refresh')) {",
+          "    return; // these requests manage tokens themselves",
+          "  }",
+          "  const SAFETY_SECONDS = 30;",
+          "  const expiresAt = (token) => {",
+          "    try {",
+          "      const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');",
+          "      return JSON.parse(require('atob')(payload)).exp || 0;",
+          "    } catch (e) {",
+          "      return 0;",
+          "    }",
+          "  };",
+          "  const isFresh = (name) => {",
+          "    const token = pm.variables.get(name);",
+          "    return Boolean(token) && expiresAt(token) > Date.now() / 1000 + SAFETY_SECONDS;",
+          "  };",
+          "  const post = (url, body, onSuccess) => pm.sendRequest({",
+          "    url: pm.variables.get('host') + url,",
+          "    method: 'POST',",
+          "    header: [{ key: 'Content-Type', value: 'application/json' }],",
+          "    body: { mode: 'raw', raw: JSON.stringify(body) },",
+          "  }, (err, res) => {",
+          "    if (!err && res.code === 200) onSuccess(res.json().data);",
+          "  });",
+          "  const auth = JSON.stringify(pm.request.auth ? pm.request.auth.toJSON() : {});",
+          "  ",
+          "  if (auth.includes('adminToken') && !isFresh('adminToken') && pm.variables.get('adminPassword')) {",
+          "    post('/api/v1/auth/login', {",
+          "      email: pm.variables.get('adminEmail'),",
+          "      password: pm.variables.get('adminPassword'),",
+          "    }, (data) => {",
+          "      pm.collectionVariables.set('adminToken', data.accessToken);",
+          "      console.log('Token admin đã hết hạn → tự đăng nhập lại');",
+          "    });",
+          "  }",
+          "  if (auth.includes('userToken') && !isFresh('userToken') && pm.variables.get('userRefreshToken')) {",
+          "    post('/api/v1/auth/refresh', { refreshToken: pm.variables.get('userRefreshToken') }, (data) => {",
+          "      pm.collectionVariables.set('userToken', data.accessToken);",
+          "      pm.collectionVariables.set('userRefreshToken', data.refreshToken);",
+          "      console.log('Token của bạn đã hết hạn → tự refresh');",
+          "    });",
+          "  }",
+          "})();"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "host",
+      "value": "http://localhost:3001"
+    },
+    {
+      "key": "adminEmail",
+      "value": "admin@etp.local"
+    },
+    {
+      "key": "adminPassword",
+      "value": "Admin@123456"
+    },
+    {
+      "key": "email",
+      "value": ""
+    },
+    {
+      "key": "password",
+      "value": ""
+    },
+    {
+      "key": "adminToken",
+      "value": ""
+    },
+    {
+      "key": "userToken",
+      "value": ""
+    },
+    {
+      "key": "userRefreshToken",
+      "value": ""
+    },
+    {
+      "key": "categoryId",
+      "value": ""
+    },
+    {
+      "key": "venueId",
+      "value": ""
+    },
+    {
+      "key": "zoneAId",
+      "value": ""
+    },
+    {
+      "key": "pitId",
+      "value": ""
+    },
+    {
+      "key": "eventId",
+      "value": ""
+    },
+    {
+      "key": "scheduleId",
+      "value": ""
+    },
+    {
+      "key": "startAt",
+      "value": ""
+    },
+    {
+      "key": "endAt",
+      "value": ""
+    },
+    {
+      "key": "vipId",
+      "value": ""
+    },
+    {
+      "key": "stdId",
+      "value": ""
+    },
+    {
+      "key": "gaId",
+      "value": ""
+    },
+    {
+      "key": "seatA01",
+      "value": ""
+    },
+    {
+      "key": "seatA02",
+      "value": ""
+    },
+    {
+      "key": "seatB01",
+      "value": ""
+    },
+    {
+      "key": "orderId",
+      "value": ""
+    },
+    {
+      "key": "order2Id",
+      "value": ""
+    },
+    {
+      "key": "promoCode",
+      "value": ""
+    },
+    {
+      "key": "promoId",
+      "value": ""
+    },
+    {
+      "key": "promoStart",
+      "value": ""
+    },
+    {
+      "key": "promoEnd",
+      "value": ""
+    },
+    {
+      "key": "payKey",
+      "value": ""
+    },
+    {
+      "key": "payKey2",
+      "value": ""
+    },
+    {
+      "key": "paymentId",
+      "value": ""
+    },
+    {
+      "key": "freeCode",
+      "value": ""
+    },
+    {
+      "key": "freeOrderId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Đăng nhập",
+      "item": [
+        {
+          "name": "Admin đăng nhập",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  try { const v = data.accessToken; if (v !== undefined) pm.collectionVariables.set('adminToken', v); } catch (e) {}",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Bạn đăng nhập (organizer từ Phase 3)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  try { const v = data.accessToken; if (v !== undefined) pm.collectionVariables.set('userToken', v); } catch (e) {}",
+                  "  try { const v = data.refreshToken; if (v !== undefined) pm.collectionVariables.set('userRefreshToken', v); } catch (e) {}",
+                  "  pm.test('Có role ORGANIZER', () => pm.expect(JSON.stringify(data.user)).to.include('ORGANIZER'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Chuẩn bị một sự kiện đang bán (giống Phase 4, rút gọn)",
+      "item": [
+        {
+          "name": "Admin tạo danh mục",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  try { const v = data.category.id; if (v !== undefined) pm.collectionVariables.set('categoryId', v); } catch (e) {}",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/categories",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Booking {{$randomInt}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Admin tạo địa điểm",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  try { const v = data.venue.id; if (v !== undefined) pm.collectionVariables.set('venueId', v); } catch (e) {}",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/venues",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Nhà hát Bến Thành {{$randomInt}}\",\n  \"addressLine\": \"6 Mạc Đĩnh Chi, Quận 1\",\n  \"city\": \"Hồ Chí Minh\",\n  \"capacity\": 500\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Admin tạo khu ngồi A",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  try { const v = data.zone.id; if (v !== undefined) pm.collectionVariables.set('zoneAId', v); } catch (e) {}",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/venues/{{venueId}}/zones",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"A\",\n  \"name\": \"Khu A\",\n  \"kind\": \"SEATED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Admin tạo khu đứng PIT (50 chỗ)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  try { const v = data.zone.id; if (v !== undefined) pm.collectionVariables.set('pitId', v); } catch (e) {}",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/venues/{{venueId}}/zones",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"PIT\",\n  \"name\": \"Khu đứng\",\n  \"kind\": \"STANDING\",\n  \"capacity\": 50\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Admin sinh 20 ghế (hàng A, B × 10)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/zones/{{zoneAId}}/seats/bulk",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rows\": [\n    {\n      \"rowLabel\": \"A\",\n      \"from\": 1,\n      \"to\": 10\n    },\n    {\n      \"rowLabel\": \"B\",\n      \"from\": 1,\n      \"to\": 10\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Tạo sự kiện",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  try { const v = data.event.id; if (v !== undefined) pm.collectionVariables.set('eventId', v); } catch (e) {}",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/events",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Đêm nhạc Phase 5 {{$randomInt}}\",\n  \"categoryIds\": [\n    \"{{categoryId}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Thêm suất diễn",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  const start = new Date();",
+                  "  start.setUTCDate(start.getUTCDate() + 60);",
+                  "  start.setUTCHours(12, 0, 0, 0);",
+                  "  pm.collectionVariables.set('startAt', start.toISOString());",
+                  "  pm.collectionVariables.set('endAt', new Date(start.getTime() + 3 * 3600 * 1000).toISOString());",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  try { const v = data.schedule.id; if (v !== undefined) pm.collectionVariables.set('scheduleId', v); } catch (e) {}",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/events/{{eventId}}/schedules",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"venueId\": \"{{venueId}}\",\n  \"startAt\": \"{{startAt}}\",\n  \"endAt\": \"{{endAt}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Hạng VIP (hàng A, tối đa 4 vé/đơn)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  try { const v = data.ticketType.id; if (v !== undefined) pm.collectionVariables.set('vipId', v); } catch (e) {}",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/schedules/{{scheduleId}}/ticket-types",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"VIP\",\n  \"name\": \"VIP\",\n  \"price\": 2000000,\n  \"inventoryMode\": \"RESERVED\",\n  \"maxPerOrder\": 4,\n  \"sortOrder\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Hạng STD (hàng B)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  try { const v = data.ticketType.id; if (v !== undefined) pm.collectionVariables.set('stdId', v); } catch (e) {}",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/schedules/{{scheduleId}}/ticket-types",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"STD\",\n  \"name\": \"Tiêu chuẩn\",\n  \"price\": 800000,\n  \"inventoryMode\": \"RESERVED\",\n  \"sortOrder\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Hạng GA – vé đứng 50 chỗ",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  try { const v = data.ticketType.id; if (v !== undefined) pm.collectionVariables.set('gaId', v); } catch (e) {}",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/schedules/{{scheduleId}}/ticket-types",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"GA\",\n  \"name\": \"Vé đứng\",\n  \"price\": 500000,\n  \"inventoryMode\": \"GENERAL_ADMISSION\",\n  \"capacity\": 50,\n  \"venueZoneId\": \"{{pitId}}\",\n  \"sortOrder\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Gán ghế",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/schedules/{{scheduleId}}/seat-plan",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assignments\": [\n    {\n      \"ticketTypeId\": \"{{vipId}}\",\n      \"zoneId\": \"{{zoneAId}}\",\n      \"rows\": [\n        \"A\"\n      ]\n    },\n    {\n      \"ticketTypeId\": \"{{stdId}}\",\n      \"zoneId\": \"{{zoneAId}}\",\n      \"rows\": [\n        \"B\"\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Gửi duyệt",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/events/{{eventId}}/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PENDING_APPROVAL\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Admin duyệt",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/events/{{eventId}}/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PUBLISHED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Admin tạo mã giảm giá (PRO-02)",
+      "item": [
+        {
+          "name": "Tạo mã giảm 20% (tối đa 300.000đ, 1 lượt / người)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.collectionVariables.set('promoStart', new Date(Date.now() - 60000).toISOString());",
+                  "  pm.collectionVariables.set('promoEnd', new Date(Date.now() + 30 * 86400000).toISOString());",
+                  "  pm.collectionVariables.set('promoCode', 'GIAM20' + Math.floor(Math.random() * 1e6));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  try { const v = data.promotion.id; if (v !== undefined) pm.collectionVariables.set('promoId', v); } catch (e) {}",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/promotions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{promoCode}}\",\n  \"name\": \"Giảm 20%\",\n  \"discountType\": \"PERCENTAGE\",\n  \"discountValue\": 20,\n  \"maxDiscount\": 300000,\n  \"usageLimit\": 100,\n  \"perUserLimit\": 1,\n  \"startsAt\": \"{{promoStart}}\",\n  \"expiresAt\": \"{{promoEnd}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Thử tạo trùng mã (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 409', () => pm.expect(pm.response.code).to.be.oneOf([409]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  pm.test('error.code = PROMOTION_CODE_TAKEN', () => pm.expect((json.error || {}).code).to.eql('PROMOTION_CODE_TAKEN'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/promotions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{promoCode}}\",\n  \"name\": \"Trùng\",\n  \"discountType\": \"FIXED_AMOUNT\",\n  \"discountValue\": 1000,\n  \"startsAt\": \"{{promoStart}}\",\n  \"expiresAt\": \"{{promoEnd}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Danh sách mã",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/promotions",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Giữ vé và checkout (ORD-03)",
+      "item": [
+        {
+          "name": "Xem sơ đồ ghế (lấy id ghế A01, A02, B01)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  try { const v = data.zones.find((z) => z.code === 'A').seats.find((s) => s.code === 'A01').seatId; if (v !== undefined) pm.collectionVariables.set('seatA01', v); } catch (e) {}",
+                  "  try { const v = data.zones.find((z) => z.code === 'A').seats.find((s) => s.code === 'A02').seatId; if (v !== undefined) pm.collectionVariables.set('seatA02', v); } catch (e) {}",
+                  "  try { const v = data.zones.find((z) => z.code === 'A').seats.find((s) => s.code === 'B01').seatId; if (v !== undefined) pm.collectionVariables.set('seatB01', v); } catch (e) {}",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/schedules/{{scheduleId}}/seat-map",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Giữ ghế VIP A01 + 1 vé đứng (2.500.000đ)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  try { const v = data.order.id; if (v !== undefined) pm.collectionVariables.set('orderId', v); } catch (e) {}",
+                  "  pm.test('Tạm tính 2.500.000đ', () => pm.expect(data.order.subtotal).to.eql(2500000));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/schedules/{{scheduleId}}/orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"seatIds\": [\n    \"{{seatA01}}\"\n  ],\n  \"items\": [\n    {\n      \"ticketTypeId\": \"{{gaId}}\",\n      \"quantity\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Thử thanh toán khi chưa checkout (409)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.collectionVariables.set('payKey', pm.variables.replaceIn('{{$guid}}'));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 409', () => pm.expect(pm.response.code).to.be.oneOf([409]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  pm.test('error.code = ORDER_NOT_PAYABLE', () => pm.expect((json.error || {}).code).to.eql('ORDER_NOT_PAYABLE'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{payKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/payments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Xem trước mã: giảm 300.000đ (20% bị chặn ở mức tối đa)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  pm.test('Giảm 300.000đ, còn 2.200.000đ', () => pm.expect(data.preview).to.include({ discountAmount: 300000, totalAmount: 2200000 }));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/promotions/validate",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{promoCode}}\",\n  \"orderId\": \"{{orderId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Checkout với mã",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  pm.test('PAYMENT_PENDING, 2.200.000đ', () => pm.expect(data.order).to.include({ status: 'PAYMENT_PENDING', totalAmount: 2200000 }));",
+                  "  pm.test('Được thêm ~10 phút để thanh toán', () => pm.expect(data.order.remainingSeconds).to.be.within(590, 600));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/orders/{{orderId}}/checkout",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"promotionCode\": \"{{promoCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Thử checkout lần nữa (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 409', () => pm.expect(pm.response.code).to.be.oneOf([409]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  pm.test('error.code = INVALID_STATE_TRANSITION', () => pm.expect((json.error || {}).code).to.eql('INVALID_STATE_TRANSITION'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/orders/{{orderId}}/checkout",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Thanh toán (PAY-01..04)",
+      "item": [
+        {
+          "name": "Thử thanh toán không có Idempotency-Key (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 400', () => pm.expect(pm.response.code).to.be.oneOf([400]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  pm.test('error.code = IDEMPOTENCY_KEY_REQUIRED', () => pm.expect((json.error || {}).code).to.eql('IDEMPOTENCY_KEY_REQUIRED'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/payments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Thanh toán bị từ chối (simulate FAILED)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.collectionVariables.set('payKey', pm.variables.replaceIn('{{$guid}}'));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  pm.test('FAILED, CARD_DECLINED', () => pm.expect(data.payment).to.include({ status: 'FAILED', failureCode: 'CARD_DECLINED' }));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{payKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/payments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"simulate\": \"FAILED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Đơn vẫn giữ ghế (PAYMENT_FAILED)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  pm.test('PAYMENT_FAILED', () => pm.expect(data.order.status).to.eql('PAYMENT_FAILED'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/orders/{{orderId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Thanh toán lại với key MỚI → thành công",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.collectionVariables.set('payKey', pm.variables.replaceIn('{{$guid}}'));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  try { const v = data.payment.id; if (v !== undefined) pm.collectionVariables.set('paymentId', v); } catch (e) {}",
+                  "  pm.test('SUCCESS 2.200.000đ', () => pm.expect(data.payment).to.include({ status: 'SUCCESS', amount: 2200000 }));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{payKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/payments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Gửi lại ĐÚNG request đó (cùng key) → trả lại kết quả cũ",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  pm.test('Cùng payment id', () => pm.expect(data.payment.id).to.eql(pm.variables.get('paymentId')));",
+                  "  pm.test('Header Idempotent-Replayed', () => pm.expect(pm.response.headers.get('Idempotent-Replayed')).to.eql('true'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{payKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/payments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Dùng lại key đó cho nội dung khác (422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 422', () => pm.expect(pm.response.code).to.be.oneOf([422]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  pm.test('error.code = IDEMPOTENCY_KEY_REUSED', () => pm.expect((json.error || {}).code).to.eql('IDEMPOTENCY_KEY_REUSED'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{payKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/payments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"simulate\": \"FAILED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Thử trả tiền lần 2 bằng key khác (409)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.collectionVariables.set('payKey2', pm.variables.replaceIn('{{$guid}}'));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 409', () => pm.expect(pm.response.code).to.be.oneOf([409]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  pm.test('error.code = ORDER_ALREADY_PAID', () => pm.expect((json.error || {}).code).to.eql('ORDER_ALREADY_PAID'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{payKey2}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/payments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Xem đơn: PAID, có 2 lần thanh toán",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  pm.test('PAID, [SUCCESS, FAILED]', () => { pm.expect(data.order.status).to.eql('PAID'); pm.expect(data.order.payments.map((p) => p.status)).to.eql(['SUCCESS', 'FAILED']); });",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/orders/{{orderId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Xem một lần thanh toán (PAY-03)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/payments/{{paymentId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Hoàn tiền (PAY-05)",
+      "item": [
+        {
+          "name": "Khách thử tự hoàn tiền (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 403', () => pm.expect(pm.response.code).to.be.oneOf([403]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/payments/{{paymentId}}/refund",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Muốn hoàn\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Admin hoàn tiền",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  pm.test('REFUNDED', () => pm.expect(data.payment.status).to.eql('REFUNDED'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/payments/{{paymentId}}/refund",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Khách bận đột xuất\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Hoàn tiền lần 2 (409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 409', () => pm.expect(pm.response.code).to.be.oneOf([409]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  pm.test('error.code = PAYMENT_NOT_REFUNDABLE', () => pm.expect((json.error || {}).code).to.eql('PAYMENT_NOT_REFUNDABLE'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/payments/{{paymentId}}/refund",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Lần nữa\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Tồn kho trở lại (VIP 10, GA 50)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  const byCode = Object.fromEntries(data.ticketTypes.map((t) => [t.code, t.available]));",
+                  "  pm.test('VIP 10, GA 50', () => pm.expect(byCode).to.include({ VIP: 10, GA: 50 }));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/schedules/{{scheduleId}}/availability",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Đơn 0đ (mã giảm 100%)",
+      "item": [
+        {
+          "name": "Tạo mã MIENPHI (100%)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.collectionVariables.set('promoStart', new Date(Date.now() - 60000).toISOString());",
+                  "  pm.collectionVariables.set('promoEnd', new Date(Date.now() + 30 * 86400000).toISOString());",
+                  "  pm.collectionVariables.set('freeCode', 'MIENPHI' + Math.floor(Math.random() * 1e6));",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/promotions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{freeCode}}\",\n  \"name\": \"Miễn phí\",\n  \"discountType\": \"PERCENTAGE\",\n  \"discountValue\": 100,\n  \"startsAt\": \"{{promoStart}}\",\n  \"expiresAt\": \"{{promoEnd}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Giữ ghế VIP A02",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  try { const v = data.order.id; if (v !== undefined) pm.collectionVariables.set('freeOrderId', v); } catch (e) {}",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/schedules/{{scheduleId}}/orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"seatIds\": [\n    \"{{seatA02}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Checkout với mã 100% → PAID ngay, không cần thanh toán",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  pm.test('PAID, 0đ', () => pm.expect(data.order).to.include({ status: 'PAID', totalAmount: 0 }));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/orders/{{freeOrderId}}/checkout",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"promotionCode\": \"{{freeCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

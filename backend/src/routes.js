@@ -6,6 +6,8 @@ const { venuesRouter, zonesRouter, seatsRouter } = require('./modules/venues/ven
 const organizersRoutes = require('./modules/organizers/organizers.routes');
 const { eventsRouter, schedulesRouter, ticketTypesRouter } = require('./modules/events/events.routes');
 const { ordersRouter, scheduleOrdersRouter } = require('./modules/orders/orders.routes');
+const paymentsRoutes = require('./modules/payments/payments.routes');
+const promotionsRoutes = require('./modules/promotions/promotions.routes');
 
 /** Everything under /api/v1. Each module mounts its own router here. */
 const apiRouter = Router();
@@ -22,5 +24,7 @@ apiRouter.use('/schedules', schedulesRouter);
 apiRouter.use('/schedules', scheduleOrdersRouter); // POST /schedules/:id/orders
 apiRouter.use('/ticket-types', ticketTypesRouter);
 apiRouter.use('/orders', ordersRouter);
+apiRouter.use('/payments', paymentsRoutes);
+apiRouter.use('/promotions', promotionsRoutes);
 
 module.exports = apiRouter;

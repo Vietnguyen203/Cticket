@@ -12,6 +12,10 @@ const MESSAGE = Object.freeze({
   // Personal (room user:{id})
   ORDER_EXPIRED: 'ORDER_EXPIRED',
   ORDER_CANCELLED: 'ORDER_CANCELLED',
+  ORDER_PAID: 'ORDER_PAID', // Phase 8
+  ORDER_REFUNDED: 'ORDER_REFUNDED',
+  PAYMENT_SUCCEEDED: 'PAYMENT_SUCCEEDED',
+  PAYMENT_FAILED: 'PAYMENT_FAILED',
 });
 
 const scheduleRoom = (scheduleId) => `schedule:${scheduleId}`;

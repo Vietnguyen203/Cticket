@@ -35,4 +35,14 @@ async function cancel(req, res) {
   return sendSuccess(res, { order });
 }
 
-module.exports = { create, list, get, cancel };
+async function checkout(req, res) {
+  const order = await ordersService.checkoutOrder(
+    requestContext(req),
+    await resolveActor(req.user),
+    req.valid.params.id,
+    req.valid.body,
+  );
+  return sendSuccess(res, { order });
+}
+
+module.exports = { create, list, get, cancel, checkout };
