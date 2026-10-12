@@ -9,6 +9,7 @@
   },
   "scripts": {
     "start": "node src/server.js",
+    "worker": "node src/worker.js",
     "dev": "nodemon --watch src src/server.js",
     "migrate": "node --env-file-if-exists=.env node_modules/node-pg-migrate/bin/node-pg-migrate.js -m migrations -j sql --migration-filename-format utc",
     "migrate:up": "npm run migrate -- up",
@@ -35,6 +36,7 @@
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "bullmq": "^5.81.5",
     "cors": "^2.8.6",
     "dotenv": "^18.0.6",
     "express": "^5.2.1",

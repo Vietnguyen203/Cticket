@@ -1,6 +1,5 @@
 name: etp
 
-# The queue worker is added in Phase 9.
 services:
   postgres:
     image: postgres:17-alpine
@@ -75,6 +74,7 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-etp}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-etp}
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?Set JWT_ACCESS_SECRET in .env}
       OTP_SECRET: ${OTP_SECRET:?Set OTP_SECRET in .env}
+      QR_SECRET: ${QR_SECRET:?Set QR_SECRET in .env}
       # Defaults to the local Mailpit inbox; set SMTP_* in .env to send real email.
       SMTP_HOST: ${SMTP_HOST:-mailpit}
       SMTP_PORT: ${SMTP_PORT:-1025}
@@ -101,6 +101,39 @@ services:
       timeout: 3s
       retries: 5
       start_period: 10s
+    restart: unless-stopped
+
+  # Background jobs (BullMQ): tickets, emails, timed hold expiry, notifications,
+  # maintenance. Same image as the API; scale it independently.
+  worker:
+    build: ./backend
+    command: ["node", "src/worker.js"]
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: info
+      DATABASE_URL: postgres://${POSTGRES_USER:-etp}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-etp}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?Set JWT_ACCESS_SECRET in .env}
+      OTP_SECRET: ${OTP_SECRET:?Set OTP_SECRET in .env}
+      QR_SECRET: ${QR_SECRET:?Set QR_SECRET in .env}
+      # Defaults to the local Mailpit inbox; set SMTP_* in .env to send real email.
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-Event Tickets <no-reply@etp.local>}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    # SIGTERM lets running jobs finish; give them time before SIGKILL.
+    stop_grace_period: 30s
     restart: unless-stopped
 
 volumes:

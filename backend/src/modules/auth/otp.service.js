@@ -1,14 +1,15 @@
 const env = require('../../config/env');
 const { OTP } = require('../../config/constants');
 const AppError = require('../../utils/AppError');
-const logger = require('../../utils/logger');
 const { hmacSha256, randomNumericCode } = require('../../utils/crypto');
 const { redis } = require('../../redis/client');
 const mailer = require('../../mail/mailer');
+const { QUEUE, enqueue } = require('../../queue/queues');
 const { otpEmail } = require('../../mail/templates');
 
 const SECONDS_PER_MINUTE = 60;
 const SECONDS_PER_HOUR = 3600;
+const OTP_JOB_FAILED_RETENTION_SECONDS = SECONDS_PER_HOUR;
 
 /**
  * The stored hash binds the code to one user and one purpose: the same
@@ -80,18 +81,23 @@ async function consumeOtp(userId, purpose, code) {
 }
 
 /**
- * Email the code. A failed send is logged, not thrown: the account is already
- * saved and the user can request a new code. The code itself is never logged.
+ * Queue the email (Q-02): the request does not wait for SMTP, and a failed
+ * send is retried by the worker. The code travels in the job data, so the
+ * job is deleted as soon as it is sent, and within an hour if every attempt
+ * failed (the code expires after 10 minutes anyway). It is never logged.
  */
-async function sendOtpEmail(user, purpose, code) {
-  try {
-    await mailer.sendMail({
-      to: user.email,
-      ...otpEmail({ purpose, code, firstName: user.first_name, ttlMinutes: OTP.TTL_MINUTES }),
-    });
-  } catch (err) {
-    logger.error({ err, userId: user.id, purpose }, 'Failed to send OTP email');
-  }
+async function queueOtpEmail(user, purpose, code) {
+  await enqueue(
+    QUEUE.EMAILS,
+    'otp',
+    { to: user.email, firstName: user.first_name, purpose, code },
+    { removeOnComplete: true, removeOnFail: { age: OTP_JOB_FAILED_RETENTION_SECONDS } },
+  );
 }
 
-module.exports = { issueOtp, consumeOtp, sendOtpEmail, otpKeys };
+/** The emails worker: send the code. Throws so that the job is retried. */
+async function sendOtpEmail({ to, firstName, purpose, code }) {
+  await mailer.sendMail({ to, ...otpEmail({ purpose, code, firstName, ttlMinutes: OTP.TTL_MINUTES }) });
+}
+
+module.exports = { issueOtp, consumeOtp, queueOtpEmail, sendOtpEmail, otpKeys };

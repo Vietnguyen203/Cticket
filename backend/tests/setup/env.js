@@ -28,5 +28,10 @@ process.env.SMTP_PASS = '';
 process.env.RATE_LIMIT_ENABLED = 'false';
 process.env.JWT_ACCESS_SECRET ??= TEST_SECRET;
 process.env.OTP_SECRET ??= TEST_SECRET;
+process.env.QR_SECRET ??= TEST_SECRET;
+// Jobs run inline, inside the request, so tests see emails and tickets at
+// once; the queue tests switch to real BullMQ workers.
+process.env.QUEUE_MODE = 'inline';
+process.env.QUEUE_RETRY_DELAY_MS = '50';
 // Minimum bcrypt cost: hashing in tests should take ~1 ms, not ~250 ms.
 process.env.BCRYPT_COST = '4';
