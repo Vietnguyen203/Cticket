@@ -210,7 +210,9 @@ async function refresh({ refreshToken }, meta) {
  * (denylist) instead of staying valid until it expires.
  */
 async function logout({ refreshToken }, accessToken) {
-  await authRepository.revokeFamilyByTokenHash(pool, tokens.hashRefreshToken(refreshToken));
+  if (refreshToken) {
+    await authRepository.revokeFamilyByTokenHash(pool, tokens.hashRefreshToken(refreshToken));
+  }
   if (accessToken) {
     await denylist.revokeToken(accessToken);
   }

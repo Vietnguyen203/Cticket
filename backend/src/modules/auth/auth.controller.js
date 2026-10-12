@@ -1,8 +1,11 @@
+const AppError = require('../../utils/AppError');
 const { sendSuccess } = require('../../utils/response');
 const { requestContext } = require('../../utils/requestContext');
 const { getProfile } = require('../users');
 const authService = require('./auth.service');
 const { verifyAccessToken } = require('./auth.tokens');
+const schemas = require('./auth.schemas');
+const cookie = require('./refresh-cookie');
 
 const HTTP_CREATED = 201;
 const HTTP_ACCEPTED = 202;
@@ -27,14 +30,44 @@ async function verifyOtp(req, res) {
   return sendSuccess(res, { purpose: req.valid.body.purpose, verified: true });
 }
 
+/**
+ * Where the refresh token comes from: the body, or (web app) the httpOnly cookie.
+ * @returns {string|undefined}
+ */
+function refreshTokenOf(req) {
+  if (req.valid.body.refreshToken) return req.valid.body.refreshToken;
+  const fromCookie = cookie.readRefreshCookie(req);
+  return schemas.refreshToken.safeParse(fromCookie).success ? fromCookie : undefined;
+}
+
+/** Cookie mode: the refresh token goes into the cookie and is left out of the body (a script could read the body). */
+function sendTokens(req, res, tokens) {
+  if (!cookie.usesCookie(req)) return sendSuccess(res, tokens);
+  const { refreshToken, ...rest } = tokens;
+  cookie.setRefreshCookie(res, refreshToken);
+  return sendSuccess(res, rest);
+}
+
 // The request context (IP, user agent) is stored with each refresh token so
 // users can later see their active sessions.
 async function login(req, res) {
-  return sendSuccess(res, await authService.login(req.valid.body, requestContext(req)));
+  return sendTokens(req, res, await authService.login(req.valid.body, requestContext(req)));
 }
 
 async function refresh(req, res) {
-  return sendSuccess(res, await authService.refresh(req.valid.body, requestContext(req)));
+  const refreshToken = refreshTokenOf(req);
+  if (!refreshToken) {
+    // Same answer as before for API clients; a browser without a cookie simply has no session.
+    if (cookie.usesCookie(req)) throw new AppError('INVALID_REFRESH_TOKEN');
+    throw new AppError('VALIDATION_ERROR', undefined, { details: [{ field: 'body.refreshToken', message: 'Required' }] });
+  }
+  try {
+    return sendTokens(req, res, await authService.refresh({ refreshToken }, requestContext(req)));
+  } catch (err) {
+    // A dead cookie would otherwise be sent again on every page load.
+    if (cookie.usesCookie(req)) cookie.clearRefreshCookie(res);
+    throw err;
+  }
 }
 
 const BEARER_PATTERN = /^Bearer\s+(\S+)$/i;
@@ -51,7 +84,13 @@ function accessTokenOf(req) {
 }
 
 async function logout(req, res) {
-  await authService.logout(req.valid.body, accessTokenOf(req));
+  const refreshToken = refreshTokenOf(req);
+  if (!refreshToken && !cookie.usesCookie(req)) {
+    throw new AppError('VALIDATION_ERROR', undefined, { details: [{ field: 'body.refreshToken', message: 'Required' }] });
+  }
+  if (cookie.usesCookie(req)) cookie.clearRefreshCookie(res);
+  // Idempotent: a browser whose cookie is already gone still gets its access token revoked.
+  await authService.logout({ refreshToken }, accessTokenOf(req));
   return res.status(HTTP_NO_CONTENT).end();
 }
 
