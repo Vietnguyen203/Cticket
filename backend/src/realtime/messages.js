@@ -18,6 +18,7 @@ const MESSAGE = Object.freeze({
   PAYMENT_FAILED: 'PAYMENT_FAILED',
   TICKET_ISSUED: 'TICKET_ISSUED', // Phase 9
   NOTIFICATION: 'NOTIFICATION', // a new in-app notification (Q-05)
+  CHECK_IN_SUCCESS: 'CHECK_IN_SUCCESS', // Phase 10: to the event's staff and organizer only (CHK-03)
 });
 
 const scheduleRoom = (scheduleId) => `schedule:${scheduleId}`;

@@ -143,6 +143,18 @@ const ORDER_LIMITS = Object.freeze({
   EXPIRE_BATCH_SIZE: 100, // orders expired per sweep / per lazy clean-up
 });
 
+const TICKET_STATUS = Object.freeze({
+  VALID: 'VALID',
+  USED: 'USED', // checked in
+  CANCELLED: 'CANCELLED',
+  REFUNDED: 'REFUNDED',
+});
+
+const CHECKIN = Object.freeze({
+  // Gates open this long before the show; check-in closes when the show ends.
+  OPENS_MINUTES_BEFORE_START: 180,
+});
+
 const PAGINATION = Object.freeze({
   DEFAULT_PAGE_SIZE: 20,
   MAX_PAGE_SIZE: 50,
@@ -175,6 +187,8 @@ module.exports = {
   PROMOTION_STATUS,
   CANCEL_REASON,
   ORDER_LIMITS,
+  TICKET_STATUS,
+  CHECKIN,
   PAGINATION,
   EVENT_LIMITS,
 };

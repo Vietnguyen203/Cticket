@@ -1,5 +1,7 @@
 const env = require('../../config/env');
-const { hmacSha256, sha256 } = require('../../utils/crypto');
+const { hmacSha256, sha256, safeEqualHex } = require('../../utils/crypto');
+
+const TOKEN_PATTERN = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.([1-9][0-9]{0,8})\.([0-9a-f]{64})$/;
 
 /**
  * Content of a ticket's QR code: "<ticket id>.<qr version>.<HMAC>".
@@ -18,4 +20,17 @@ function qrToken(ticketId, version) {
 
 const qrTokenHash = (token) => sha256(token);
 
-module.exports = { qrToken, qrTokenHash };
+/**
+ * Read a scanned QR (CHK-01): checks the shape, then the signature in
+ * constant time. Anything edited or made up without QR_SECRET gives null.
+ * @returns {{ ticketId: string, version: number } | null}
+ */
+function parseQrToken(token) {
+  const match = TOKEN_PATTERN.exec(String(token).trim());
+  if (!match) return null;
+  const [, ticketId, version, signature] = match;
+  if (!safeEqualHex(signature, hmacSha256(env.QR_SECRET, `${ticketId}.${version}`))) return null;
+  return { ticketId, version: Number(version) };
+}
+
+module.exports = { qrToken, qrTokenHash, parseQrToken };

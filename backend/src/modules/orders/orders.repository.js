@@ -197,6 +197,15 @@ async function listTickets(db, orderId) {
   return rows;
 }
 
+/**
+ * Before a refund: lock the order's tickets (a gate scanning one of them
+ * waits, then sees it REFUNDED) and tell whether any has been checked in.
+ */
+async function lockTicketsHasUsed(db, orderId) {
+  const { rows } = await db.query(`SELECT status FROM tickets WHERE order_id = $1 ORDER BY id FOR UPDATE`, [orderId]);
+  return rows.some((row) => row.status === 'USED');
+}
+
 /** Refund: tickets issued for the order (Phase 9) stop being valid. */
 async function refundTicketsOfOrder(db, orderId) {
   await db.query(
@@ -351,6 +360,7 @@ module.exports = {
   checkout,
   listPayments,
   refundTicketsOfOrder,
+  lockTicketsHasUsed,
   completeOrdersOfFinishedSchedules,
   listTickets,
   findInventoryMismatches,

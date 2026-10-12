@@ -6,7 +6,15 @@ const {
   expireOrder,
   expireDueOrders,
 } = require('./order-release');
-const { markOrderPaid, markPaymentFailed, refundPaidOrder, lockOrder, lockPaidOrders, PAYABLE } = require('./order-payment');
+const {
+  markOrderPaid,
+  markPaymentFailed,
+  refundPaidOrder,
+  hasCheckedInTickets,
+  lockOrder,
+  lockPaidOrders,
+  PAYABLE,
+} = require('./order-payment');
 const { findInventoryMismatches, completeOrdersOfFinishedSchedules } = require('./orders.repository');
 const { previewPromotion } = require('./orders.service');
 
@@ -20,6 +28,7 @@ module.exports = {
   markOrderPaid,
   markPaymentFailed,
   refundPaidOrder,
+  hasCheckedInTickets,
   lockOrder,
   lockPaidOrders,
   PAYABLE_STATUSES: PAYABLE,

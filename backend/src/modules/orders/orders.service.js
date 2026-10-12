@@ -102,11 +102,11 @@ function toOrder(row, items, payments, tickets) {
 
 async function loadOrder(db, orderId) {
   const row = await ordersRepository.findDetail(db, orderId);
-  const [items, payments, tickets] = await Promise.all([
-    ordersRepository.listItems(db, [orderId]),
-    ordersRepository.listPayments(db, orderId),
-    ordersRepository.listTickets(db, orderId),
-  ]);
+  // One after another: `db` may be a transaction client, which runs one query at a time
+  // (overlapping calls are deprecated in pg and removed in pg@9).
+  const items = await ordersRepository.listItems(db, [orderId]);
+  const payments = await ordersRepository.listPayments(db, orderId);
+  const tickets = await ordersRepository.listTickets(db, orderId);
   return toOrder(row, items, payments, tickets);
 }
 
