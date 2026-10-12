@@ -306,6 +306,79 @@ async function holdGa(db, { ticketTypeId, quantity }) {
   return rows[0] ?? null;
 }
 
+// ---------------------------------------------------------------------------
+// Checkout, sale and refund (Phase 8). Same lock order as holds: the order row
+// (locked by the caller) → its seats in seat_id order → GA counters.
+// ---------------------------------------------------------------------------
+
+async function lockSeatsOf(db, column, orderId, status) {
+  await db.query(
+    `SELECT 1 FROM schedule_seats WHERE ${column} = $1 AND status = $2::schedule_seat_status ORDER BY seat_id FOR UPDATE`,
+    [orderId, status],
+  );
+}
+
+/**
+ * Checkout gives the buyer the payment window. now() is the transaction's
+ * start time, so the seats' new deadline equals the order's new expires_at.
+ */
+async function extendHoldsOfOrder(db, orderId, windowSeconds) {
+  await lockSeatsOf(db, 'held_by_order_id', orderId, 'HELD');
+  await db.query(
+    `UPDATE schedule_seats SET hold_expires_at = now() + make_interval(secs => $2)
+     WHERE held_by_order_id = $1 AND status = 'HELD'`,
+    [orderId, windowSeconds],
+  );
+}
+
+/** Payment succeeded: HELD → SOLD, owner moves from held_by to sold_by (chk_schedule_seats_state). */
+async function sellSeatsOfOrder(db, orderId) {
+  await lockSeatsOf(db, 'held_by_order_id', orderId, 'HELD');
+  const { rows } = await db.query(
+    `UPDATE schedule_seats
+     SET status = 'SOLD', sold_by_order_id = held_by_order_id, sold_at = now(),
+         held_by_order_id = NULL, hold_expires_at = NULL
+     WHERE held_by_order_id = $1 AND status = 'HELD'
+     RETURNING ${CHANGED_SEAT}`,
+    [orderId],
+  );
+  return rows;
+}
+
+/** Refund: the order's SOLD seats go back on sale. */
+async function refundSeatsOfOrder(db, orderId) {
+  await lockSeatsOf(db, 'sold_by_order_id', orderId, 'SOLD');
+  const { rows } = await db.query(
+    `UPDATE schedule_seats SET status = 'AVAILABLE', sold_by_order_id = NULL, sold_at = NULL
+     WHERE sold_by_order_id = $1 AND status = 'SOLD'
+     RETURNING ${CHANGED_SEAT}`,
+    [orderId],
+  );
+  return rows;
+}
+
+/** GA: held → sold (availability unchanged). @returns {Promise<object|null>} null if the counters disagree */
+async function sellGa(db, { ticketTypeId, quantity }) {
+  const { rows } = await db.query(
+    `UPDATE ga_inventory SET held_quantity = held_quantity - $2, sold_quantity = sold_quantity + $2
+     WHERE ticket_type_id = $1 AND held_quantity >= $2
+     RETURNING ${GA_AVAILABLE}`,
+    [ticketTypeId, quantity],
+  );
+  return rows[0] ?? null;
+}
+
+/** GA refund: sold → available again. @returns {Promise<object|null>} null if the counters disagree */
+async function refundGa(db, { ticketTypeId, quantity }) {
+  const { rows } = await db.query(
+    `UPDATE ga_inventory SET sold_quantity = sold_quantity - $2
+     WHERE ticket_type_id = $1 AND sold_quantity >= $2
+     RETURNING ${GA_AVAILABLE}`,
+    [ticketTypeId, quantity],
+  );
+  return rows[0] ?? null;
+}
+
 /** Tickets still available on a GA counter (for the Redis "sold out" hint). */
 async function gaAvailable(db, ticketTypeId) {
   const { rows } = await db.query(
@@ -349,4 +422,9 @@ module.exports = {
   holdGa,
   releaseGa,
   gaAvailable,
+  extendHoldsOfOrder,
+  sellSeatsOfOrder,
+  refundSeatsOfOrder,
+  sellGa,
+  refundGa,
 };

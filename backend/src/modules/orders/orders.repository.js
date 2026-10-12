@@ -3,10 +3,14 @@
  * never the API server's, so every replica agrees on when a hold expires.
  */
 
+// Orders that still hold inventory (same list as uq_orders_active_cart and ACTIVE_ORDER_STATUSES).
+const OPEN = `('HELD', 'PAYMENT_PENDING', 'PAYMENT_FAILED')`;
+
 const ORDER_COLUMNS = `o.id, o.order_code, o.user_id, o.schedule_id, o.status, o.subtotal, o.discount_amount,
-  o.total_amount, o.currency, o.expires_at, o.paid_at, o.cancelled_at, o.cancel_reason, o.created_at, o.updated_at,
-  (o.status = 'HELD' AND o.expires_at <= now()) AS hold_expired,
-  CASE WHEN o.status = 'HELD' THEN greatest(0, ceil(extract(epoch FROM o.expires_at - now())))::int END
+  o.total_amount, o.currency, o.expires_at, o.checked_out_at, o.paid_at, o.cancelled_at, o.cancel_reason,
+  o.created_at, o.updated_at,
+  (o.status IN ${OPEN} AND o.expires_at <= now()) AS hold_expired,
+  CASE WHEN o.status IN ${OPEN} THEN greatest(0, ceil(extract(epoch FROM o.expires_at - now())))::int END
     AS remaining_seconds`;
 
 // What a customer needs to recognise the order in a list (read model join).
@@ -125,19 +129,58 @@ async function list(db, { userId, scheduleId, status, limit, offset }) {
 
 /**
  * Compare-and-set status change. Returns null when the order was no longer in
- * `from` (another request ended it first), so inventory is released at most once.
+ * one of the `from` statuses (another request ended it first), so inventory
+ * is released at most once.
+ * @param {{ orderId: string, from: string[], to: string, cancelReason?: string|null }} change
  */
 async function transition(db, { orderId, from, to, cancelReason = null }) {
   const { rows } = await db.query(
     `UPDATE orders
      SET status = $3::order_status,
          cancelled_at = CASE WHEN $3::order_status = 'CANCELLED' THEN now() END,
-         cancel_reason = $4
-     WHERE id = $1 AND status = $2::order_status
-     RETURNING id, user_id, schedule_id`,
+         cancel_reason = $4,
+         paid_at = CASE WHEN $3::order_status = 'PAID' THEN now() ELSE paid_at END
+     WHERE id = $1 AND status = ANY($2::order_status[])
+     RETURNING id, user_id, schedule_id, total_amount`,
     [orderId, from, to, cancelReason],
   );
   return rows[0] ?? null;
+}
+
+/**
+ * HELD → PAYMENT_PENDING, once: price fixed (discount applied), hold extended
+ * by the payment window. now() is the transaction's start time, the same
+ * value used for the seats' new hold_expires_at.
+ */
+async function checkout(db, { orderId, discount, windowSeconds }) {
+  const { rows } = await db.query(
+    `UPDATE orders
+     SET status = 'PAYMENT_PENDING', checked_out_at = now(),
+         expires_at = now() + make_interval(secs => $3),
+         discount_amount = $2, total_amount = subtotal - $2
+     WHERE id = $1 AND status = 'HELD'
+     RETURNING id, expires_at, total_amount`,
+    [orderId, discount, windowSeconds],
+  );
+  return rows[0] ?? null;
+}
+
+/** Payments of an order, newest first (read model for the order page). */
+async function listPayments(db, orderId) {
+  const { rows } = await db.query(
+    `SELECT id, status, amount, currency, provider, failure_code, paid_at, created_at
+     FROM payments WHERE order_id = $1 ORDER BY created_at DESC`,
+    [orderId],
+  );
+  return rows;
+}
+
+/** Refund: tickets issued for the order (Phase 9) stop being valid. */
+async function refundTicketsOfOrder(db, orderId) {
+  await db.query(
+    `UPDATE tickets SET status = 'REFUNDED', cancelled_at = now() WHERE order_id = $1 AND status = 'VALID'`,
+    [orderId],
+  );
 }
 
 /** GA lines in ticket_type_id order: the lock order of ga_inventory rows. */
@@ -159,7 +202,7 @@ async function gaLines(db, orderId) {
 async function findDueOrderIds(db, { scheduleId = null, userId = null, limit }) {
   const { rows } = await db.query(
     `SELECT id FROM orders
-     WHERE status = 'HELD' AND expires_at <= now()
+     WHERE status IN ${OPEN} AND expires_at <= now()
        AND ($1::uuid IS NULL OR schedule_id = $1)
        AND ($2::uuid IS NULL OR user_id = $2)
      ORDER BY expires_at
@@ -175,23 +218,26 @@ async function findDueOrderIds(db, { scheduleId = null, userId = null, limit }) 
  */
 async function lockDueOrder(db, id) {
   const { rows } = await db.query(
-    `SELECT id FROM orders WHERE id = $1 AND status = 'HELD' AND expires_at <= now() FOR UPDATE SKIP LOCKED`,
+    `SELECT id FROM orders WHERE id = $1 AND status IN ${OPEN} AND expires_at <= now() FOR UPDATE SKIP LOCKED`,
     [id],
   );
   return rows[0] ?? null;
 }
 
-/** HELD orders of an event or of one schedule, locked in id order (cancellations). */
-async function lockHeldOrders(db, { eventId = null, scheduleId = null }) {
+/**
+ * Orders of an event or of one schedule in the given statuses, locked in id
+ * order (cancellations: open orders are cancelled, paid ones refunded).
+ */
+async function lockOrdersOf(db, { eventId = null, scheduleId = null }, statuses) {
   const { rows } = await db.query(
     `SELECT o.id FROM orders o
      JOIN event_schedules es ON es.id = o.schedule_id
-     WHERE o.status = 'HELD'
+     WHERE o.status = ANY($3::order_status[])
        AND ($1::uuid IS NULL OR es.event_id = $1)
        AND ($2::uuid IS NULL OR o.schedule_id = $2)
      ORDER BY o.id
      FOR UPDATE OF o`,
-    [eventId, scheduleId],
+    [eventId, scheduleId, statuses],
   );
   return rows.map((row) => row.id);
 }
@@ -235,7 +281,33 @@ async function findInventoryMismatches(db) {
      JOIN orders o ON o.id = oi.order_id
      JOIN schedule_seats s ON s.id = oi.schedule_seat_id
      WHERE o.status IN ('HELD', 'PAYMENT_PENDING', 'PAYMENT_FAILED')
-       AND (s.status <> 'HELD' OR s.held_by_order_id IS DISTINCT FROM o.id)`,
+       AND (s.status <> 'HELD' OR s.held_by_order_id IS DISTINCT FROM o.id)
+
+     UNION ALL
+     -- A SOLD seat must belong to a paid order that has a line for it.
+     SELECT 'SEAT_SOLD_WITHOUT_ORDER', s.id, format('sold to order %s', s.sold_by_order_id)
+     FROM schedule_seats s
+     LEFT JOIN orders o ON o.id = s.sold_by_order_id
+     WHERE s.status = 'SOLD'
+       AND (o.status IS NULL OR o.status NOT IN ('PAID', 'COMPLETED')
+            OR NOT EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = o.id AND oi.schedule_seat_id = s.id))
+
+     UNION ALL
+     -- A seat line of a paid order must be SOLD to that order.
+     SELECT 'ORDER_SEAT_NOT_SOLD', oi.id, format('order %s, seat %s', oi.order_id, oi.schedule_seat_id)
+     FROM order_items oi
+     JOIN orders o ON o.id = oi.order_id
+     JOIN schedule_seats s ON s.id = oi.schedule_seat_id
+     WHERE o.status IN ('PAID', 'COMPLETED')
+       AND (s.status <> 'SOLD' OR s.sold_by_order_id IS DISTINCT FROM o.id)
+
+     UNION ALL
+     -- used_count of a promotion = its usage rows (taken at checkout, returned when an unpaid order ends).
+     SELECT 'PROMOTION_USED_COUNT', p.id, format('used_count %s, usages %s', p.used_count, count(u.id))
+     FROM promotions p
+     LEFT JOIN promotion_usages u ON u.promotion_id = p.id
+     GROUP BY p.id
+     HAVING p.used_count <> count(u.id)`,
   );
   return rows;
 }
@@ -253,6 +325,9 @@ module.exports = {
   gaLines,
   findDueOrderIds,
   lockDueOrder,
-  lockHeldOrders,
+  lockOrdersOf,
+  checkout,
+  listPayments,
+  refundTicketsOfOrder,
   findInventoryMismatches,
 };

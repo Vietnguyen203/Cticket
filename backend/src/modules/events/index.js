@@ -33,4 +33,9 @@ module.exports = {
   holdGa: inventoryRepository.holdGa,
   releaseGa: inventoryRepository.releaseGa,
   gaAvailable: inventoryRepository.gaAvailable,
+  extendHoldsOfOrder: inventoryRepository.extendHoldsOfOrder,
+  sellSeatsOfOrder: inventoryRepository.sellSeatsOfOrder,
+  refundSeatsOfOrder: inventoryRepository.refundSeatsOfOrder,
+  sellGa: inventoryRepository.sellGa,
+  refundGa: inventoryRepository.refundGa,
 };

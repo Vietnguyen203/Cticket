@@ -37,6 +37,10 @@ const CONSTRAINT_ERROR_CODES = {
   // if a bug ever tries it, the CHECK fires and the client gets a clear 409.
   chk_ga_inventory_capacity: 'INSUFFICIENT_INVENTORY',
   uq_orders_active_cart: 'ACTIVE_ORDER_EXISTS',
+  promotions_code_key: 'PROMOTION_CODE_TAKEN',
+  // Backstops: the payment flow checks these first while holding the order lock.
+  uq_payments_order_active: 'ORDER_ALREADY_PAID',
+  uq_refunds_payment_active: 'PAYMENT_NOT_REFUNDABLE',
 };
 
 const GENERIC_CODE_BY_SQLSTATE = {

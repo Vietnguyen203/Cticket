@@ -67,6 +67,8 @@ const envSchema = z.object({
   // Booking: how long a HELD order keeps its seats, and how often expired
   // holds are swept back into stock (in-process until BullMQ in Phase 9).
   HOLD_TTL_MINUTES: z.coerce.number().int().min(1).max(60).default(10),
+  // Checkout extends the hold once by this much, to pay (CTicket: 10 + 10 minutes).
+  PAYMENT_WINDOW_MINUTES: z.coerce.number().int().min(1).max(60).default(10),
   ORDER_SWEEP_INTERVAL_SECONDS: z.coerce.number().int().min(5).max(3600).default(30),
 
   // Used only by `npm run seed:admin`.

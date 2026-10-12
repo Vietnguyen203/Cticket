@@ -9,6 +9,7 @@ const {
   TICKET_TYPE_STATUS,
   SEAT_STATUS,
   ORDER_STATUS,
+  ACTIVE_ORDER_STATUSES,
   CANCEL_REASON,
   ORDER_LIMITS,
 } = require('../../config/constants');
@@ -16,10 +17,12 @@ const AppError = require('../../utils/AppError');
 const { toLimitOffset, toPageMeta } = require('../../utils/pagination');
 const { recordAudit } = require('../audit');
 const events = require('../events');
+const promotions = require('../promotions');
 const ordersRepository = require('./orders.repository');
 const { releaseHeldOrder, expireOrder, expireDueOrders } = require('./order-release');
 const { generateOrderCode } = require('./order-code');
 const fastPath = require('./fast-path');
+const { markOrderPaid } = require('./order-payment');
 const { publishAfterCommit } = require('../../realtime/publisher');
 const { MESSAGE, scheduleRoom, seatUpdate, inventoryUpdate } = require('../../realtime/messages');
 
@@ -47,7 +50,20 @@ function toOrderItem(row) {
   };
 }
 
-function toOrder(row, items) {
+function toPayment(row) {
+  return {
+    id: row.id,
+    status: row.status,
+    amount: row.amount,
+    currency: row.currency,
+    provider: row.provider,
+    failureCode: row.failure_code,
+    paidAt: row.paid_at,
+    createdAt: row.created_at,
+  };
+}
+
+function toOrder(row, items, payments) {
   return {
     id: row.id,
     orderCode: row.order_code,
@@ -61,16 +77,22 @@ function toOrder(row, items) {
     currency: row.currency,
     expiresAt: row.expires_at,
     remainingSeconds: row.remaining_seconds,
+    checkedOutAt: row.checked_out_at,
     paidAt: row.paid_at,
     cancelledAt: row.cancelled_at,
     cancelReason: row.cancel_reason,
     createdAt: row.created_at,
+    ...(payments ? { payments: payments.map(toPayment) } : {}),
   };
 }
 
 async function loadOrder(db, orderId) {
   const row = await ordersRepository.findDetail(db, orderId);
-  return toOrder(row, await ordersRepository.listItems(db, [orderId]));
+  const [items, payments] = await Promise.all([
+    ordersRepository.listItems(db, [orderId]),
+    ordersRepository.listPayments(db, orderId),
+  ]);
+  return toOrder(row, items, payments);
 }
 
 const canSee = (actor, order) => order.user_id === actor.userId || actor.canManageAll;
@@ -315,7 +337,7 @@ async function cancelOrder(context, actor, orderId) {
   const outcome = await withTransaction(async (client) => {
     const order = await ordersRepository.findById(client, orderId, { forUpdate: true });
     if (!order || !canSee(actor, order)) throw orderNotFound();
-    if (order.status !== ORDER_STATUS.HELD) {
+    if (!ACTIVE_ORDER_STATUSES.includes(order.status)) {
       throw new AppError('INVALID_STATE_TRANSITION', `Cannot cancel an order that is ${order.status}.`);
     }
     if (order.hold_expired) {
@@ -345,4 +367,47 @@ async function cancelOrder(context, actor, orderId) {
   return loadOrder(pool, orderId);
 }
 
-module.exports = { createOrder, getOrder, listOrders, cancelOrder };
+// ---------------------------------------------------------------------------
+// Checkout (ORD-03)
+// ---------------------------------------------------------------------------
+
+/**
+ * HELD → PAYMENT_PENDING, once. Fixes the price (a promotion code is checked
+ * and one use taken now), and extends the hold by the payment window.
+ * Lock order: order → its seats → the promotion row, as in every order flow.
+ * A 0đ order (100% discount) has nothing to pay and becomes PAID right away.
+ */
+async function checkoutOrder(context, actor, orderId, { promotionCode }) {
+  const outcome = await withTransaction(async (client) => {
+    const order = await ordersRepository.findById(client, orderId, { forUpdate: true });
+    if (!order || order.user_id !== actor.userId) throw orderNotFound();
+    if (order.status !== ORDER_STATUS.HELD) {
+      throw new AppError('INVALID_STATE_TRANSITION', `Only a HELD order can be checked out; this one is ${order.status}.`);
+    }
+    if (order.hold_expired) {
+      await releaseHeldOrder(client, orderId, { to: ORDER_STATUS.EXPIRED });
+      return 'EXPIRED';
+    }
+
+    const windowSeconds = env.PAYMENT_WINDOW_MINUTES * SECONDS_PER_MINUTE;
+    await events.extendHoldsOfOrder(client, orderId, windowSeconds);
+    const { discount } = promotionCode
+      ? await promotions.useForOrder(client, { code: promotionCode, orderId, subtotal: order.subtotal, userId: actor.userId })
+      : { discount: 0 };
+    const checkedOut = await ordersRepository.checkout(client, { orderId, discount, windowSeconds });
+    if (checkedOut.total_amount === 0) await markOrderPaid(client, orderId);
+    return 'CHECKED_OUT';
+  });
+
+  if (outcome === 'EXPIRED') throw new AppError('ORDER_EXPIRED');
+  return loadOrder(pool, orderId);
+}
+
+/** PRO-01: preview a promotion code on one of my HELD orders, without using it. */
+async function previewPromotion(actor, { orderId, code }) {
+  const order = await ordersRepository.findById(pool, orderId);
+  if (!order || order.user_id !== actor.userId) throw orderNotFound();
+  return { orderId, subtotal: order.subtotal, ...(await promotions.preview({ code, subtotal: order.subtotal, userId: actor.userId })) };
+}
+
+module.exports = { createOrder, getOrder, listOrders, cancelOrder, checkoutOrder, previewPromotion };

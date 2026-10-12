@@ -1,23 +1,26 @@
 const { pool } = require('../../database/pool');
 const { withTransaction } = require('../../database/transaction');
-const { ORDER_STATUS, CANCEL_REASON, ORDER_LIMITS } = require('../../config/constants');
+const { ORDER_STATUS, ACTIVE_ORDER_STATUSES, CANCEL_REASON, ORDER_LIMITS } = require('../../config/constants');
 const events = require('../events');
+const promotions = require('../promotions');
 const { publishAfterCommit } = require('../../realtime/publisher');
 const { MESSAGE, scheduleRoom, userRoom, seatUpdate, inventoryUpdate } = require('../../realtime/messages');
 const ordersRepository = require('./orders.repository');
 
 /**
- * End a HELD order and put its inventory back on sale, in the caller's
- * transaction. Used by cancel, expiry and event cancellation alike.
+ * End an open (unpaid) order — HELD, PAYMENT_PENDING or PAYMENT_FAILED — and
+ * put its inventory back on sale, in the caller's transaction. Used by
+ * cancel, expiry and event / schedule cancellation alike.
  *
  * Lock order: the order row (compare-and-set) → its seats (by seat_id) → GA
- * counters (by ticket_type_id), the same order as the booking flow.
+ * counters (by ticket_type_id) → the promotion row, the same order as
+ * booking, checkout and payment.
  *
- * @returns {Promise<boolean>} false if the order was no longer HELD (someone
- *   else already ended it, and already released its inventory)
+ * @returns {Promise<boolean>} false if the order was no longer open (someone
+ *   else already ended or paid it, and already dealt with its inventory)
  */
 async function releaseHeldOrder(client, orderId, { to, cancelReason = null }) {
-  const changed = await ordersRepository.transition(client, { orderId, from: ORDER_STATUS.HELD, to, cancelReason });
+  const changed = await ordersRepository.transition(client, { orderId, from: ACTIVE_ORDER_STATUSES, to, cancelReason });
   if (!changed) return false;
 
   const seats = await events.releaseSeatsOfOrder(client, orderId);
@@ -31,6 +34,8 @@ async function releaseHeldOrder(client, orderId, { to, cancelReason = null }) {
     }
     counters.push(counter);
   }
+  // A promotion use taken at checkout goes back to the code: it was never paid for.
+  await promotions.returnUsesOfOrder(client, orderId);
 
   // Live seat maps and the order's owner hear about it once this commits.
   const room = scheduleRoom(changed.schedule_id);
@@ -45,7 +50,7 @@ async function releaseHeldOrder(client, orderId, { to, cancelReason = null }) {
 }
 
 /**
- * Expire one order if it is HELD and its time is up, in its own transaction.
+ * Expire one order if it is still open and its time is up, in its own transaction.
  * SKIP LOCKED: if another sweeper or a cancel is working on it, leave it to them.
  * @returns {Promise<boolean>} true if this call expired it
  */
@@ -57,7 +62,7 @@ function expireOrder(orderId) {
 }
 
 /**
- * Expire HELD orders whose time is up. Each order gets its own short
+ * Expire open orders whose time is up. Each order gets its own short
  * transaction, locked with SKIP LOCKED, so several API instances (or a
  * sweeper and a lazy clean-up) can run this at once without double work.
  * @returns {Promise<number>} orders expired
@@ -82,15 +87,15 @@ async function expireDueOrders({ scheduleId = null, userId = null } = {}) {
 }
 
 /**
- * Event or schedule cancellation: cancel every HELD order of it in the
+ * Event or schedule cancellation: cancel every open order of it in the
  * caller's transaction. The caller already holds the event row FOR UPDATE, so
  * no booking (which needs it FOR SHARE) can add a hold meanwhile.
- * Paid orders are refunded in Phase 8.
+ * Paid orders are refunded by the payments module in the same transaction.
  * @returns {Promise<number>} orders cancelled
  */
 async function cancelHeldOrders(client, scope, cancelReason) {
   let cancelled = 0;
-  for (const id of await ordersRepository.lockHeldOrders(client, scope)) {
+  for (const id of await ordersRepository.lockOrdersOf(client, scope, ACTIVE_ORDER_STATUSES)) {
     const done = await releaseHeldOrder(client, id, { to: ORDER_STATUS.CANCELLED, cancelReason });
     if (done) cancelled += 1;
   }

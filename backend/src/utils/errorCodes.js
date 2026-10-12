@@ -5,6 +5,7 @@
  */
 const ERROR_CODES = Object.freeze({
   VALIDATION_ERROR: { status: 400, message: 'The request is invalid.' },
+  IDEMPOTENCY_KEY_REQUIRED: { status: 400, message: 'Send an Idempotency-Key header (8-255 characters) with every payment.' },
   MALFORMED_JSON: { status: 400, message: 'The request body is not valid JSON.' },
   INVALID_OTP: { status: 400, message: 'The code is invalid or has expired.' },
   UNAUTHENTICATED: { status: 401, message: 'Authentication is required.' },
@@ -36,6 +37,10 @@ const ERROR_CODES = Object.freeze({
   ACTIVE_ORDER_EXISTS: { status: 409, message: 'You already have an open order for this schedule.' },
   SEATS_UNAVAILABLE: { status: 409, message: 'One or more seats are no longer available.' },
   ORDER_EXPIRED: { status: 409, message: 'This order has expired.' },
+  ORDER_NOT_PAYABLE: { status: 409, message: 'This order cannot be paid in its current status.' },
+  ORDER_ALREADY_PAID: { status: 409, message: 'This order has already been paid.' },
+  PAYMENT_NOT_REFUNDABLE: { status: 409, message: 'Only a successful payment of a paid order can be refunded.' },
+  PROMOTION_CODE_TAKEN: { status: 409, message: 'A promotion with this code already exists.' },
   RESOURCE_LOCKED: { status: 409, message: 'The resource is busy. Please try again.' },
   CONCURRENCY_CONFLICT: { status: 409, message: 'The request conflicted with another request. Please try again.' },
   PAYLOAD_TOO_LARGE: { status: 413, message: 'The request body is too large.' },
@@ -56,6 +61,8 @@ const ERROR_CODES = Object.freeze({
   SALES_CLOSED: { status: 422, message: 'Ticket sales for this schedule are closed.' },
   TICKET_TYPE_UNAVAILABLE: { status: 422, message: 'One or more ticket types cannot be bought.' },
   ORDER_LIMIT_EXCEEDED: { status: 422, message: 'Too many tickets in one order.' },
+  IDEMPOTENCY_KEY_REUSED: { status: 422, message: 'This Idempotency-Key was already used for a different request.' },
+  PROMOTION_INVALID: { status: 422, message: 'This promotion code cannot be used for this order.' },
   RATE_LIMITED: { status: 429, message: 'Too many requests. Please slow down.' },
   INTERNAL_ERROR: { status: 500, message: 'An unexpected error occurred.' },
   SERVICE_UNAVAILABLE: { status: 503, message: 'The service is temporarily unavailable.' },
