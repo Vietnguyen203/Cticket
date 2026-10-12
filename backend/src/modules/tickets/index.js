@@ -1,4 +1,16 @@
-/** Public API of the tickets module (used by background jobs and the orders module). */
-const { issueTicketsForOrder, reconcileTickets, listForOrder, confirmationOf } = require('./tickets.service');
+/** Public API of the tickets module (used by background jobs, the orders and the check-ins modules). */
+const { issueTicketsForOrder, reconcileTickets, listForOrder, confirmationOf, toTicketView } = require('./tickets.service');
+const ticketsRepository = require('./tickets.repository');
+const { qrTokenHash, parseQrToken } = require('./qr');
 
-module.exports = { issueTicketsForOrder, reconcileTickets, listForOrder, confirmationOf };
+module.exports = {
+  issueTicketsForOrder,
+  reconcileTickets,
+  listForOrder,
+  confirmationOf,
+  toTicketView,
+  parseQrToken,
+  qrTokenHash,
+  lockTicketForCheckIn: ticketsRepository.lockViewForCheckIn,
+  markTicketUsed: ticketsRepository.markUsed,
+};

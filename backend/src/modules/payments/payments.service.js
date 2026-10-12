@@ -143,6 +143,10 @@ async function refundPayment(context, paymentId, { reason }) {
     if (payment.status !== PAYMENT_STATUS.SUCCESS || order.status !== ORDER_STATUS.PAID) {
       throw new AppError('PAYMENT_NOT_REFUNDABLE');
     }
+    // Phase 10: the customer has been in. A cancelled event still refunds everyone (refundPaidOrders).
+    if (await orders.hasCheckedInTickets(client, order.id)) {
+      throw new AppError('PAYMENT_NOT_REFUNDABLE', 'Tickets of this order have already been checked in.');
+    }
     await refundLockedOrder(client, { orderId: order.id, payment, reason, context });
   });
   return toPayment(await paymentsRepository.findById(pool, paymentId));

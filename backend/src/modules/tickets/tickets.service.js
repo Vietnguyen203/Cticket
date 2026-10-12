@@ -1,7 +1,10 @@
 const { randomInt, randomUUID } = require('node:crypto');
+const QRCode = require('qrcode');
 const { pool } = require('../../database/pool');
 const { withTransaction } = require('../../database/transaction');
-const { ORDER_STATUS } = require('../../config/constants');
+const { ORDER_STATUS, TICKET_STATUS } = require('../../config/constants');
+const AppError = require('../../utils/AppError');
+const { toLimitOffset, toPageMeta } = require('../../utils/pagination');
 const orders = require('../orders');
 const { QUEUE, enqueue, enqueueAfterCommit } = require('../../queue/queues');
 const { publishAfterCommit } = require('../../realtime/publisher');
@@ -15,6 +18,9 @@ const CODE_LENGTH = 10; // 32^10 ≈ 10^15
 const FIRST_QR_VERSION = 1;
 const RECONCILE_AFTER_SECONDS = 60;
 const RECONCILE_BATCH = 100;
+const QR_PNG_OPTIONS = { type: 'png', errorCorrectionLevel: 'M', margin: 2, width: 320 };
+// A refunded / cancelled ticket shows no QR: there is nothing left to scan.
+const SCANNABLE = [TICKET_STATUS.VALID, TICKET_STATUS.USED];
 
 function ticketCode() {
   let code = 'TKT-';
@@ -32,6 +38,18 @@ function toTicket(row) {
     status: row.status,
     issuedAt: row.issued_at,
     usedAt: row.used_at,
+  };
+}
+
+/** A ticket in "My tickets" (TKT-01): what it is for, never who bought it. */
+function toTicketView(row) {
+  return {
+    ...toTicket(row),
+    ticketTypeId: row.ticket_type_id,
+    event: { id: row.event_id, title: row.event_title },
+    schedule: { id: row.schedule_id, startAt: row.start_at, endAt: row.end_at, status: row.schedule_status },
+    venue: { name: row.venue_name, address: row.venue_address, city: row.venue_city },
+    orderId: row.order_id,
   };
 }
 
@@ -109,4 +127,42 @@ async function confirmationOf(orderId) {
   return { order, tickets: await listForOrder(pool, orderId) };
 }
 
-module.exports = { issueTicketsForOrder, reconcileTickets, listForOrder, confirmationOf, toTicket };
+async function listMine(userId, { status, page, pageSize }) {
+  const { rows, total } = await ticketsRepository.listForUser(pool, { userId, status, ...toLimitOffset({ page, pageSize }) });
+  return { tickets: rows.map(toTicketView), meta: toPageMeta({ page, pageSize }, total) };
+}
+
+/** Only the owner sees a ticket; anyone else gets 404 (we do not confirm it exists). */
+async function findOwnTicket(userId, ticketId) {
+  const row = await ticketsRepository.findView(pool, ticketId);
+  if (!row || row.user_id !== userId) throw new AppError('NOT_FOUND', 'Ticket not found.');
+  return row;
+}
+
+/** TKT-02: the ticket plus its QR content (qrToken), for the app to draw. */
+async function getMine(userId, ticketId) {
+  const row = await findOwnTicket(userId, ticketId);
+  return {
+    ...toTicketView(row),
+    qrToken: SCANNABLE.includes(row.status) ? qrToken(row.id, row.qr_version) : null,
+  };
+}
+
+/** TKT-02: the same QR as a PNG image (emails, simple web pages). */
+async function qrPngOfMine(userId, ticketId) {
+  const row = await findOwnTicket(userId, ticketId);
+  if (!SCANNABLE.includes(row.status)) throw new AppError('TICKET_NOT_VALID', 'This ticket has no QR code any more.');
+  return QRCode.toBuffer(qrToken(row.id, row.qr_version), QR_PNG_OPTIONS);
+}
+
+module.exports = {
+  issueTicketsForOrder,
+  reconcileTickets,
+  listForOrder,
+  confirmationOf,
+  toTicket,
+  toTicketView,
+  listMine,
+  getMine,
+  qrPngOfMine,
+};

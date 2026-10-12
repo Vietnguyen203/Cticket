@@ -8,6 +8,8 @@ const inventorySchemas = require('./inventory.schemas');
 const controller = require('./events.controller');
 const schedulesController = require('./schedules.controller');
 const inventoryController = require('./inventory.controller');
+const staffSchemas = require('./staff.schemas');
+const staffController = require('./staff.controller');
 
 // ":own" permissions let an organizer act on THEIR events (checked in the
 // service); ":any" / approve lets an admin act on all of them.
@@ -15,6 +17,7 @@ const canEdit = [authenticate, authorize.any('event:update:own', 'event:manage:a
 const canChangeStatus = [authenticate, authorize.any('event:update:own', 'event:approve')];
 const canManageSchedules = [authenticate, authorize.any('schedule:manage:own', 'event:manage:any')];
 const canBlockInventory = [authenticate, authorize.any('seat:block:own', 'event:manage:any')];
+const canAssignStaff = [authenticate, authorize.any('staff:assign:own', 'event:manage:any')];
 
 /** Mounted at /api/v1/events */
 const eventsRouter = Router();
@@ -43,6 +46,21 @@ eventsRouter.post(
   validate({ params: scheduleSchemas.eventIdParams, body: scheduleSchemas.createSchedule }),
   schedulesController.create,
 );
+
+// Gate staff of an event (Phase 10): the owning organizer or an admin.
+eventsRouter.get('/:id/staff', ...canAssignStaff, validate({ params: staffSchemas.eventIdParams }), staffController.list);
+eventsRouter.post(
+  '/:id/staff',
+  ...canAssignStaff,
+  validate({ params: staffSchemas.eventIdParams, body: staffSchemas.assignStaff }),
+  staffController.assign,
+);
+eventsRouter.delete('/:id/staff/:userId', ...canAssignStaff, validate({ params: staffSchemas.staffParams }), staffController.remove);
+
+/** Mounted at /api/v1/staff: the gate staff's own view (APP-S01). */
+const staffRouter = Router();
+
+staffRouter.get('/events', authenticate, authorize('checkin:read'), staffController.myEvents);
 
 /** Mounted at /api/v1/schedules */
 const schedulesRouter = Router();
@@ -105,4 +123,4 @@ ticketTypesRouter.delete(
   inventoryController.deleteTicketType,
 );
 
-module.exports = { eventsRouter, schedulesRouter, ticketTypesRouter };
+module.exports = { eventsRouter, schedulesRouter, ticketTypesRouter, staffRouter };

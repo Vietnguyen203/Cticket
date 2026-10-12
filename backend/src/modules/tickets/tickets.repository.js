@@ -91,4 +91,66 @@ async function confirmationOf(db, orderId) {
   return rows[0] ?? null;
 }
 
-module.exports = { orderLines, insertTickets, listForOrder, findPaidOrdersWithoutTickets, confirmationOf };
+// What a ticket shows: its seat / ticket type, the show and where it is.
+const TICKET_VIEW = `${TICKET_COLUMNS}, oi.seat_label, oi.ticket_type_id, oi.ticket_type_name,
+  e.title AS event_title, e.organizer_id, es.start_at, es.end_at, es.status AS schedule_status,
+  v.name AS venue_name, v.address_line AS venue_address, v.city AS venue_city`;
+
+const TICKET_VIEW_JOINS = `JOIN order_items oi ON oi.id = t.order_item_id
+  JOIN event_schedules es ON es.id = t.schedule_id
+  JOIN events e ON e.id = t.event_id
+  JOIN venues v ON v.id = es.venue_id`;
+
+/** TKT-01: the user's tickets, next show first, then past ones (most recent first). */
+async function listForUser(db, { userId, status, limit, offset }) {
+  const { rows } = await db.query(
+    `SELECT ${TICKET_VIEW}, count(*) OVER () AS total_count
+     FROM tickets t ${TICKET_VIEW_JOINS}
+     WHERE t.user_id = $1 AND ($2::ticket_status IS NULL OR t.status = $2)
+     ORDER BY (es.end_at < now()), CASE WHEN es.end_at >= now() THEN es.start_at END,
+              es.start_at DESC, oi.seat_label NULLS LAST, t.admission_no, t.id
+     LIMIT $3 OFFSET $4`,
+    [userId, status ?? null, limit, offset],
+  );
+  return { rows, total: rows.length > 0 ? Number(rows[0].total_count) : 0 };
+}
+
+/** One ticket with its show. Ownership is the caller's check. */
+async function findView(db, ticketId) {
+  const { rows } = await db.query(`SELECT ${TICKET_VIEW} FROM tickets t ${TICKET_VIEW_JOINS} WHERE t.id = $1`, [ticketId]);
+  return rows[0] ?? null;
+}
+
+/**
+ * CHK-01: lock the scanned ticket (only the ticket row: FOR UPDATE OF t).
+ * Two gates scanning the same ticket queue up here; the second one then
+ * sees it USED.
+ */
+async function lockViewForCheckIn(db, ticketId) {
+  const { rows } = await db.query(
+    `SELECT ${TICKET_VIEW}, t.qr_token_hash FROM tickets t ${TICKET_VIEW_JOINS} WHERE t.id = $1 FOR UPDATE OF t`,
+    [ticketId],
+  );
+  return rows[0] ?? null;
+}
+
+/** VALID → USED, compare-and-set. @returns {Promise<object|null>} null if it was not VALID any more */
+async function markUsed(db, ticketId) {
+  const { rows } = await db.query(
+    `UPDATE tickets SET status = 'USED', used_at = now() WHERE id = $1 AND status = 'VALID' RETURNING used_at`,
+    [ticketId],
+  );
+  return rows[0] ?? null;
+}
+
+module.exports = {
+  orderLines,
+  insertTickets,
+  listForOrder,
+  findPaidOrdersWithoutTickets,
+  confirmationOf,
+  listForUser,
+  findView,
+  lockViewForCheckIn,
+  markUsed,
+};

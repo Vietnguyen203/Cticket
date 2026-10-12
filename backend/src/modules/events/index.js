@@ -3,7 +3,8 @@
  * and releases inventory through these). Does not load events.service, so the
  * events service may itself depend on the orders module without a cycle.
  */
-const { lockScheduleForSale, PUBLIC_STATUSES } = require('./event-access');
+const { lockScheduleForSale, PUBLIC_STATUSES, resolveActor, canManage } = require('./event-access');
+const staffRepository = require('./staff.repository');
 const inventoryRepository = require('./inventory.repository');
 const ticketTypesRepository = require('./ticket-types.repository');
 const schedulesRepository = require('./schedules.repository');
@@ -25,6 +26,12 @@ async function findWatchableSchedule(scheduleId) {
 
 module.exports = {
   PUBLIC_STATUSES,
+  resolveActor,
+  canManage,
+  findEventById: (db, eventId) => eventsRepository.findById(db, eventId),
+  findScheduleById: (db, scheduleId) => schedulesRepository.findById(db, scheduleId),
+  isEventStaff: (db, eventId, userId) => staffRepository.isStaff(db, { eventId, userId }),
+  eventAudience: staffRepository.audienceOf,
   findWatchableSchedule,
   finishPastShows,
   lockScheduleForSale,
