@@ -23,6 +23,7 @@ const { releaseHeldOrder, expireOrder, expireDueOrders } = require('./order-rele
 const { generateOrderCode } = require('./order-code');
 const fastPath = require('./fast-path');
 const { markOrderPaid } = require('./order-payment');
+const { QUEUE, enqueueAfterCommit } = require('../../queue/queues');
 const { publishAfterCommit } = require('../../realtime/publisher');
 const { MESSAGE, scheduleRoom, seatUpdate, inventoryUpdate } = require('../../realtime/messages');
 
@@ -63,7 +64,19 @@ function toPayment(row) {
   };
 }
 
-function toOrder(row, items, payments) {
+function toTicket(row) {
+  return {
+    id: row.id,
+    code: row.ticket_code,
+    seatLabel: row.seat_label,
+    ticketTypeName: row.ticket_type_name,
+    admissionNo: row.admission_no,
+    status: row.status,
+    issuedAt: row.issued_at,
+  };
+}
+
+function toOrder(row, items, payments, tickets) {
   return {
     id: row.id,
     orderCode: row.order_code,
@@ -83,19 +96,38 @@ function toOrder(row, items, payments) {
     cancelReason: row.cancel_reason,
     createdAt: row.created_at,
     ...(payments ? { payments: payments.map(toPayment) } : {}),
+    ...(tickets ? { tickets: tickets.map(toTicket) } : {}),
   };
 }
 
 async function loadOrder(db, orderId) {
   const row = await ordersRepository.findDetail(db, orderId);
-  const [items, payments] = await Promise.all([
+  const [items, payments, tickets] = await Promise.all([
     ordersRepository.listItems(db, [orderId]),
     ordersRepository.listPayments(db, orderId),
+    ordersRepository.listTickets(db, orderId),
   ]);
-  return toOrder(row, items, payments);
+  return toOrder(row, items, payments, tickets);
 }
 
 const canSee = (actor, order) => order.user_id === actor.userId || actor.canManageAll;
+
+/**
+ * Q-03: expire the order exactly at its deadline. One job per deadline (the
+ * id includes it): checkout schedules a new one, and the earlier job then
+ * finds the order not yet due and does nothing (expireOrder only expires
+ * orders whose expires_at has passed). The worker's sweep is the safety net.
+ */
+function scheduleExpiry(client, orderId, expiresAt) {
+  const deadline = new Date(expiresAt).getTime();
+  enqueueAfterCommit(
+    client,
+    QUEUE.HOLDS,
+    'expire',
+    { orderId },
+    { jobId: `expire-${orderId}-${deadline}`, delay: Math.max(0, deadline - Date.now()) },
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Booking
@@ -232,6 +264,7 @@ function placeOrder(actor, scheduleId, { seatIds = [], items = [] }) {
     ];
     await ordersRepository.insertItems(client, { orderId: order.id, eventId: event.id, scheduleId }, lines);
     await ordersRepository.recalculateTotals(client, order.id);
+    scheduleExpiry(client, order.id, order.expires_at);
 
     // Live seat maps update once this commits (never for a rolled-back attempt).
     const room = scheduleRoom(scheduleId);
@@ -396,6 +429,7 @@ async function checkoutOrder(context, actor, orderId, { promotionCode }) {
       : { discount: 0 };
     const checkedOut = await ordersRepository.checkout(client, { orderId, discount, windowSeconds });
     if (checkedOut.total_amount === 0) await markOrderPaid(client, orderId);
+    else scheduleExpiry(client, orderId, checkedOut.expires_at);
     return 'CHECKED_OUT';
   });
 

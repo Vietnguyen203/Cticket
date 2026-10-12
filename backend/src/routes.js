@@ -8,6 +8,7 @@ const { eventsRouter, schedulesRouter, ticketTypesRouter } = require('./modules/
 const { ordersRouter, scheduleOrdersRouter } = require('./modules/orders/orders.routes');
 const paymentsRoutes = require('./modules/payments/payments.routes');
 const promotionsRoutes = require('./modules/promotions/promotions.routes');
+const notificationsRoutes = require('./modules/notifications/notifications.routes');
 
 /** Everything under /api/v1. Each module mounts its own router here. */
 const apiRouter = Router();
@@ -26,5 +27,6 @@ apiRouter.use('/ticket-types', ticketTypesRouter);
 apiRouter.use('/orders', ordersRouter);
 apiRouter.use('/payments', paymentsRoutes);
 apiRouter.use('/promotions', promotionsRoutes);
+apiRouter.use('/notifications', notificationsRoutes);
 
 module.exports = apiRouter;

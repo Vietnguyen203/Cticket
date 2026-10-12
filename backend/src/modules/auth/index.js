@@ -5,5 +5,6 @@
  */
 const { verifyAccessToken } = require('./auth.tokens');
 const { isRevoked, revokeAllTokensOfUser } = require('./denylist');
+const { sendOtpEmail } = require('./otp.service');
 
-module.exports = { verifyAccessToken, isRevoked, revokeAllTokensOfUser };
+module.exports = { verifyAccessToken, isRevoked, revokeAllTokensOfUser, sendOtpEmail };

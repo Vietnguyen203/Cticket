@@ -9,6 +9,7 @@ const ticketTypesRepository = require('./ticket-types.repository');
 const schedulesRepository = require('./schedules.repository');
 const eventsRepository = require('./events.repository');
 const { pool } = require('../../database/pool');
+const { finishPastShows } = require('./lifecycle');
 
 /**
  * A schedule whose seat map anyone may watch live (WebSocket SUBSCRIBE):
@@ -25,6 +26,7 @@ async function findWatchableSchedule(scheduleId) {
 module.exports = {
   PUBLIC_STATUSES,
   findWatchableSchedule,
+  finishPastShows,
   lockScheduleForSale,
   listTicketTypes: ticketTypesRepository.listBySchedule,
   lockSeatsForHold: inventoryRepository.lockSeatsForHold,

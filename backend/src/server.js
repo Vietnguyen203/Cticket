@@ -4,7 +4,7 @@ const logger = require('./utils/logger');
 const { createApp } = require('./app');
 const { closePool } = require('./database/pool');
 const { redis, closeRedis } = require('./redis/client');
-const { startOrderSweeper } = require('./modules/orders/orders.sweeper');
+const { closeQueues } = require('./queue/queues');
 const { RealtimeHub } = require('./realtime/hub');
 
 const server = http.createServer(createApp());
@@ -21,7 +21,6 @@ server.listen(env.PORT, () => {
 // ioredis keeps reconnecting in the background.
 redis.connect().catch((err) => logger.warn({ err }, 'Redis not reachable at startup; continuing without it'));
 
-const orderSweeper = startOrderSweeper();
 
 let shuttingDown = false;
 
@@ -29,7 +28,7 @@ let shuttingDown = false;
  * Graceful shutdown (Docker sends SIGTERM on `docker compose stop`):
  *  1. close WebSockets (clients reconnect elsewhere), stop accepting new
  *     connections and let in-flight requests finish,
- *  2. stop the order sweeper (letting a sweep in progress finish),
+ *  2. close the job queue connection (jobs themselves run in src/worker.js),
  *  3. close the PostgreSQL pool and the Redis connection,
  *  4. exit. A timer forces exit if something hangs.
  */
@@ -48,7 +47,7 @@ async function shutdown(signal, exitCode = 0) {
     // Open WebSockets would keep server.close() waiting forever: close them first.
     await realtimeHub.close();
     await new Promise((resolve, reject) => server.close((err) => (err ? reject(err) : resolve())));
-    await orderSweeper.stop();
+    await closeQueues();
     await closePool();
     await closeRedis();
     logger.info('Shutdown complete');

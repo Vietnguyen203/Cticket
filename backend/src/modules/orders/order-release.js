@@ -5,6 +5,7 @@ const events = require('../events');
 const promotions = require('../promotions');
 const { publishAfterCommit } = require('../../realtime/publisher');
 const { MESSAGE, scheduleRoom, userRoom, seatUpdate, inventoryUpdate } = require('../../realtime/messages');
+const { QUEUE, enqueueAfterCommit } = require('../../queue/queues');
 const ordersRepository = require('./orders.repository');
 
 /**
@@ -41,10 +42,12 @@ async function releaseHeldOrder(client, orderId, { to, cancelReason = null }) {
   const room = scheduleRoom(changed.schedule_id);
   if (seats.length > 0) publishAfterCommit(client, room, seatUpdate(MESSAGE.SEAT_RELEASED, changed.schedule_id, seats));
   if (counters.length > 0) publishAfterCommit(client, room, inventoryUpdate(changed.schedule_id, counters));
-  publishAfterCommit(client, userRoom(changed.user_id), {
-    type: to === ORDER_STATUS.EXPIRED ? MESSAGE.ORDER_EXPIRED : MESSAGE.ORDER_CANCELLED,
-    orderId,
-    reason: cancelReason,
+  const type = to === ORDER_STATUS.EXPIRED ? MESSAGE.ORDER_EXPIRED : MESSAGE.ORDER_CANCELLED;
+  publishAfterCommit(client, userRoom(changed.user_id), { type, orderId, reason: cancelReason });
+  enqueueAfterCommit(client, QUEUE.NOTIFICATIONS, 'notify', {
+    userId: changed.user_id,
+    type,
+    data: { orderId, orderCode: changed.order_code, reason: cancelReason },
   });
   return true;
 }

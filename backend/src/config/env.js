@@ -64,12 +64,23 @@ const envSchema = z.object({
   // WebSocket: ping every N seconds; a client that misses one ping is dropped.
   WS_HEARTBEAT_SECONDS: z.coerce.number().int().min(1).max(300).default(30),
 
+  // Signs ticket QR codes (Phase 9/10): a QR cannot be forged without it.
+  QR_SECRET: secret,
+
+  // Background jobs (BullMQ). "inline" runs a job right away in the calling
+  // process instead: used by the test suite so it does not need a worker.
+  QUEUE_MODE: z.enum(['bullmq', 'inline']).default('bullmq'),
+  WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(50).default(5),
+  // First retry delay of a failed job; later retries wait longer (exponential).
+  QUEUE_RETRY_DELAY_MS: z.coerce.number().int().min(10).max(600_000).default(5_000),
+
   // Booking: how long a HELD order keeps its seats, and how often expired
   // holds are swept back into stock (in-process until BullMQ in Phase 9).
   HOLD_TTL_MINUTES: z.coerce.number().int().min(1).max(60).default(10),
   // Checkout extends the hold once by this much, to pay (CTicket: 10 + 10 minutes).
   PAYMENT_WINDOW_MINUTES: z.coerce.number().int().min(1).max(60).default(10),
-  ORDER_SWEEP_INTERVAL_SECONDS: z.coerce.number().int().min(5).max(3600).default(30),
+  // Safety-net sweep of expired holds, run by the worker (each order also has its own timed job).
+  ORDER_SWEEP_INTERVAL_SECONDS: z.coerce.number().int().min(5).max(3600).default(60),
 
   // Used only by `npm run seed:admin`.
   ADMIN_EMAIL: z.string().optional(),

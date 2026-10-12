@@ -2,6 +2,7 @@ const { ORDER_STATUS } = require('../../config/constants');
 const events = require('../events');
 const { publishAfterCommit } = require('../../realtime/publisher');
 const { MESSAGE, scheduleRoom, userRoom, seatUpdate, inventoryUpdate } = require('../../realtime/messages');
+const { QUEUE, enqueueAfterCommit } = require('../../queue/queues');
 const ordersRepository = require('./orders.repository');
 
 /**
@@ -36,6 +37,9 @@ async function markOrderPaid(client, orderId) {
     publishAfterCommit(client, scheduleRoom(changed.schedule_id), seatUpdate(MESSAGE.SEAT_SOLD, changed.schedule_id, seats));
   }
   publishAfterCommit(client, userRoom(changed.user_id), { type: MESSAGE.ORDER_PAID, orderId });
+  // Q-01: the worker issues the tickets (and then emails them). If this
+  // enqueue is lost, the reconciliation job finds the order a minute later.
+  enqueueAfterCommit(client, QUEUE.TICKETS, 'issue', { orderId }, { jobId: `issue-${orderId}` });
   return changed;
 }
 
@@ -70,6 +74,12 @@ async function refundPaidOrder(client, orderId) {
   if (seats.length > 0) publishAfterCommit(client, room, seatUpdate(MESSAGE.SEAT_RELEASED, changed.schedule_id, seats));
   if (counters.length > 0) publishAfterCommit(client, room, inventoryUpdate(changed.schedule_id, counters));
   publishAfterCommit(client, userRoom(changed.user_id), { type: MESSAGE.ORDER_REFUNDED, orderId });
+  enqueueAfterCommit(client, QUEUE.EMAILS, 'order-refunded', { orderId }, { jobId: `order-refunded-${orderId}` });
+  enqueueAfterCommit(client, QUEUE.NOTIFICATIONS, 'notify', {
+    userId: changed.user_id,
+    type: MESSAGE.ORDER_REFUNDED,
+    data: { orderId, orderCode: changed.order_code, amount: changed.total_amount },
+  });
   return changed;
 }
 

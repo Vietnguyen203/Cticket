@@ -80,7 +80,7 @@ async function register({ email, password, firstName, lastName, phone }) {
   // here the account still exists and "resend code" fixes it.
   try {
     const code = await otpService.issueOtp(user.id, OTP_PURPOSE.EMAIL_VERIFICATION);
-    if (code) await otpService.sendOtpEmail(user, OTP_PURPOSE.EMAIL_VERIFICATION, code);
+    if (code) await otpService.queueOtpEmail(user, OTP_PURPOSE.EMAIL_VERIFICATION, code);
   } catch (err) {
     logger.error({ err, userId: user.id }, 'Account created but the verification code could not be issued');
   }
@@ -100,7 +100,7 @@ async function requestOtp({ email, purpose }) {
   }
   const code = await otpService.issueOtp(user.id, purpose);
   if (code) {
-    await otpService.sendOtpEmail(user, purpose, code);
+    await otpService.queueOtpEmail(user, purpose, code);
   }
 }
 

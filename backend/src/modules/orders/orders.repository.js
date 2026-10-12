@@ -141,7 +141,7 @@ async function transition(db, { orderId, from, to, cancelReason = null }) {
          cancel_reason = $4,
          paid_at = CASE WHEN $3::order_status = 'PAID' THEN now() ELSE paid_at END
      WHERE id = $1 AND status = ANY($2::order_status[])
-     RETURNING id, user_id, schedule_id, total_amount`,
+     RETURNING id, order_code, user_id, schedule_id, total_amount`,
     [orderId, from, to, cancelReason],
   );
   return rows[0] ?? null;
@@ -170,6 +170,28 @@ async function listPayments(db, orderId) {
   const { rows } = await db.query(
     `SELECT id, status, amount, currency, provider, failure_code, paid_at, created_at
      FROM payments WHERE order_id = $1 ORDER BY created_at DESC`,
+    [orderId],
+  );
+  return rows;
+}
+
+/** After the show: PAID orders of finished schedules are COMPLETED (no regular refund any more). */
+async function completeOrdersOfFinishedSchedules(db) {
+  const { rowCount } = await db.query(
+    `UPDATE orders o SET status = 'COMPLETED'
+     FROM event_schedules es
+     WHERE es.id = o.schedule_id AND es.status = 'FINISHED' AND o.status = 'PAID'`,
+  );
+  return rowCount;
+}
+
+/** Tickets of an order with what is printed on them (read model for the order page). */
+async function listTickets(db, orderId) {
+  const { rows } = await db.query(
+    `SELECT t.id, t.ticket_code, t.admission_no, t.status, t.issued_at, t.used_at, oi.seat_label, oi.ticket_type_name
+     FROM tickets t JOIN order_items oi ON oi.id = t.order_item_id
+     WHERE t.order_id = $1
+     ORDER BY oi.seat_label NULLS LAST, oi.ticket_type_name, t.admission_no`,
     [orderId],
   );
   return rows;
@@ -329,5 +351,7 @@ module.exports = {
   checkout,
   listPayments,
   refundTicketsOfOrder,
+  completeOrdersOfFinishedSchedules,
+  listTickets,
   findInventoryMismatches,
 };
