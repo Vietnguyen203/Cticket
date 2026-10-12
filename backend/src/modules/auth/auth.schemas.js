@@ -49,7 +49,8 @@ const login = z.object({
   password: z.string().min(1).max(MAX_LOGIN_PASSWORD_LENGTH),
 });
 
-const refresh = z.object({ refreshToken });
-const logout = z.object({ refreshToken });
+// Optional here: the web app sends it in an httpOnly cookie instead (refresh-cookie.js).
+const refresh = z.object({ refreshToken: refreshToken.optional() });
+const logout = refresh;
 
-module.exports = { register, requestOtp, verifyOtp, login, refresh, logout };
+module.exports = { register, requestOtp, verifyOtp, login, refresh, logout, refreshToken };

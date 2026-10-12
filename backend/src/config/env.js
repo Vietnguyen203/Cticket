@@ -58,6 +58,8 @@ const envSchema = z.object({
   // A slow Redis must not make the API slow: give up on a command after this.
   REDIS_COMMAND_TIMEOUT_MS: z.coerce.number().int().positive().default(200),
   RATE_LIMIT_ENABLED: booleanString.default(true),
+  // Web app refresh cookie (Phase 11): Secure by default in production only.
+  REFRESH_COOKIE_SECURE: booleanString.optional(),
   // Behind a reverse proxy: number of proxy hops to trust for the client IP.
   TRUST_PROXY: z.coerce.number().int().min(0).default(0),
 

@@ -269,6 +269,81 @@ describe('refresh token rotation and logout', () => {
   });
 });
 
+describe('refresh token in an httpOnly cookie (web app, Phase 11)', () => {
+  const COOKIE = 'X-Auth-Transport';
+  const refreshCookieOf = (res) => (res.headers['set-cookie'] ?? []).find((c) => c.startsWith('etp_refresh='));
+  const valueOf = (setCookie) => setCookie.split(';')[0]; // "etp_refresh=<token>"
+  const webLogin = (email) =>
+    request(app).post(api('/login')).set(COOKIE, 'cookie').send({ email, password: DEFAULT_PASSWORD });
+  const webRefresh = (cookie) => {
+    const req = request(app).post(api('/refresh')).set(COOKIE, 'cookie');
+    return cookie ? req.set('Cookie', cookie).send({}) : req.send({});
+  };
+
+  test('login sets an httpOnly, SameSite=Strict cookie and leaves the token out of the body', async () => {
+    const { email } = await createVerifiedUser(app, mailbox);
+    const res = await webLogin(email).expect(200);
+
+    expect(res.body.data.accessToken).toEqual(expect.any(String));
+    expect(res.body.data).not.toHaveProperty('refreshToken');
+    const setCookie = refreshCookieOf(res);
+    expect(setCookie).toMatch(/HttpOnly/);
+    expect(setCookie).toMatch(/SameSite=Strict/);
+    expect(setCookie).toMatch(/Path=\/api\/v1\/auth/);
+    expect(setCookie).toMatch(/Max-Age=604800/);
+    expect(setCookie).not.toMatch(/Secure/); // tests run with NODE_ENV=test
+  });
+
+  test('refresh rotates the cookie; replaying the old one revokes the session and clears the cookie', async () => {
+    const { email } = await createVerifiedUser(app, mailbox);
+    const first = valueOf(refreshCookieOf(await webLogin(email).expect(200)));
+
+    const res = await webRefresh(first).expect(200);
+    expect(res.body.data.accessToken).toEqual(expect.any(String));
+    expect(res.body.data).not.toHaveProperty('refreshToken');
+    const second = valueOf(refreshCookieOf(res));
+    expect(second).not.toBe(first);
+
+    const replay = await webRefresh(first).expect(401);
+    expect(replay.body.error.code).toBe('REFRESH_TOKEN_REUSED');
+    expect(refreshCookieOf(replay)).toMatch(/etp_refresh=;.*Expires=Thu, 01 Jan 1970/);
+    expect((await webRefresh(second)).status).toBe(401);
+  });
+
+  test('the cookie is ignored without the header (CSRF); the header without a cookie is no session', async () => {
+    const { email } = await createVerifiedUser(app, mailbox);
+    const cookie = valueOf(refreshCookieOf(await webLogin(email).expect(200)));
+
+    const withoutHeader = await request(app).post(api('/refresh')).set('Cookie', cookie).send({});
+    expect(withoutHeader.status).toBe(400);
+    expect(withoutHeader.body.error.details).toEqual([{ field: 'body.refreshToken', message: 'Required' }]);
+
+    const noCookie = await webRefresh(null).expect(401);
+    expect(noCookie.body.error.code).toBe('INVALID_REFRESH_TOKEN');
+    await webRefresh(cookie).expect(200); // the session was never touched
+  });
+
+  test('logout revokes the cookie session and clears the cookie; without a cookie it still succeeds', async () => {
+    const { email } = await createVerifiedUser(app, mailbox);
+    const login = await webLogin(email).expect(200);
+    const cookie = valueOf(refreshCookieOf(login));
+
+    const res = await request(app)
+      .post(api('/logout'))
+      .set(COOKIE, 'cookie')
+      .set('Cookie', cookie)
+      .set('Authorization', `Bearer ${login.body.data.accessToken}`)
+      .send({})
+      .expect(204);
+    expect(refreshCookieOf(res)).toMatch(/Expires=Thu, 01 Jan 1970/);
+    expect((await webRefresh(cookie)).body.error.code).toBe('INVALID_REFRESH_TOKEN');
+    await request(app).get(api('/me')).set('Authorization', `Bearer ${login.body.data.accessToken}`).expect(401);
+
+    await request(app).post(api('/logout')).set(COOKIE, 'cookie').send({}).expect(204);
+    expect((await request(app).post(api('/logout')).send({})).status).toBe(400); // API clients: unchanged
+  });
+});
+
 describe('password reset with OTP', () => {
   const requestReset = (email) => request(app).post(api('/otp')).send({ email, purpose: 'PASSWORD_RESET' });
   const reset = (body) => request(app).post(api('/otp/verify')).send({ purpose: 'PASSWORD_RESET', ...body });
