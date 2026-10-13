@@ -124,3 +124,62 @@ describe('general admission "sold out" hint', () => {
     await book(app, third.token, schedule.id, oneTicket).expect(201);
   });
 });
+
+describe('"seat taken" hint (Phase 13 load test)', () => {
+  const hintKey = (scheduleId, seatId) => `seat-taken:${scheduleId}:${seatId}`;
+
+  test('after PostgreSQL refused a seat, the next requests for it are refused from Redis, without a transaction', async () => {
+    const { schedule, seat } = await onSale();
+    const [holder, second, third] = await createCustomers(3);
+    await book(app, holder.token, schedule.id, { seatIds: [seat.A05] }).expect(201);
+
+    const refused = await book(app, second.token, schedule.id, { seatIds: [seat.A05] });
+    expect(refused.body.error).toMatchObject({ code: 'SEATS_UNAVAILABLE', details: [{ seatId: seat.A05, status: 'HELD' }] });
+    expect(await redis.get(hintKey(schedule.id, seat.A05))).toBe('HELD');
+    expect(await redis.pttl(hintKey(schedule.id, seat.A05))).toBeLessThanOrEqual(3000);
+
+    const connect = jest.spyOn(pool, 'connect');
+    try {
+      const fast = await book(app, third.token, schedule.id, { seatIds: [seat.A06, seat.A05] });
+      expect(fast.status).toBe(409);
+      expect(fast.body.error.details).toEqual([{ seatId: seat.A05, status: 'HELD' }]);
+      expect(connect).not.toHaveBeenCalled(); // no transaction was opened
+    } finally {
+      connect.mockRestore();
+    }
+  });
+
+  test('a cancelled hold drops the hint after the commit: the seat can be held again at once', async () => {
+    const { schedule, seat } = await onSale();
+    const [holder, waiting] = await createCustomers(2);
+    const { order } = (await book(app, holder.token, schedule.id, { seatIds: [seat.A07] }).expect(201)).body.data;
+    await book(app, waiting.token, schedule.id, { seatIds: [seat.A07] }).expect(409);
+    expect(await redis.get(hintKey(schedule.id, seat.A07))).toBe('HELD');
+
+    await cancelOrder(app, holder.token, order.id).expect(200);
+    await waitFor(async () => (await redis.get(hintKey(schedule.id, seat.A07))) === null);
+    await book(app, waiting.token, schedule.id, { seatIds: [seat.A07] }).expect(201);
+  });
+
+  test('with Redis down the hint is skipped and PostgreSQL decides alone', async () => {
+    const { schedule, seat } = await onSale();
+    const [holder, second] = await createCustomers(2);
+    await book(app, holder.token, schedule.id, { seatIds: [seat.A08] }).expect(201);
+    const mget = jest.spyOn(redis, 'mget').mockRejectedValue(new Error('Connection is closed.'));
+    try {
+      const refused = await book(app, second.token, schedule.id, { seatIds: [seat.A08] });
+      expect(refused.body.error.details).toEqual([{ seatId: seat.A08, status: 'HELD' }]);
+    } finally {
+      mget.mockRestore();
+    }
+  });
+});
+
+/** afterCommit callbacks run just after the response is sent: wait for the effect. */
+async function waitFor(condition, timeoutMs = 2000) {
+  const start = Date.now();
+  while (!(await condition())) {
+    if (Date.now() - start > timeoutMs) throw new Error('condition not met in time');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+}

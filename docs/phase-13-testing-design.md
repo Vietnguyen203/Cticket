@@ -71,7 +71,7 @@ Chạy: `cd e2e && npm test` (hoặc `npm run test:ui` để xem trực quan).
 
 - File `loadtest/docker-compose.loadtest.yml` (ghép thêm vào compose chính): `api-load` + `worker-load` cùng image với `api` / `worker`, nhưng dùng **database riêng `etp_load`** và **Redis database 2**, cổng **3200**, mail về Mailpit, **tắt giới hạn tần suất** (k6 gửi mọi request từ một IP; giới hạn tần suất đã có test riêng). Dữ liệu dev không bị ảnh hưởng.
 - Script `seed` tạo dữ liệu tải: 1 sự kiện lớn (địa điểm **2.000 ghế** + **5.000 vé đứng**), thêm khoảng 50 sự kiện khác để trang danh sách có dữ liệu, **2.000 khách** kèm access token (ghi ra file trong thư mục bị git bỏ qua). Token sống 15 phút nên seed ngay trước khi chạy.
-- k6 đã có sẵn trên máy (v1.64). Kết quả lưu JSON + tóm tắt trong `docs/`.
+- k6 đã có sẵn trên máy (v2.2). Kết quả lưu JSON + tóm tắt trong `docs/`.
 
 ### 3.2 Bốn kịch bản (theo kế hoạch)
 
@@ -157,3 +157,48 @@ Mỗi bước: bạn chạy thử rồi commit, như các phase trước.
   1. **Trang chỉnh sửa sự kiện mở được sự kiện đã đăng bán của nhà tổ chức khác** (hiện cả nút "Hủy sự kiện"). API vẫn chặn mọi thay đổi (404) nên không mất dữ liệu; nguyên nhân: `GET /events/:id` là API công khai. Sửa: trang editor kiểm tra sự kiện thuộc nhà tổ chức đang đăng nhập, nếu không thì báo "không tìm thấy" (`api/organizer.ts`).
   2. **Ô "Tên cổng" ở trang soát vé không gắn với nhãn** (trình đọc màn hình không đọc được tên ô). Sửa tận gốc trong `TextField`: tự sinh id (`useId`) khi không có `id` / `name`.
   3. **Redis trả lời chậm hơn 200 ms khi máy quá tải** (6 trình duyệt + Vite + API + Docker trên laptop): cache, giới hạn tần suất, khóa ghế tự chạy tiếp không có Redis đúng thiết kế, nhưng **mã OTP chỉ nằm trong Redis nên trả 503**. Môi trường E2E đặt `REDIS_COMMAND_TIMEOUT_MS=1000`; mặc định 200 ms của production **chưa đổi**, sẽ đo độ trễ Redis dưới tải ở bước 13.2 rồi quyết định.
+
+### Bước 13.2 (xong): load test bằng k6
+
+**Cách chạy** (từ thư mục gốc, stack dev đang chạy; Windows PowerShell dùng `;` thay cho `&&`):
+
+```
+docker compose --env-file .env -f loadtest/docker-compose.yml up -d --build   # stack riêng: etp_load, Redis db 2, cổng 3200
+node loadtest/seed.mjs                                                          # dữ liệu: 2.000 ghế + 5.000 vé đứng, 51 sự kiện, 2.000 khách (token 2 giờ)
+k6 run loadtest/k6/browse.js        # 1. duyệt        (≈ 3,5 phút)
+k6 run loadtest/k6/seatmap.js       # 2. sơ đồ ghế    (≈ 3 phút)
+k6 run loadtest/k6/contention.js    # 3. tranh ghế    (≈ 1 phút)
+k6 run loadtest/k6/mixed.js         # 4. hỗn hợp      (5 phút)
+node loadtest/verify.mjs            # dữ liệu còn đúng không (không ghế nào thuộc 2 đơn, tồn kho khớp)
+docker compose --env-file .env -f loadtest/docker-compose.yml down             # tắt (dữ liệu etp_load vẫn giữ)
+```
+
+`LOAD_API_REPLICAS=3` chạy 3 bản API sau nginx (`load-lb`, round robin; khởi động lại `load-lb` sau khi đổi số bản).
+
+**Máy đo**: laptop i5-12500H (12 nhân / 16 luồng), 24 GB, Windows 11 + Docker Desktop (WSL2); k6, API, PostgreSQL, Redis **chung một máy** → số liệu để so sánh và tìm nút thắt, không phải năng lực production.
+
+**Kết quả** (1 bản API, cấu hình như production; "VU" = người dùng ảo, có thời gian nghĩ 1–5 giây giữa các thao tác):
+
+| Kịch bản | Tải | Request/giây | p95 | p99 | Lỗi | Ngưỡng |
+|---|---|---|---|---|---|---|
+| 1. Duyệt (danh sách, tìm kiếm, chi tiết) | 300 VU | 392 | 5,7 ms | 9,2 ms | 0% | đạt (< 300 ms) |
+| 2. Sơ đồ 2.000 ghế + còn chỗ (không nén) | 200 VU | 95 | 90 ms / 67 ms | 191 ms | 0% | đạt |
+| 2b. Như trên, **có gzip ở nginx** | 200 VU | 95 | 63 ms / 45 ms | 102 ms | 0% | đạt |
+| 3. Tranh ghế: 500 người, 50 ghế, 1 phút | 500 VU | 1.000–1.250 | giữ ghế 249–313 ms; **hủy đơn 3,4 s** | | 0% | giữ ghế đạt; hủy đơn **chưa đạt** (< 800 ms) |
+| 3b. Như trên, **3 bản API** + gợi ý ghế | 500 VU | 1.250 | giữ ghế 372 ms; hủy đơn **1,04 s** | 0,8 s / 1,3 s | 0% | hủy đơn vẫn chưa đạt |
+| 4. Hỗn hợp: 70% duyệt, 20% sơ đồ, 10% mua | 200 VU, 5 phút | 283 | duyệt 14 ms, sơ đồ 37 ms, giữ chỗ 71 ms, thanh toán 52 ms | 69 ms (tất cả) | 0% | **đạt hết**; 2.819 lượt mua, 3.953 vé phát đủ |
+
+**Tính đúng** (sau mọi lần chạy, `verify.mjs`): **không ghế nào thuộc hai đơn**, tồn kho ghế và vé đứng khớp từng đơn, số vé phát ra = số chỗ đã trả tiền. Riêng kịch bản tranh ghế: hơn 16.000 lượt giữ ghế thành công rồi hủy, hàng trăm nghìn lượt bị từ chối 409 đúng.
+
+**Nút thắt tìm được và đã làm gì**:
+
+1. **Một tiến trình Node.js đầy 1 nhân CPU ở khoảng 1.000 request/giây** (tranh ghế). PostgreSQL không phải nguyên nhân: không truy vấn nào chờ khóa, mọi kết nối ở trạng thái `ClientRead` (chờ Node). Hủy đơn cần ~10 lượt hỏi DB, mỗi lượt xếp hàng sau hàng trăm request khác → 2–3 giây. Tắt log request: **không đổi** (log không phải thủ phạm). **3 bản API sau nginx**: hủy đơn trung vị 2,65 s → 0,42 s. Kiến trúc đã sẵn sàng scale ngang (WebSocket qua Redis pub/sub, worker BullMQ, khóa ghế ở Redis + PostgreSQL).
+2. **Lỗi khi đặt API sau nginx giữ kết nối (keep-alive)**: Node đóng kết nối rảnh sau 5 giây, nginx gửi request vào đúng kết nối vừa đóng → "connection reset" → nginx coi API chết 10 giây → 502. **Sửa trong `server.js`**: `keepAliveTimeout` 65 s (> 60 s của nginx / load balancer cloud), `headersTimeout` 66 s.
+3. **Mỗi lượt bấm vào ghế đã có người giữ vẫn mở một transaction và khóa dòng ghế** chỉ để trả 409; hủy đơn phải chờ khóa đó. **Thêm "gợi ý ghế đã có người lấy" trong Redis** (3 giây, như gợi ý "hết vé đứng" có từ Phase 6; Redis chỉ từ chối, không bao giờ tự chấp nhận; xóa ngay sau khi commit lúc ghế được trả lại; Redis hỏng thì bỏ qua). Đo lại: CPU PostgreSQL giảm 22–30% (63% → 44% với 1 bản; 179% → 140% với 3 bản), hủy đơn p95 1,58 → 1,04 s và p99 2,0 → 1,3 s (3 bản). Thêm 3 test Jest.
+4. **Sơ đồ 2.000 ghế là 470 KB JSON không nén**: **bật gzip ở nginx** (`frontend/docker/nginx.conf`, cả JS / CSS): 470 KB → 70 KB, p95 90 → 63 ms, lưu lượng giảm 6 lần. Còn lại: API vẫn dựng lại JSON sơ đồ mỗi lần (CPU 80%) → hướng tiếp theo nếu cần: lưu sẵn chuỗi JSON đã dựng / ETag.
+5. **Docker**: hai stack dùng chung mạng, service cùng tên `api` → DNS của Docker trả về **cả API dev lẫn API load test**, nginx chia tải sang API dev (sai database → 401). Đổi tên toàn bộ service load test thành `load-*`.
+6. Docker Desktop trên Windows từ chối một phần khi 500 kết nối mở **cùng một lúc** (lỗi ở tầng chuyển tiếp cổng, API không nhận được) → kịch bản tăng dần 500 người trong 5 giây (sát thực tế hơn).
+
+**Redis dưới tải** (câu hỏi từ bước 13.1): chỉ trong kịch bản tranh ghế (API đầy CPU), 322 lệnh Redis vượt 200 ms (~0,1%): kiểm tra token bị thu hồi, khóa ghế, gợi ý ghế, cache. Tất cả **chạy tiếp không cần Redis đúng thiết kế, 0 request lỗi**; Redis chỉ dùng 15–35% CPU, độ trễ đến từ vòng lặp sự kiện của Node bị quá tải. **Giữ mặc định 200 ms**; cách giảm là thêm bản API, không phải nới timeout.
+
+**Chưa đạt, ghi nhận**: hủy đơn p95 < 800 ms trong kịch bản tranh ghế cực đoan (500 người, mỗi người bấm 3–5 lần/giây vào cùng 50 ghế). Với 3 bản API đạt 1,04 s; trên máy có nhiều nhân hơn / nhiều máy, thêm bản API sẽ tiếp tục giảm. Các kịch bản sát thực tế (1, 2, 4) đạt hết với 1 bản API.

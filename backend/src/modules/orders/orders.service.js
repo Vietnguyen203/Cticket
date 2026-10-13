@@ -301,6 +301,7 @@ async function createOrder(context, actor, scheduleId, body) {
 
   // Redis fast path (Phase 6): refuse early what PostgreSQL would refuse anyway.
   await fastPath.assertGaHint(body.items ?? []);
+  await fastPath.assertSeatHints(scheduleId, body.seatIds ?? []);
   const releaseSeatLocks = await fastPath.lockSeats(scheduleId, body.seatIds ?? []);
   try {
     await expireDueOrders({ scheduleId });
@@ -319,6 +320,9 @@ async function createOrder(context, actor, scheduleId, body) {
     }
     if (err.gaLeft) {
       await fastPath.rememberGaLeft(err.gaLeft.ticketTypeId, err.gaLeft.left);
+    }
+    if (err.code === 'SEATS_UNAVAILABLE' && Array.isArray(err.details)) {
+      await fastPath.rememberTakenSeats(scheduleId, err.details);
     }
     throw err;
   } finally {

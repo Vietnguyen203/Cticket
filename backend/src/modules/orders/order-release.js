@@ -7,6 +7,7 @@ const { publishAfterCommit } = require('../../realtime/publisher');
 const { MESSAGE, scheduleRoom, userRoom, seatUpdate, inventoryUpdate } = require('../../realtime/messages');
 const { QUEUE, enqueueAfterCommit } = require('../../queue/queues');
 const ordersRepository = require('./orders.repository');
+const { forgetTakenSeatsAfterCommit } = require('./fast-path');
 
 /**
  * End an open (unpaid) order — HELD, PAYMENT_PENDING or PAYMENT_FAILED — and
@@ -25,6 +26,7 @@ async function releaseHeldOrder(client, orderId, { to, cancelReason = null }) {
   if (!changed) return false;
 
   const seats = await events.releaseSeatsOfOrder(client, orderId);
+  forgetTakenSeatsAfterCommit(client, changed.schedule_id, seats.map((seat) => seat.seat_id));
   const counters = [];
   for (const line of await ordersRepository.gaLines(client, orderId)) {
     const counter = await events.releaseGa(client, line);
