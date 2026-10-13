@@ -44,7 +44,7 @@ function refreshTokenOf(req) {
 function sendTokens(req, res, tokens) {
   if (!cookie.usesCookie(req)) return sendSuccess(res, tokens);
   const { refreshToken, ...rest } = tokens;
-  cookie.setRefreshCookie(res, refreshToken);
+  cookie.setRefreshCookie(res, refreshToken, { persistent: cookie.wantsPersistentCookie(req) });
   return sendSuccess(res, rest);
 }
 

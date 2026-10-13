@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { createBrowserRouter } from 'react-router'
 import { AdminLayout, OrganizerLayout } from './admin/AdminLayout'
-import { ORGANIZER_PERMISSIONS } from './admin/permissions'
+import { ADMIN_MENU, ORGANIZER_PERMISSIONS } from './admin/permissions'
 import { RequirePermission } from './admin/RequirePermission'
 import { RequireAuth } from './auth/RequireAuth'
 import { Layout } from './components/Layout'
@@ -21,6 +21,11 @@ import { EventsReviewPage } from './pages/admin/EventsReviewPage'
 import { OrganizersPage } from './pages/admin/OrganizersPage'
 import { VenueDetailPage } from './pages/admin/VenueDetailPage'
 import { VenuesPage } from './pages/admin/VenuesPage'
+import { AuditLogPage } from './pages/admin/AuditLogPage'
+import { OrderDetailPage } from './pages/admin/OrderDetailPage'
+import { OrdersPage } from './pages/admin/OrdersPage'
+import { PromotionsPage } from './pages/admin/PromotionsPage'
+import { UsersPage } from './pages/admin/UsersPage'
 import { ApplyOrganizerPage } from './pages/organizer/ApplyOrganizerPage'
 import { EventEditorPage } from './pages/organizer/EventEditorPage'
 import { MyEventsPage } from './pages/organizer/MyEventsPage'
@@ -57,13 +62,18 @@ export const router = createBrowserRouter([
           </RequireAuth>
         ),
         children: [
-          { index: true, element: guarded(['event:approve', 'organizer:manage', 'venue:manage', 'category:manage'], <AdminHomePage />) },
+          { index: true, element: guarded(ADMIN_MENU[0].anyOf, <AdminHomePage />) },
           { path: 'events', element: guarded(EVENT_REVIEW, <EventsReviewPage />) },
           { path: 'events/:id', element: guarded(EVENT_REVIEW, <EventReviewPage />) },
           { path: 'organizers', element: guarded(['organizer:manage'], <OrganizersPage />) },
           { path: 'venues', element: guarded(['venue:manage'], <VenuesPage />) },
           { path: 'venues/:id', element: guarded(['venue:manage'], <VenueDetailPage />) },
           { path: 'categories', element: guarded(['category:manage'], <CategoriesPage />) },
+          { path: 'users', element: guarded(['user:manage'], <UsersPage />) },
+          { path: 'orders', element: guarded(['order:manage'], <OrdersPage />) },
+          { path: 'orders/:id', element: guarded(['order:manage'], <OrderDetailPage />) },
+          { path: 'promotions', element: guarded(['promotion:manage'], <PromotionsPage />) },
+          { path: 'audit', element: guarded(['audit:read'], <AuditLogPage />) },
         ],
       },
       {

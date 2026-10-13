@@ -81,6 +81,7 @@ function toOrder(row, items, payments, tickets) {
     id: row.id,
     orderCode: row.order_code,
     status: row.status,
+    buyerEmail: row.buyer_email,
     event: { id: row.event_id, title: row.event_title, slug: row.event_slug },
     schedule: { id: row.schedule_id, startAt: row.start_at, venueName: row.venue_name },
     items: items.map(toOrderItem),
@@ -338,7 +339,7 @@ async function getOrder(actor, orderId) {
 }
 
 /** Own orders by default; `all=true` (order:manage) lists everyone's. */
-async function listOrders(actor, { all, scheduleId, status, page, pageSize }) {
+async function listOrders(actor, { all, scheduleId, status, q, page, pageSize }) {
   if (all && !actor.canManageAll) {
     throw new AppError('FORBIDDEN', 'Only administrators can list all orders.');
   }
@@ -348,6 +349,7 @@ async function listOrders(actor, { all, scheduleId, status, page, pageSize }) {
     userId: all ? null : actor.userId,
     scheduleId,
     status,
+    q: all ? q : undefined,
     ...toLimitOffset({ page, pageSize }),
   });
   const items = rows.length > 0 ? await ordersRepository.listItems(pool, rows.map((row) => row.id)) : [];

@@ -4,6 +4,7 @@ const { pool } = require('../../database/pool');
 const { withTransaction } = require('../../database/transaction');
 const { ORDER_STATUS, TICKET_STATUS } = require('../../config/constants');
 const AppError = require('../../utils/AppError');
+const { recordAudit } = require('../audit');
 const { toLimitOffset, toPageMeta } = require('../../utils/pagination');
 const orders = require('../orders');
 const { QUEUE, enqueue, enqueueAfterCommit } = require('../../queue/queues');
@@ -155,7 +156,31 @@ async function qrPngOfMine(userId, ticketId) {
   return QRCode.toBuffer(qrToken(row.id, row.qr_version), QR_PNG_OPTIONS);
 }
 
+/**
+ * TKT-03: the customer's QR leaked (a shared screenshot…). Same row lock as a
+ * check-in, so it cannot interleave with a scan of the old code at a gate.
+ */
+async function reissueQr(context, ticketId) {
+  return withTransaction(async (client) => {
+    const ticket = await ticketsRepository.lockViewForCheckIn(client, ticketId);
+    if (!ticket) throw new AppError('NOT_FOUND', 'Ticket not found.');
+    if (ticket.status !== TICKET_STATUS.VALID) throw new AppError('TICKET_NOT_REISSUABLE');
+    const version = ticket.qr_version + 1;
+    await ticketsRepository.bumpQrVersion(client, { ticketId, version, qrTokenHash: qrTokenHash(qrToken(ticketId, version)) });
+    await recordAudit(client, {
+      context,
+      action: 'TICKET_QR_REISSUED',
+      entityType: 'ticket',
+      entityId: ticketId,
+      oldValue: { qrVersion: ticket.qr_version },
+      newValue: { qrVersion: version },
+    });
+    return toTicketView({ ...ticket, qr_version: version });
+  });
+}
+
 module.exports = {
+  reissueQr,
   issueTicketsForOrder,
   reconcileTickets,
   listForOrder,

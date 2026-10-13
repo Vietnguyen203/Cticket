@@ -1,3 +1,3 @@
-const { recordAudit } = require('./audit.repository');
+const { recordAudit, listAuditLogs, listAuditActions } = require('./audit.repository');
 
-module.exports = { recordAudit };
+module.exports = { recordAudit, listAuditLogs, listAuditActions };

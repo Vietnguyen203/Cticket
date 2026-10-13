@@ -290,8 +290,23 @@ describe('refresh token in an httpOnly cookie (web app, Phase 11)', () => {
     expect(setCookie).toMatch(/HttpOnly/);
     expect(setCookie).toMatch(/SameSite=Strict/);
     expect(setCookie).toMatch(/Path=\/api\/v1\/auth/);
-    expect(setCookie).toMatch(/Max-Age=604800/);
+    expect(setCookie).not.toMatch(/Max-Age|Expires/); // a session cookie: gone when the browser closes
     expect(setCookie).not.toMatch(/Secure/); // tests run with NODE_ENV=test
+  });
+
+  test('"remember me": a 7-day cookie at login, kept 7-day by refreshes that ask for it', async () => {
+    const { email } = await createVerifiedUser(app, mailbox);
+    const login = await request(app)
+      .post(api('/login'))
+      .set(COOKIE, 'cookie')
+      .send({ email, password: DEFAULT_PASSWORD, remember: true })
+      .expect(200);
+    expect(refreshCookieOf(login)).toMatch(/Max-Age=604800/);
+
+    const remembered = await webRefresh(valueOf(refreshCookieOf(login))).set('X-Auth-Remember', '1').expect(200);
+    expect(refreshCookieOf(remembered)).toMatch(/Max-Age=604800/);
+    const forgotten = await webRefresh(valueOf(refreshCookieOf(remembered))).expect(200);
+    expect(refreshCookieOf(forgotten)).not.toMatch(/Max-Age/);
   });
 
   test('refresh rotates the cookie; replaying the old one revokes the session and clears the cookie', async () => {

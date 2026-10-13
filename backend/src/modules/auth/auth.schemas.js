@@ -47,6 +47,8 @@ const verifyOtp = z.discriminatedUnion('purpose', [
 const login = z.object({
   email,
   password: z.string().min(1).max(MAX_LOGIN_PASSWORD_LENGTH),
+  // Web app, cookie mode: a 7-day cookie instead of one that ends with the browser.
+  remember: z.boolean().optional(),
 });
 
 // Optional here: the web app sends it in an httpOnly cookie instead (refresh-cookie.js).

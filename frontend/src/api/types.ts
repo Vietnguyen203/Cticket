@@ -185,4 +185,9 @@ export interface Order {
   cancelledAt: string | null
   cancelReason: string | null
   createdAt: string
+  /** Admins see the buyer */
+  buyerEmail?: string
+  /** Order detail only */
+  payments?: Array<{ id: string; status: string; amount: number; provider: string; failureCode: string | null; paidAt: string | null; createdAt: string }>
+  tickets?: Array<{ id: string; code: string; seatLabel: string | null; ticketTypeName: string; admissionNo: number; status: string; issuedAt: string }>
 }

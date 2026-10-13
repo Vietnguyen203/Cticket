@@ -17,6 +17,9 @@ const env = require('../../config/env');
 const COOKIE_NAME = 'etp_refresh';
 const COOKIE_PATH = '/api/v1/auth';
 const TRANSPORT_HEADER = 'x-auth-transport';
+// "Remember me": the web asks for a 7-day cookie. Without it the cookie has no
+// expiry (a session cookie): the browser forgets it when it is closed.
+const REMEMBER_HEADER = 'x-auth-remember';
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // Browsers accept Secure cookies on http://localhost, so production can always require HTTPS.
@@ -40,12 +43,25 @@ function readRefreshCookie(req) {
   return undefined;
 }
 
-function setRefreshCookie(res, token) {
-  res.cookie(COOKIE_NAME, token, { ...cookieOptions(), maxAge: env.REFRESH_TOKEN_TTL_DAYS * DAY_MS });
+/** Persistent only for "remember me" (login body `remember`, or the header on later refreshes). */
+function wantsPersistentCookie(req) {
+  return req.valid?.body?.remember === true || req.get(REMEMBER_HEADER) === '1';
+}
+
+function setRefreshCookie(res, token, { persistent }) {
+  res.cookie(COOKIE_NAME, token, persistent ? { ...cookieOptions(), maxAge: env.REFRESH_TOKEN_TTL_DAYS * DAY_MS } : cookieOptions());
 }
 
 function clearRefreshCookie(res) {
   res.clearCookie(COOKIE_NAME, cookieOptions());
 }
 
-module.exports = { COOKIE_NAME, COOKIE_PATH, usesCookie, readRefreshCookie, setRefreshCookie, clearRefreshCookie };
+module.exports = {
+  COOKIE_NAME,
+  COOKIE_PATH,
+  usesCookie,
+  readRefreshCookie,
+  wantsPersistentCookie,
+  setRefreshCookie,
+  clearRefreshCookie,
+};

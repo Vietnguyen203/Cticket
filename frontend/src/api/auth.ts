@@ -10,9 +10,12 @@ export interface RegisterInput {
   phone?: string
 }
 
-/** The refresh token comes back as an httpOnly cookie, not in the body. */
-export function login(email: string, password: string): Promise<LoginResult> {
-  return unwrap(api.post('/auth/login', { email, password }, { headers: COOKIE_TRANSPORT }))
+/**
+ * The refresh token comes back as an httpOnly cookie, not in the body:
+ * for 7 days with `remember`, otherwise until the browser is closed.
+ */
+export function login(email: string, password: string, remember = false): Promise<LoginResult> {
+  return unwrap(api.post('/auth/login', { email, password, remember }, { headers: COOKIE_TRANSPORT }))
 }
 
 /** Revokes the session (cookie) and the current access token; the API clears the cookie. */

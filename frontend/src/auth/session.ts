@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { isRemembered } from './remember'
 
 /**
  * The login session in this browser tab (docs/phase-11-web-design.md, section 5).
@@ -63,7 +64,9 @@ export function refreshAccessToken(): Promise<string | null> {
 
 async function requestNewAccessToken(): Promise<string | null> {
   try {
-    const res = await refreshHttp.post(REFRESH_URL, {}, { headers: COOKIE_TRANSPORT })
+    // "Remember me": ask for the 7-day cookie again; otherwise it stays a session cookie.
+    const headers = isRemembered() ? { ...COOKIE_TRANSPORT, 'X-Auth-Remember': '1' } : COOKIE_TRANSPORT
+    const res = await refreshHttp.post(REFRESH_URL, {}, { headers })
     setAccessToken(res.data.data.accessToken)
     return accessToken
   } catch (err) {

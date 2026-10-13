@@ -6,5 +6,13 @@
 const { verifyAccessToken } = require('./auth.tokens');
 const { isRevoked, revokeAllTokensOfUser } = require('./denylist');
 const { sendOtpEmail } = require('./otp.service');
+const { revokeAllRefreshTokensOfUser } = require('./auth.repository');
 
-module.exports = { verifyAccessToken, isRevoked, revokeAllTokensOfUser, sendOtpEmail };
+module.exports = {
+  verifyAccessToken,
+  isRevoked,
+  revokeAllTokensOfUser,
+  /** Every refresh token of the user (in the caller's transaction): no new access tokens. */
+  revokeSessionsOfUser: revokeAllRefreshTokensOfUser,
+  sendOtpEmail,
+};
