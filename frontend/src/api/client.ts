@@ -1,12 +1,13 @@
 import axios, { type InternalAxiosRequestConfig } from 'axios'
 import { expiresWithin } from '../auth/jwt'
 import { getAccessToken, refreshAccessToken } from '../auth/session'
+import { recordServerDate } from '../utils/serverClock'
 import { toApiError } from './errors'
 
 /** Refresh a little before expiry rather than waste a round trip on a 401. */
 const REFRESH_AHEAD_SECONDS = 15
 
-type RetriableConfig = InternalAxiosRequestConfig & { retried?: boolean }
+type RetriableConfig = InternalAxiosRequestConfig & { retried?: boolean; sentAt?: number }
 
 /**
  * The API client. Same origin as the page (/api/v1, forwarded by Vite or
@@ -23,13 +24,18 @@ api.interceptors.request.use(async (config) => {
     token = await refreshAccessToken().catch(() => token) // offline: let the call fail on its own
   }
   if (token) config.headers.set('Authorization', `Bearer ${token}`)
+  ;(config as RetriableConfig).sentAt = Date.now()
   return config
 })
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    recordServerDate(response.headers.date, (response.config as RetriableConfig).sentAt ?? Date.now())
+    return response
+  },
   async (error) => {
     const config = error.config as RetriableConfig | undefined
+    if (error.response) recordServerDate(error.response.headers?.date, config?.sentAt ?? Date.now())
     // 401 on a call that carried a token: it expired (or was revoked). Refresh ONCE, then retry.
     if (
       error.response?.status === 401 &&

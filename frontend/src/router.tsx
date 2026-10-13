@@ -14,6 +14,11 @@ import { VerifyEmailPage } from './pages/auth/VerifyEmailPage'
 import { ProfilePage } from './pages/customer/ProfilePage'
 import { EventDetailPage } from './pages/customer/EventDetailPage'
 import { EventsPage } from './pages/customer/EventsPage'
+import { MyOrdersPage } from './pages/customer/MyOrdersPage'
+import { MyTicketsPage } from './pages/customer/MyTicketsPage'
+import { OrderPage } from './pages/customer/OrderPage'
+import { SeatSelectPage } from './pages/customer/SeatSelectPage'
+import { TicketPage } from './pages/customer/TicketPage'
 import { AdminHomePage } from './pages/admin/AdminHomePage'
 import { CategoriesPage } from './pages/admin/CategoriesPage'
 import { EventReviewPage } from './pages/admin/EventReviewPage'
@@ -34,6 +39,7 @@ import { NewEventPage } from './pages/organizer/NewEventPage'
 /** One route of the admin area, guarded by any of the given permissions. */
 const guarded = (anyOf: string[], element: ReactNode) => <RequirePermission anyOf={anyOf}>{element}</RequirePermission>
 const EVENT_REVIEW = ['event:approve', 'event:manage:any']
+const signedIn = (element: ReactNode) => <RequireAuth>{element}</RequireAuth>
 
 export const router = createBrowserRouter([
   {
@@ -42,6 +48,11 @@ export const router = createBrowserRouter([
       { index: true, element: <HomePage /> },
       { path: 'events', element: <EventsPage /> },
       { path: 'events/:slug', element: <EventDetailPage /> },
+      { path: 'events/:slug/schedules/:scheduleId', element: <SeatSelectPage /> },
+      { path: 'orders', element: signedIn(<MyOrdersPage />) },
+      { path: 'orders/:id', element: signedIn(<OrderPage />) },
+      { path: 'tickets', element: signedIn(<MyTicketsPage />) },
+      { path: 'tickets/:id', element: signedIn(<TicketPage />) },
       { path: 'login', element: <LoginPage /> },
       { path: 'register', element: <RegisterPage /> },
       { path: 'verify-email', element: <VerifyEmailPage /> },
