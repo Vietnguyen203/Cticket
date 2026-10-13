@@ -30,6 +30,8 @@ import { AuditLogPage } from './pages/admin/AuditLogPage'
 import { OrderDetailPage } from './pages/admin/OrderDetailPage'
 import { OrdersPage } from './pages/admin/OrdersPage'
 import { PromotionsPage } from './pages/admin/PromotionsPage'
+import { EventReportPage } from './pages/admin/EventReportPage'
+import { ReportsPage } from './pages/admin/ReportsPage'
 import { UsersPage } from './pages/admin/UsersPage'
 import { ApplyOrganizerPage } from './pages/organizer/ApplyOrganizerPage'
 import { EventEditorPage } from './pages/organizer/EventEditorPage'
@@ -88,6 +90,8 @@ export const router = createBrowserRouter([
           { path: 'orders/:id', element: guarded(['order:manage'], <OrderDetailPage />) },
           { path: 'promotions', element: guarded(['promotion:manage'], <PromotionsPage />) },
           { path: 'audit', element: guarded(['audit:read'], <AuditLogPage />) },
+          { path: 'reports', element: guarded(['report:read:any'], <ReportsPage />) },
+          { path: 'reports/events/:id', element: guarded(['report:read:any'], <EventReportPage />) },
         ],
       },
       {
