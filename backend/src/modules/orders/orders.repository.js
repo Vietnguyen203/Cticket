@@ -15,7 +15,7 @@ const ORDER_COLUMNS = `o.id, o.order_code, o.user_id, o.schedule_id, o.status, o
 
 // What a customer needs to recognise the order in a list (read model join).
 const WITH_EVENT = `${ORDER_COLUMNS}, es.event_id, es.start_at, e.title AS event_title, e.slug AS event_slug,
-  v.name AS venue_name`;
+  v.name AS venue_name, (SELECT email FROM users WHERE id = o.user_id) AS buyer_email`;
 const EVENT_JOINS = `JOIN event_schedules es ON es.id = o.schedule_id
   JOIN events e ON e.id = es.event_id
   JOIN venues v ON v.id = es.venue_id`;
@@ -104,7 +104,7 @@ async function listItems(db, orderIds) {
   return rows;
 }
 
-async function list(db, { userId, scheduleId, status, limit, offset }) {
+async function list(db, { userId, scheduleId, status, q, limit, offset }) {
   const conditions = [];
   const params = [];
   const add = (sql, value) => {
@@ -114,6 +114,8 @@ async function list(db, { userId, scheduleId, status, limit, offset }) {
   if (userId) add('o.user_id = ?', userId);
   if (scheduleId) add('o.schedule_id = ?', scheduleId);
   if (status) add('o.status = ?::order_status', status);
+  // Admin search (ORD-05): the start of an order code, or the buyer's exact email.
+  if (q) add(`(o.order_code ILIKE ? || '%' OR o.user_id IN (SELECT id FROM users WHERE email = lower($${params.length + 1})))`, q);
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
   const { rows } = await db.query(

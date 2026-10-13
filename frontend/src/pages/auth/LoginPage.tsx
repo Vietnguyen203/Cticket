@@ -22,6 +22,7 @@ export function LoginPage() {
   const next = safeNext(params.get('next') ?? state.next ?? null)
   const [email, setEmail] = useState(state.email ?? '')
   const [password, setPassword] = useState('')
+  const [remember, setRemember] = useState(false)
   const [error, setError] = useState<ApiError | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -32,7 +33,7 @@ export function LoginPage() {
     setBusy(true)
     setError(null)
     try {
-      await login(email, password)
+      await login(email, password, remember)
       navigate(next, { replace: true })
     } catch (err) {
       setError(toApiError(err))
@@ -97,7 +98,11 @@ export function LoginPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        <div className="text-right">
+        <div className="flex items-center justify-between gap-2">
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+            Ghi nhớ đăng nhập (7 ngày)
+          </label>
           <Link to="/forgot-password" state={{ email } satisfies AuthPageState} className="text-sm text-brand-700 hover:underline">
             Quên mật khẩu?
           </Link>

@@ -143,7 +143,13 @@ async function markUsed(db, ticketId) {
   return rows[0] ?? null;
 }
 
+/** TKT-03: a new QR version; every copy of the previous QR stops opening the gate. */
+async function bumpQrVersion(db, { ticketId, version, qrTokenHash }) {
+  await db.query(`UPDATE tickets SET qr_version = $2, qr_token_hash = $3 WHERE id = $1`, [ticketId, version, qrTokenHash]);
+}
+
 module.exports = {
+  bumpQrVersion,
   orderLines,
   insertTickets,
   listForOrder,

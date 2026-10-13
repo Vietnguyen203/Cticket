@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { Category, EventDetail, EventSummary, PageMeta } from './types'
+import type { Category, EventDetail, EventSummary, Order, PageMeta, Role } from './types'
 
 /** API calls of the admin pages (Phase 12). Permissions are checked by the API. */
 
@@ -178,4 +178,123 @@ export interface SeatPlanSummary {
 
 export async function getSeatPlan(scheduleId: string): Promise<SeatPlanSummary> {
   return (await api.get(`/schedules/${scheduleId}/seat-plan`)).data.data
+}
+
+// --- Users (USR-03/04/05) ---------------------------------------------------
+
+export interface AdminUser {
+  id: string
+  email: string
+  firstName: string | null
+  lastName: string | null
+  phone: string | null
+  status: 'PENDING_VERIFICATION' | 'ACTIVE' | 'INACTIVE' | 'SUSPENDED'
+  emailVerifiedAt: string | null
+  roles: Role[]
+  createdAt: string
+}
+
+export async function listUsers(params: { q?: string; role?: Role; status?: string; page?: number; pageSize?: number }) {
+  const res = await api.get('/admin/users', { params })
+  return { users: res.data.data.users as AdminUser[], meta: res.data.meta as PageMeta }
+}
+
+/** Suspending logs the user out everywhere at once (reason required). */
+export async function setUserStatus(id: string, status: 'ACTIVE' | 'SUSPENDED', reason?: string): Promise<AdminUser> {
+  return (await api.patch(`/admin/users/${id}/status`, { status, ...(reason ? { reason } : {}) })).data.data.user
+}
+
+export async function setUserRoles(id: string, roles: Role[]): Promise<AdminUser> {
+  return (await api.put(`/admin/users/${id}/roles`, { roles })).data.data.user
+}
+
+// --- Audit log (AUD-02) -----------------------------------------------------
+
+export interface AuditLog {
+  id: string
+  userId: string | null
+  userEmail: string | null
+  action: string
+  entityType: string
+  entityId: string | null
+  oldValue: unknown
+  newValue: unknown
+  ipAddress: string | null
+  createdAt: string
+}
+
+export interface AuditFilters {
+  entityType?: string
+  entityId?: string
+  action?: string
+  from?: string
+  to?: string
+  page?: number
+  pageSize?: number
+}
+
+export async function listAuditLogs(params: AuditFilters) {
+  const res = await api.get('/admin/audit-logs', { params })
+  return { auditLogs: res.data.data.auditLogs as AuditLog[], meta: res.data.meta as PageMeta }
+}
+
+export async function listAuditActions(): Promise<string[]> {
+  return (await api.get('/admin/audit-logs/actions')).data.data.actions
+}
+
+// --- Orders, payments, tickets (ORD-05, PAY-05, TKT-03) ---------------------
+
+export async function listAllOrders(params: { q?: string; status?: string; page?: number; pageSize?: number }) {
+  const res = await api.get('/orders', { params: { all: 'true', ...params } })
+  return { orders: res.data.data.orders as Order[], meta: res.data.meta as PageMeta }
+}
+
+export async function getOrderDetail(id: string): Promise<Order> {
+  return (await api.get(`/orders/${id}`)).data.data.order
+}
+
+/** Full refund of a successful payment (the order's tickets stop being valid). */
+export async function refundPayment(paymentId: string, reason: string) {
+  return (await api.post(`/payments/${paymentId}/refund`, { reason })).data.data.payment
+}
+
+/** TKT-03: a new QR for a valid ticket; the old one stops opening the gate. */
+export async function reissueTicketQr(ticketId: string) {
+  return (await api.post(`/admin/tickets/${ticketId}/reissue-qr`)).data.data.ticket
+}
+
+// --- Promotions (PRO-02) ----------------------------------------------------
+
+export type DiscountType = 'PERCENTAGE' | 'FIXED_AMOUNT'
+export type PromotionStatus = 'ACTIVE' | 'INACTIVE' | 'EXPIRED'
+
+export interface Promotion {
+  id: string
+  code: string
+  name: string
+  discountType: DiscountType
+  discountValue: number
+  maxDiscount: number | null
+  minOrderAmount: number
+  usageLimit: number | null
+  usedCount: number
+  perUserLimit: number | null
+  startsAt: string
+  expiresAt: string
+  status: PromotionStatus
+}
+
+export type PromotionInput = Omit<Promotion, 'id' | 'usedCount'>
+
+export async function listPromotions(params: { status?: PromotionStatus; page?: number; pageSize?: number }) {
+  const res = await api.get('/promotions', { params })
+  return { promotions: res.data.data.promotions as Promotion[], meta: res.data.meta as PageMeta }
+}
+
+export async function createPromotion(input: PromotionInput): Promise<Promotion> {
+  return (await api.post('/promotions', input)).data.data.promotion
+}
+
+export async function updatePromotion(id: string, input: Partial<Omit<PromotionInput, 'code'>>): Promise<Promotion> {
+  return (await api.patch(`/promotions/${id}`, input)).data.data.promotion
 }

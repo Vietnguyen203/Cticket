@@ -199,3 +199,20 @@ Mỗi bước: bạn chạy thử trên web rồi commit.
   - Chưa làm: xóa ảnh không còn dùng, thu nhỏ / nén ảnh, lưu lên S3 (Phase 14).
   - Test backend: `uploads.test.js` (5 test). Toàn bộ: 226 test pass.
 
+### Bước 12.3 (xong): người dùng, đơn hàng, mã giảm giá, audit log
+
+- **API mới** (module `admin`, mount `/api/v1/admin`; module riêng vì `auth` đã phụ thuộc `users`, thêm vào `users` sẽ tạo vòng phụ thuộc):
+  - `GET /admin/users` (tìm email / tên, lọc role, trạng thái; không bao giờ trả mật khẩu băm).
+  - `PATCH /admin/users/:id/status`: khóa (bắt buộc lý do) → thu hồi mọi refresh token + denylist mọi access token **ngay** (chế độ nghiêm ngặt: cả token tạo trong giây hiện tại); mở khóa → `ACTIVE` (hoặc `PENDING_VERIFICATION` nếu chưa xác minh email).
+  - `PUT /admin/users/:id/roles`: luôn giữ `CUSTOMER`; bỏ quyền thì đăng xuất ngay, thêm quyền có hiệu lực lần refresh sau; không tự khóa / tự gỡ quyền admin của mình (`CANNOT_CHANGE_SELF`); **luôn còn ít nhất 1 admin** (`LAST_ADMIN`): khóa các dòng role ADMIN, nên 2 admin gỡ quyền nhau cùng lúc chỉ 1 người thành công (có test).
+  - `GET /admin/audit-logs` (+ `/actions`): lọc theo đối tượng, id, người làm, hành động, khoảng ngày.
+  - `POST /admin/tickets/:id/reissue-qr` (TKT-03): khóa dòng vé như lúc check-in, tăng `qr_version`; QR cũ hết hiệu lực; vé đã dùng / hoàn tiền thì `TICKET_NOT_REISSUABLE`.
+  - `GET /orders?all=true&q=…`: tìm đơn theo mã đơn hoặc email người mua; đơn có `buyerEmail`.
+  - Test: `admin.test.js` (8 test). Toàn bộ: 234 test pass.
+- **Trang admin mới**: Người dùng (tìm, phân quyền, khóa / mở khóa), Đơn hàng (lọc trạng thái, tìm; chi tiết: dòng vé, thanh toán + **hoàn tiền**, vé + **cấp lại QR**), Mã giảm giá (tạo / sửa: %, số tiền, giảm tối đa, đơn tối thiểu, lượt dùng, thời hạn, tạm dừng), Audit log (lọc, xem giá trị cũ → mới).
+- Đã thử trên trình duyệt (API tạm, Mailpit): tìm đơn theo email → cấp lại QR → hoàn tiền (vé chuyển "Đã hoàn tiền"); cấp quyền Soát vé → khóa (bắt buộc lý do) → mở khóa; audit log hiện đủ 3 thao tác; tạo mã giảm giá 15% tối đa 100.000đ.
+- **Đăng xuất khi đóng tab** (theo yêu cầu): ô "Ghi nhớ đăng nhập (7 ngày)" ở trang đăng nhập, mặc định không tick.
+  - Không ghi nhớ: refresh cookie là cookie phiên (không có `Max-Age`); mở lại web sau khi đã đóng mọi tab (không phải tải lại, không còn tab nào khác trả lời qua `BroadcastChannel`) thì web gọi logout, thu hồi luôn phiên trên server.
+  - Ghi nhớ: login gửi `remember: true`, các lần refresh gửi `X-Auth-Remember: 1` → cookie 7 ngày.
+  - Giới hạn: trình duyệt bật "khôi phục phiên trước" có thể giữ lại cookie phiên và tab.
+

@@ -20,11 +20,19 @@ async function revokeToken({ jti, expiresAt }) {
   await tryRedis('revoke access token', () => redis.set(jtiKey(jti), '1', 'EX', ttl), null);
 }
 
-/** Password reset: block every access token of the user issued so far. */
-async function revokeAllTokensOfUser(userId) {
+/**
+ * Block every access token of the user issued so far.
+ * - Password reset: tokens of the current second stay valid (the user logs in
+ *   again right away with the new password).
+ * - strict (account suspended, role removed by an admin): the current second
+ *   too; nobody is expected to log in at that moment, and a token issued just
+ *   before the change must not keep working.
+ */
+async function revokeAllTokensOfUser(userId, { strict = false } = {}) {
+  const cutoff = nowSeconds() + (strict ? 1 : 0);
   await tryRedis(
     'revoke all access tokens of a user',
-    () => redis.set(userKey(userId), String(nowSeconds()), 'EX', env.JWT_ACCESS_TTL_SECONDS),
+    () => redis.set(userKey(userId), String(cutoff), 'EX', env.JWT_ACCESS_TTL_SECONDS + 1),
     null,
   );
 }

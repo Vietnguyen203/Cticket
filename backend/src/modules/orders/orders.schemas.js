@@ -31,6 +31,8 @@ const listQuery = z.object({
   all: z.enum(['true', 'false']).transform((value) => value === 'true').default(false),
   scheduleId: z.uuid().optional(),
   status: z.enum(Object.values(ORDER_STATUS)).optional(),
+  // all=true only: order code (or its beginning) or buyer email
+  q: z.string().trim().min(2).max(255).optional(),
 });
 
 const checkout = z.object({

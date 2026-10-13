@@ -39,6 +39,8 @@ const STATUS: Record<string, [string, keyof typeof TONES]> = {
   PUBLISHED: ['Đang bán', 'green'],
   CANCELLED: ['Đã hủy', 'red'],
   FINISHED: ['Đã diễn', 'blue'],
+  // promotions
+  EXPIRED: ['Hết hạn', 'gray'],
   // schedules
   SCHEDULED: ['Sắp diễn', 'blue'],
 }

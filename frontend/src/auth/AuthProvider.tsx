@@ -4,13 +4,35 @@ import { getMe } from '../api/users'
 import type { Role, User } from '../api/types'
 import { AuthContext, type AuthStatus, type AuthValue } from './AuthContext'
 import { decodeJwt } from './jwt'
+import { isRemembered, setRemembered } from './remember'
 import { getAccessToken, onAccessTokenChange, refreshAccessToken, setAccessToken } from './session'
+import { isFreshOpen, type PresenceMessage } from './tabPresence'
 
 const SESSION_EXPIRED = 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.'
 
 // Tells the other tabs of this browser about a login / logout (they share the refresh cookie).
-type TabMessage = { type: 'login' } | { type: 'logout' }
+type TabMessage = { type: 'login' } | { type: 'logout' } | PresenceMessage
 const channel = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('etp-auth')
+
+/**
+ * The session at page load, decided ONCE (React may run start-up effects
+ * twice): without "remember me", coming back after closing every tab of the
+ * site ends the session (logout revokes it on the server too).
+ */
+let startup: Promise<string | null> | null = null
+function startupToken(): Promise<string | null> {
+  startup ??= (async () => {
+    if (!isRemembered() && (await isFreshOpen(channel))) {
+      await authApi.logout().catch(() => undefined)
+      return null
+    }
+    return refreshAccessToken()
+  })().catch((err: unknown) => {
+    startup = null // unreachable API: "Thử lại" runs it again
+    throw err
+  })
+  return startup
+}
 
 const rolesOf = (token: string | null): Role[] => (token ? ((decodeJwt(token)?.roles ?? []) as Role[]) : [])
 
@@ -22,9 +44,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loggingOut = useRef(false)
 
   /** Start-up (and after a login in another tab): the refresh cookie gives us an access token, if any. */
-  const restore = useCallback(async () => {
+  const restore = useCallback(async (atStartup = false) => {
     try {
-      const token = getAccessToken() ?? (await refreshAccessToken())
+      const token = getAccessToken() ?? (await (atStartup ? startupToken() : refreshAccessToken()))
       if (!token) {
         setUser(null)
         setStatus('anonymous')
@@ -40,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Synchronises with the API; every state update in restore() happens after an await.
     // oxlint-disable-next-line react/set-state-in-effect
-    void restore()
+    void restore(true)
   }, [restore])
 
   // The token changes on every refresh; null means the session is over.
@@ -59,7 +81,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!channel) return undefined
     const onMessage = (event: MessageEvent<TabMessage>) => {
-      if (event.data.type === 'logout') {
+      if (event.data.type === 'ping') {
+        channel.postMessage({ type: 'pong' } satisfies TabMessage) // "this site is still open in another tab"
+      } else if (event.data.type === 'logout') {
         loggingOut.current = true
         setAccessToken(null)
         loggingOut.current = false
@@ -71,8 +95,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => channel.removeEventListener('message', onMessage)
   }, [restore])
 
-  const login = useCallback(async (email: string, password: string) => {
-    const result = await authApi.login(email, password)
+  const login = useCallback(async (email: string, password: string, remember = false) => {
+    const result = await authApi.login(email, password, remember)
+    setRemembered(remember)
     setAccessToken(result.accessToken)
     // The profile carries the permissions (what menus to show); fall back to the login answer.
     setUser(await getMe().catch(() => result.user))
@@ -89,6 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Offline or already logged out: forget the session here anyway.
     } finally {
       setAccessToken(null)
+      setRemembered(false)
       setUser(null)
       setStatus('anonymous')
       loggingOut.current = false
@@ -111,7 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       retry: () => {
         setStatus('loading')
-        void restore()
+        void restore(true)
       },
     }),
     [status, user, roles, notice, login, logout, restore],
