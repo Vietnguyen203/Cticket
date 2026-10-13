@@ -1,4 +1,4 @@
-# Phase 12 — Trang quản trị cho admin và ban tổ chức (thiết kế, chờ review)
+# Phase 12 — Trang quản trị cho admin và ban tổ chức (đã duyệt, đang triển khai)
 
 > Mục tiêu: admin và organizer **làm việc trên web** thay vì Postman: duyệt nhà tổ chức, dựng địa điểm và sơ đồ ghế, tạo sự kiện, suất diễn, hạng vé, gửi duyệt và duyệt, quản lý người dùng, đơn hàng, hoàn tiền, mã giảm giá, xem audit log và doanh thu.
 >
@@ -151,3 +151,19 @@ Mỗi bước: bạn chạy thử trên web rồi commit.
 5. Giờ trong form là **giờ Việt Nam**. Đồng ý?
 6. Ảnh sự kiện nhập bằng **đường dẫn** (chưa có tải ảnh lên). Đồng ý?
 7. **Làm theo 4 bước** ở mục 5, mỗi bước bạn test rồi commit; **nhánh git** như mục 5. Đồng ý?
+
+Đã duyệt cả 7 điểm.
+
+---
+
+## 8. Ghi chú triển khai
+
+### Bước 12.1 (xong): khung quản trị, nhà tổ chức, danh mục, địa điểm, duyệt sự kiện
+
+- `frontend/src/admin/`: menu theo quyền (`permissions.ts`), khung trang (`AdminLayout`), chặn trang theo quyền (`RequirePermission`: chưa đăng nhập → trang đăng nhập; không có quyền → 403), các thành phần chung (bảng, nhãn trạng thái, tab, phân trang, hộp xác nhận có lý do bằng `<dialog>`).
+- Trang: Tổng quan (số việc chờ), Duyệt sự kiện (danh sách theo trạng thái, xem hạng vé và số ghế đã gán từng suất, duyệt / từ chối / hủy), Nhà tổ chức (duyệt / từ chối / tạm khóa / mở lại), Địa điểm (tạo, sửa, ngừng dùng; thêm khu ngồi / khu đứng; sinh ghế theo hàng, ví dụ "A-E" từ ghế 1 tới 20), Danh mục (thêm, sửa, xóa).
+- Đăng nhập xong, web tải hồ sơ đầy đủ (`/users/me`) để có danh sách quyền.
+- Không cần sửa backend ở bước này.
+- Test web: 33 (thêm đọc hàng ghế "A-C, F", menu theo quyền).
+- Đã thử trên trình duyệt (API tạm gửi mail vào Mailpit): thêm / sửa / xóa danh mục, xóa danh mục đang dùng bị chặn; tạo địa điểm, khu, 20 ghế, hàng nhập sai và ghế trùng bị báo lỗi; duyệt một đơn nhà tổ chức; sự kiện thử bị từ chối (bắt buộc lý do) → gửi lại → duyệt → hiện ở trang chủ; tài khoản không có quyền thấy 403, chưa đăng nhập bị chuyển sang trang đăng nhập.
+

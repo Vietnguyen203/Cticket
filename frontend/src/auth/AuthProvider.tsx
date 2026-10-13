@@ -74,7 +74,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     const result = await authApi.login(email, password)
     setAccessToken(result.accessToken)
-    setUser(result.user)
+    // The profile carries the permissions (what menus to show); fall back to the login answer.
+    setUser(await getMe().catch(() => result.user))
     setStatus('authenticated')
     setNotice(null)
     channel?.postMessage({ type: 'login' } satisfies TabMessage)
