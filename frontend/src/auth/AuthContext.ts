@@ -14,6 +14,8 @@ export interface AuthValue {
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
   setUser: (user: User) => void
+  /** New access token + profile: picks up a role granted meanwhile (e.g. organizer approved). */
+  refreshSession: () => Promise<void>
   /** Try again after the API was unreachable at start-up. */
   retry: () => void
 }

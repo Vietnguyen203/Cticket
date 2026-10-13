@@ -106,6 +106,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       setUser,
+      refreshSession: async () => {
+        if (await refreshAccessToken()) setUser(await getMe())
+      },
       retry: () => {
         setStatus('loading')
         void restore()

@@ -5,6 +5,7 @@ const { ZONE_KIND, VENUE_STATUS, INVENTORY_LIMITS } = require('../../config/cons
 const AppError = require('../../utils/AppError');
 const venuesRepository = require('./venues.repository');
 const layoutRepository = require('./venue-layout.repository');
+const { canSee } = require('./venues.service');
 const { remember, invalidatesAfter, NAMESPACE, TTL } = require('../../redis/cache');
 
 const SEAT_NUMBER_DIGITS = 2;
@@ -35,11 +36,23 @@ function toPublicSeat(row) {
   };
 }
 
-async function createZone(venueId, body) {
-  const venue = await venuesRepository.findById(pool, venueId);
-  if (!venue) {
-    throw new AppError('NOT_FOUND', 'Venue not found.');
+/**
+ * Who may add zones / seats: venue managers, or the organizer who proposed
+ * the venue while it is still PENDING (once approved it is shared, so only
+ * admins change it).
+ * @param {{ canManage: boolean, organizerId: string|null }} viewer
+ */
+function assertCanBuild(venue, viewer) {
+  if (!venue || !canSee(venue, viewer)) throw new AppError('NOT_FOUND', 'Venue not found.');
+  if (viewer.canManage) return;
+  if (venue.status !== VENUE_STATUS.PENDING) {
+    throw new AppError('FORBIDDEN', 'This venue is approved: only an administrator can change it.');
   }
+}
+
+async function createZone(venueId, body, viewer) {
+  const venue = await venuesRepository.findById(pool, venueId);
+  assertCanBuild(venue, viewer);
   // A duplicate code is rejected by UNIQUE(venue_id, code) → 409 ZONE_CODE_TAKEN.
   return toPublicZone(await layoutRepository.insertZone(pool, { venueId, ...body }));
 }
@@ -82,12 +95,13 @@ function buildSeats(rows, { originX = 0, originY = 0, spacing = INVENTORY_LIMITS
  * Bulk-create seats in a SEATED zone (≤ 2,000 per request, one INSERT).
  * The zone row is locked so its kind cannot change while seats are added.
  */
-async function createSeats(zoneId, { rows, layout }) {
+async function createSeats(zoneId, { rows, layout }, viewer) {
   return withTransaction(async (client) => {
     const zone = await layoutRepository.findZoneById(client, zoneId, { forUpdate: true });
     if (!zone) {
       throw new AppError('NOT_FOUND', 'Zone not found.');
     }
+    assertCanBuild(await venuesRepository.findById(client, zone.venue_id), viewer);
     if (zone.kind !== ZONE_KIND.SEATED) {
       throw new AppError('ZONE_NOT_SEATED');
     }
@@ -118,21 +132,23 @@ async function deleteSeat(seatId) {
 }
 
 /** Physical layout: zones with their seats and coordinates (for drawing a seat map). */
-async function getLayout(venueId, { canManage }) {
+async function getLayout(venueId, viewer) {
   // An ACTIVE venue's layout comes from the cache (1 hour, refreshed on change).
-  const cached = await remember(NAMESPACE.VENUES, `layout:${venueId}`, TTL.VENUE_LAYOUT, () => loadLayout(venueId, false));
+  const cached = await remember(NAMESPACE.VENUES, `layout:${venueId}`, TTL.VENUE_LAYOUT, () => loadLayout(venueId, null));
   if (cached) return cached;
 
-  const layout = await loadLayout(venueId, canManage);
+  const layout = await loadLayout(venueId, viewer);
   if (!layout) {
     throw new AppError('NOT_FOUND', 'Venue not found.');
   }
   return layout;
 }
 
-async function loadLayout(venueId, includeInactive) {
+/** viewer null: public (ACTIVE only, the cacheable case). */
+async function loadLayout(venueId, viewer) {
   const venue = await venuesRepository.findById(pool, venueId);
-  if (!venue || (venue.status !== VENUE_STATUS.ACTIVE && !includeInactive)) {
+  const visible = venue && (viewer ? canSee(venue, viewer) : venue.status === VENUE_STATUS.ACTIVE);
+  if (!visible) {
     return null;
   }
   const [zones, seats] = await Promise.all([

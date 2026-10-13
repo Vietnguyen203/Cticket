@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { ApiError, toApiError } from '../../api/errors'
 import type { Role } from '../../api/types'
 import { updateMe, type ProfileChanges } from '../../api/users'
@@ -108,6 +108,18 @@ export function ProfilePage() {
             Lưu thay đổi
           </Button>
         </form>
+      </Card>
+
+      <Card className="flex items-center justify-between gap-4">
+        <p className="text-sm text-slate-600">
+          {user.roles?.includes('ORGANIZER') ? 'Quản lý sự kiện bạn tổ chức.' : 'Muốn bán vé sự kiện của bạn trên ETP?'}
+        </p>
+        <Link
+          to={user.roles?.includes('ORGANIZER') ? '/organizer' : '/organizer/apply'}
+          className="shrink-0 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+        >
+          {user.roles?.includes('ORGANIZER') ? 'Trang ban tổ chức' : 'Trở thành nhà tổ chức'}
+        </Link>
       </Card>
 
       <Card className="flex items-center justify-between gap-4">

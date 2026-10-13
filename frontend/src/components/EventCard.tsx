@@ -1,7 +1,7 @@
 import { Link } from 'react-router'
 import type { EventSummary } from '../api/types'
 import { formatDateTime } from '../utils/format'
-import { placeholderOf } from '../utils/placeholder'
+import { EventImage } from './EventImage'
 
 export function EventCard({ event }: { event: EventSummary }) {
   return (
@@ -10,13 +10,7 @@ export function EventCard({ event }: { event: EventSummary }) {
       className="group flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
     >
       <div className="aspect-[16/9] overflow-hidden bg-slate-100">
-        {event.thumbnailUrl ? (
-          <img src={event.thumbnailUrl} alt="" loading="lazy" className="h-full w-full object-cover transition group-hover:scale-105" />
-        ) : (
-          <div className={`flex h-full items-end bg-gradient-to-br p-4 ${placeholderOf(event.title)}`}>
-            <span className="line-clamp-2 text-lg font-bold text-white/90">{event.title}</span>
-          </div>
-        )}
+        <EventImage src={event.thumbnailUrl} title={event.title} className="transition group-hover:scale-105" />
       </div>
       <div className="flex flex-1 flex-col gap-1.5 p-4">
         {event.nextStartAt && <p className="text-sm font-semibold text-brand-700">{formatDateTime(event.nextStartAt)}</p>}

@@ -39,7 +39,7 @@
 | REP-02 | Báo cáo toàn hệ thống theo khoảng ngày (theo ngày, theo sự kiện) | `GET /admin/reports/sales` |
 | TKT-03 | Cấp lại QR khi khách báo lộ mã (QR cũ hết hiệu lực ngay) | `POST /admin/tickets/:id/reissue-qr` |
 
-**Không làm ở phase này**: đánh giá sự kiện (REV-01, mức "Mở rộng"), Bull Board (Q-06: giao diện xem job lỗi; cần thêm lớp bảo vệ riêng, để Phase 14), tải ảnh lên (banner / thumbnail vẫn nhập **đường dẫn ảnh**).
+**Không làm ở phase này**: đánh giá sự kiện (REV-01, mức "Mở rộng"), Bull Board (Q-06: giao diện xem job lỗi; cần thêm lớp bảo vệ riêng, để Phase 14). (Tải ảnh lên: ban đầu để sau, đã làm thêm theo yêu cầu, xem mục 8.)
 
 ---
 
@@ -166,4 +166,36 @@ Mỗi bước: bạn chạy thử trên web rồi commit.
 - Không cần sửa backend ở bước này.
 - Test web: 33 (thêm đọc hàng ghế "A-C, F", menu theo quyền).
 - Đã thử trên trình duyệt (API tạm gửi mail vào Mailpit): thêm / sửa / xóa danh mục, xóa danh mục đang dùng bị chặn; tạo địa điểm, khu, 20 ghế, hàng nhập sai và ghế trùng bị báo lỗi; duyệt một đơn nhà tổ chức; sự kiện thử bị từ chối (bắt buộc lý do) → gửi lại → duyệt → hiện ở trang chủ; tài khoản không có quyền thấy 403, chưa đăng nhập bị chuyển sang trang đăng nhập.
+
+### Bước 12.2 (xong): trang ban tổ chức
+
+- **Đăng ký làm nhà tổ chức** (`/organizer/apply`, lối vào ở trang Tài khoản): gửi đơn, xem trạng thái; được duyệt thì nút "Cập nhật quyền ngay" lấy token mới (role ORGANIZER) không cần đăng nhập lại.
+- **Sự kiện của tôi** (`/organizer`) và **trình sửa sự kiện** (`/organizer/events/:id`), 3 tab:
+  - *Thông tin*: nháp sửa được hết; đang bán chỉ sửa mô tả và ảnh (đúng luật backend); chờ duyệt phải rút lại mới sửa.
+  - *Suất diễn & vé*: thêm suất (giờ nhập là giờ Việt Nam), sửa giờ, xóa suất; thêm / xóa hạng vé (ghế ngồi, hoặc vé đứng gắn khu đứng); **gán hàng ghế cho hạng vé** (chọn theo từng hàng hoặc cả khu; hàng có nhiều hạng được giữ nguyên). Khi đang bán: hủy suất, **khóa / mở ghế** trên sơ đồ (kèm lý do), số đã check-in.
+  - *Nhân viên soát vé*: thêm theo email, gỡ.
+- **Kiểm tra trước khi gửi duyệt** (`organizer/readiness.ts`): đúng các điều backend kiểm tra (có suất sắp diễn, mỗi suất có hạng vé, hạng ghế ngồi có ghế); ghế chưa gán hạng chỉ là cảnh báo. Nút "Gửi duyệt" tắt khi còn thiếu.
+- Nút "Ban tổ chức" trên header chỉ hiện với role ORGANIZER (admin có mọi quyền nhưng không có hồ sơ nhà tổ chức).
+- Không cần sửa backend. Test web: 42 (thêm giờ Việt Nam ↔ ISO, kiểm tra gửi duyệt, chuyển gán ghế theo hàng ↔ API, link ban tổ chức).
+- Đã thử trên trình duyệt (API tạm, Mailpit): tạo sự kiện mới hoàn toàn bằng web → suất 19:30 hiển thị đúng → hạng VIP + vé đứng → gán hàng A cho VIP → danh sách kiểm tra cập nhật → gửi duyệt → (admin duyệt) → khóa 2 ghế, mở 1 ghế → sửa mô tả khi đang bán → thêm / gỡ nhân viên (email không tồn tại bị báo lỗi) → một khách đăng ký làm nhà tổ chức, được duyệt.
+
+#### Bổ sung sau khi test 12.2 (theo yêu cầu)
+
+- **Giờ dạng 24 giờ, không có giây**: ô `datetime-local` theo định dạng của Windows (SA/CH), nên thay bằng `DateTimeField`: ô ngày + chọn giờ 00–23 + phút (bước 5).
+- **Organizer nhập địa điểm mới, admin duyệt** (bạn chọn cách "Organizer gửi, admin duyệt"):
+  - Migration `20261013100001000_venue-proposals`: trạng thái `PENDING` cho địa điểm, cột `created_by_organizer_id`, quyền mới `venue:propose` (ORGANIZER, ADMIN).
+  - `POST /venues`: admin tạo → `ACTIVE`; organizer tạo → `PENDING`. Địa điểm `PENDING` chỉ người đề xuất (và admin) thấy; người đề xuất thêm khu / sinh ghế được cho tới khi được duyệt, sau đó chỉ admin sửa.
+  - Suất diễn dùng được địa điểm `PENDING` của chính ban tổ chức đó.
+  - **Duyệt sự kiện duyệt luôn các địa điểm `PENDING`** của nó trong cùng transaction (audit `VENUE_APPROVED`); địa điểm bị từ chối (`INACTIVE`) chặn việc duyệt (`VENUE_NOT_AVAILABLE`). Admin cũng duyệt / từ chối riêng ở trang Địa điểm (tab "Chờ duyệt").
+  - Web: trong form thêm suất có "+ Nhập địa điểm mới…" (tên, địa chỉ, rồi khu và ghế); trang duyệt sự kiện cảnh báo địa điểm chờ duyệt.
+  - Test backend: `venue-proposals.test.js` (5 test). Toàn bộ: 221 test pass.
+- **Tải ảnh sự kiện từ máy tính** (theo yêu cầu):
+  - `POST /api/v1/uploads/images`: thân request là chính file ảnh (`express.raw`, không thêm thư viện), tối đa 5 MB, 30 ảnh / giờ / người; người sửa được sự kiện / địa điểm mới được tải.
+  - **Loại file đọc từ các byte đầu** (JPEG, PNG, WebP), không tin tên file hay header: trang HTML đổi đuôi .png bị từ chối, SVG (có thể chứa script) không nhận. Tên file ngẫu nhiên (UUID).
+  - Phục vụ lại tại `/api/v1/uploads/images/<uuid>.<ext>` với `X-Content-Type-Options: nosniff`, cache 1 năm (file không bao giờ bị sửa). Cùng nguồn với web nên Vite / nginx không phải cấu hình thêm.
+  - `bannerUrl` / `thumbnailUrl` nhận link `https://…` hoặc đường dẫn ảnh đã tải lên (không nhận đường dẫn khác của site).
+  - Docker: volume `uploads` cho service `api`; khi dev chạy ngoài Docker: `backend/uploads/` (đã bỏ khỏi git). Test ghi vào thư mục tạm.
+  - Web: ô ảnh có nút **"Tải ảnh từ máy"** + xem trước; ảnh lỗi thì hiện nền màu thay vì ảnh vỡ.
+  - Chưa làm: xóa ảnh không còn dùng, thu nhỏ / nén ảnh, lưu lên S3 (Phase 14).
+  - Test backend: `uploads.test.js` (5 test). Toàn bộ: 226 test pass.
 

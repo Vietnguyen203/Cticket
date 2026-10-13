@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { Category, EventDetail, EventSummary, PageMeta, SeatMap } from './types'
+import type { Category, EventDetail, EventSummary, PageMeta, SeatMap, TicketTypeAvailability } from './types'
 
 export interface EventFilters {
   q?: string
@@ -26,6 +26,11 @@ export async function getEvent(idOrSlug: string): Promise<EventDetail> {
 
 export async function listCategories(): Promise<Category[]> {
   return (await api.get('/categories')).data.data.categories
+}
+
+/** Ticket types on sale for a schedule, with what is left. */
+export async function getAvailability(scheduleId: string): Promise<TicketTypeAvailability[]> {
+  return (await api.get(`/schedules/${scheduleId}/availability`)).data.data.ticketTypes
 }
 
 /** Seat statuses (+ versions) and ticket counts right now; layout part cached by the API. */

@@ -40,8 +40,9 @@ function assertValidTimes({ startAt, endAt, salesStartAt, salesEndAt }, now = ne
   }
 }
 
-async function assertActiveVenue(client, venueId) {
-  if (!(await venues.findActiveVenue(client, venueId))) {
+/** ACTIVE venues, or a PENDING venue proposed by the event's own organizer (Phase 12.2). */
+async function assertUsableVenue(client, venueId, event) {
+  if (!(await venues.findUsableVenue(client, venueId, event.organizer_id))) {
     throw new AppError('VENUE_NOT_AVAILABLE');
   }
 }
@@ -81,7 +82,7 @@ async function createSchedule(context, actor, eventId, body) {
       salesEndAt: body.salesEndAt ?? body.startAt,
     };
     assertValidTimes(times);
-    await assertActiveVenue(client, body.venueId);
+    await assertUsableVenue(client, body.venueId, event);
 
     const scheduleId = await schedulesRepository.insert(client, { eventId, venueId: body.venueId, ...times });
     return toPublicSchedule(await schedulesRepository.findWithVenue(client, scheduleId));
@@ -128,7 +129,7 @@ async function updateSchedule(context, actor, scheduleId, body) {
         if ((await ticketTypesRepository.countBySchedule(client, scheduleId)) > 0) {
           throw new AppError('VENUE_CHANGE_BLOCKED');
         }
-        await assertActiveVenue(client, changes.venueId);
+        await assertUsableVenue(client, changes.venueId, event);
       }
     }
 

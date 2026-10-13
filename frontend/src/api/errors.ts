@@ -64,6 +64,8 @@ const MESSAGES: Record<string, string> = {
   TICKET_ALREADY_USED: 'Vé đã được sử dụng.',
   TICKET_NOT_VALID: 'Vé không còn hiệu lực.',
   QR_INVALID: 'Mã QR không phải vé hợp lệ.',
+  IMAGE_INVALID: 'File phải là ảnh JPEG, PNG hoặc WebP.',
+  PAYLOAD_TOO_LARGE: 'File quá lớn (ảnh tối đa 5 MB).',
   WRONG_SCHEDULE: 'Vé thuộc suất diễn khác.',
   CHECKIN_NOT_OPEN: 'Chưa đến giờ check-in.',
   CHECKIN_CLOSED: 'Đã hết giờ check-in.',

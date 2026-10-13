@@ -35,3 +35,5 @@ process.env.QUEUE_MODE = 'inline';
 process.env.QUEUE_RETRY_DELAY_MS = '50';
 // Minimum bcrypt cost: hashing in tests should take ~1 ms, not ~250 ms.
 process.env.BCRYPT_COST = '4';
+// Uploaded images go to a throwaway folder, never into the project.
+process.env.UPLOAD_DIR = path.join(require('node:os').tmpdir(), 'etp-test-uploads');

@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { createVenue, listVenues } from '../../api/admin'
+import { createVenue, listVenues, type VenueStatus } from '../../api/admin'
 import { ApiError, toApiError } from '../../api/errors'
-import { EmptyRow, PageHeader, Pagination, StatusBadge, TableCard } from '../../admin/components'
+import { EmptyRow, PageHeader, Pagination, StatusBadge, TableCard, Tabs } from '../../admin/components'
 import { Alert, Button, Card, TextField } from '../../components/ui'
 import { useAsync } from '../../utils/useAsync'
 
@@ -12,7 +12,7 @@ export function VenuesPage() {
   const navigate = useNavigate()
   const [q, setQ] = useState('')
   const [search, setSearch] = useState('')
-  const [includeInactive, setIncludeInactive] = useState(false)
+  const [status, setStatus] = useState<VenueStatus | 'ALL'>('ACTIVE')
   const [page, setPage] = useState(1)
   const [creating, setCreating] = useState(false)
   const [form, setForm] = useState(EMPTY)
@@ -20,8 +20,14 @@ export function VenuesPage() {
   const [error, setError] = useState<ApiError | null>(null)
   const [busy, setBusy] = useState(false)
   const list = useAsync(
-    () => listVenues({ q: search || undefined, includeInactive, page, pageSize: 20 }),
-    `${search}:${includeInactive}:${page}`,
+    () =>
+      listVenues({
+        q: search || undefined,
+        ...(status === 'ALL' ? { includeInactive: true } : { status }),
+        page,
+        pageSize: 20,
+      }),
+    `${search}:${status}:${page}`,
   )
 
   async function onCreate(event: FormEvent) {
@@ -87,6 +93,19 @@ export function VenuesPage() {
         </Card>
       )}
 
+      <Tabs
+        value={status}
+        onChange={(value) => {
+          setStatus(value)
+          setPage(1)
+        }}
+        options={[
+          ['ACTIVE', 'Đang dùng'],
+          ['PENDING', 'Chờ duyệt (ban tổ chức đề xuất)'],
+          ['INACTIVE', 'Ngừng dùng'],
+          ['ALL', 'Tất cả'],
+        ]}
+      />
       <form
         onSubmit={(e) => {
           e.preventDefault()
@@ -103,10 +122,6 @@ export function VenuesPage() {
           aria-label="Tìm địa điểm"
           className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2"
         />
-        <label className="flex items-center gap-2 text-sm text-slate-600">
-          <input type="checkbox" checked={includeInactive} onChange={(e) => setIncludeInactive(e.target.checked)} />
-          Gồm cả địa điểm ngừng dùng
-        </label>
         <Button type="submit" variant="secondary">
           Tìm
         </Button>

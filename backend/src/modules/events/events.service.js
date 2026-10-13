@@ -14,6 +14,7 @@ const { toPublicSchedule } = require('./schedules.mapper');
 const inventoryService = require('./inventory.service');
 const { remember, invalidatesAfter, keyOf, NAMESPACE, TTL } = require('../../redis/cache');
 const orders = require('../orders');
+const venues = require('../venues');
 const payments = require('../payments');
 
 const SLUG_CONSTRAINT = 'events_slug_key';
@@ -185,6 +186,8 @@ async function changeStatus(context, actor, eventId, { status, reason }) {
       newValue: { status, reason: reason ?? null, heldOrdersCancelled, paidOrdersRefunded },
     });
     if (transition.generatesInventory) {
+      // Venues the organizer proposed for this event are approved with it (Phase 12.2).
+      await venues.activateVenuesOfEvent(client, eventId, context);
       const created = await inventoryService.generateInventory(client, eventId);
       await recordAudit(client, {
         context,
@@ -281,7 +284,8 @@ module.exports = {
   createEvent,
   updateEvent: invalidatesAfter(changesCatalog, updateEvent),
   deleteEvent: invalidatesAfter(changesCatalog, deleteEvent),
-  changeStatus: invalidatesAfter(changesCatalog, changeStatus),
+  // Approval may activate proposed venues: venue lists / layouts change too.
+  changeStatus: invalidatesAfter([...changesCatalog, NAMESPACE.VENUES], changeStatus),
   getEvent,
   listEvents,
 };

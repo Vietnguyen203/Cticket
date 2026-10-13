@@ -48,7 +48,7 @@ export async function deleteCategory(id: string): Promise<void> {
 
 // --- Venues, zones, seats ---------------------------------------------------
 
-export type VenueStatus = 'ACTIVE' | 'INACTIVE'
+export type VenueStatus = 'ACTIVE' | 'INACTIVE' | 'PENDING'
 
 export interface VenueRecord {
   id: string
@@ -59,6 +59,8 @@ export interface VenueRecord {
   country: string
   capacity: number | null
   status: VenueStatus
+  /** Set when an organizer proposed the venue (PENDING until approved) */
+  createdByOrganizerId: string | null
   createdAt: string
 }
 
@@ -104,7 +106,7 @@ export interface SeatRowInput {
   to: number
 }
 
-export async function listVenues(params: { q?: string; includeInactive?: boolean; page?: number; pageSize?: number }) {
+export async function listVenues(params: { q?: string; includeInactive?: boolean; status?: VenueStatus; page?: number; pageSize?: number }) {
   const res = await api.get('/venues', { params: { ...params, includeInactive: params.includeInactive ? 'true' : undefined } })
   return { venues: res.data.data.venues as VenueRecord[], meta: res.data.meta as PageMeta }
 }
@@ -159,6 +161,7 @@ export interface ScheduleTicketType {
   price: number
   inventoryMode: 'RESERVED' | 'GENERAL_ADMISSION'
   capacity: number | null
+  venueZoneId?: string | null
   maxPerOrder: number
   status: string
 }
