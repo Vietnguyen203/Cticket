@@ -35,6 +35,9 @@ import { ApplyOrganizerPage } from './pages/organizer/ApplyOrganizerPage'
 import { EventEditorPage } from './pages/organizer/EventEditorPage'
 import { MyEventsPage } from './pages/organizer/MyEventsPage'
 import { NewEventPage } from './pages/organizer/NewEventPage'
+import { CheckInHistoryPage } from './pages/staff/CheckInHistoryPage'
+import { ScanPage } from './pages/staff/ScanPage'
+import { StaffEventsPage } from './pages/staff/StaffEventsPage'
 
 /** One route of the admin area, guarded by any of the given permissions. */
 const guarded = (anyOf: string[], element: ReactNode) => <RequirePermission anyOf={anyOf}>{element}</RequirePermission>
@@ -108,6 +111,9 @@ export const router = createBrowserRouter([
           { path: 'events/:id', element: guarded(ORGANIZER_PERMISSIONS, <EventEditorPage />) },
         ],
       },
+      { path: 'staff', element: guarded(['checkin:read'], <StaffEventsPage />) },
+      { path: 'staff/scan/:scheduleId', element: guarded(['checkin:create'], <ScanPage />) },
+      { path: 'staff/history/:scheduleId', element: guarded(['checkin:read'], <CheckInHistoryPage />) },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

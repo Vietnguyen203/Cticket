@@ -1,15 +1,25 @@
+import { useState } from 'react'
 import { Link, NavLink, Outlet } from 'react-router'
-import { canUseAdmin, canUseOrganizer } from '../admin/permissions'
+import { canUseAdmin, canUseOrganizer, canUseStaff } from '../admin/permissions'
 import { useAuth } from '../auth/AuthContext'
 import { Alert, Button, FullPageSpinner } from './ui'
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
-  `rounded-lg px-3 py-2 text-sm font-medium transition ${
+  `whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition ${
     isActive ? 'bg-brand-50 text-brand-800' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
   }`
 
 export function Layout() {
   const { status, user, notice, clearNotice, retry } = useAuth()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const signedIn = status === 'authenticated'
+  const links: Array<[string, string]> = [
+    ['/events', 'Sự kiện'],
+    ...(signedIn ? ([['/tickets', 'Vé của tôi'], ['/orders', 'Đơn hàng']] as Array<[string, string]>) : []),
+    ...(signedIn && canUseOrganizer(user) ? ([['/organizer', 'Ban tổ chức']] as Array<[string, string]>) : []),
+    ...(signedIn && canUseStaff(user) ? ([['/staff', 'Soát vé']] as Array<[string, string]>) : []),
+    ...(signedIn && canUseAdmin(user) ? ([['/admin', 'Quản trị']] as Array<[string, string]>) : []),
+  ]
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -19,31 +29,15 @@ export function Layout() {
             <img src="/favicon.svg" alt="" className="h-7 w-7" />
             <span className="hidden sm:inline">ETP Tickets</span>
           </Link>
-          <nav className="flex flex-1 items-center gap-1 overflow-x-auto">
-            <NavLink to="/events" className={navClass}>
-              Sự kiện
-            </NavLink>
-            {status === 'authenticated' && (
-              <>
-                <NavLink to="/tickets" className={navClass}>
-                  Vé của tôi
-                </NavLink>
-                <NavLink to="/orders" className={navClass}>
-                  Đơn hàng
-                </NavLink>
-              </>
-            )}
-            {status === 'authenticated' && canUseOrganizer(user) && (
-              <NavLink to="/organizer" className={navClass}>
-                Ban tổ chức
+          {/* Wide screens: the links in the bar. Phones: a ☰ button opens them as a list. */}
+          <nav className="hidden flex-1 items-center gap-1 sm:flex">
+            {links.map(([to, label]) => (
+              <NavLink key={to} to={to} className={navClass}>
+                {label}
               </NavLink>
-            )}
-            {status === 'authenticated' && canUseAdmin(user) && (
-              <NavLink to="/admin" className={navClass}>
-                Quản trị
-              </NavLink>
-            )}
+            ))}
           </nav>
+          <div className="flex-1 sm:hidden" />
           {status === 'authenticated' && user ? (
             <NavLink to="/account" className={navClass}>
               <span className="block max-w-28 truncate">{user.firstName}</span>
@@ -55,7 +49,30 @@ export function Layout() {
               </Link>
             )
           )}
+          <button
+            type="button"
+            onClick={() => setMenuOpen((open) => !open)}
+            aria-expanded={menuOpen}
+            aria-label="Menu"
+            className="rounded-lg px-3 py-2 text-xl leading-none text-slate-700 hover:bg-slate-100 sm:hidden"
+          >
+            {menuOpen ? '✕' : '☰'}
+          </button>
         </div>
+        {menuOpen && (
+          <nav className="border-t border-slate-200 bg-white px-4 py-2 sm:hidden">
+            {links.map(([to, label]) => (
+              <NavLink
+                key={to}
+                to={to}
+                onClick={() => setMenuOpen(false)}
+                className={(state) => `block ${navClass(state)} !py-3 !text-base`}
+              >
+                {label}
+              </NavLink>
+            ))}
+          </nav>
+        )}
       </header>
 
       {notice && (
