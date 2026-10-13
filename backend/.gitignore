@@ -1,6 +1,6 @@
-
-# Uploaded images (local development)
-uploads/
+# Uploaded images (local development). Anchored with "/": a bare "uploads/" also
+# matched src/modules/uploads/ and kept that module out of git (found by CI).
+/uploads/
 
 # Test coverage report (npm run test:coverage)
-coverage/
+/coverage/
