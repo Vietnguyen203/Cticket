@@ -1,0 +1,111 @@
+# Load test stack (Phase 13.2): the production images of the API and the
+# worker, on their OWN data, next to the dev stack (same PostgreSQL / Redis
+# containers, joined through the dev network):
+#
+#   PostgreSQL database "etp_load" · Redis db 2 · API on http://localhost:3200
+#   mail → Mailpit · no rate limits (k6 sends everything from one address)
+#
+# LOAD_API_REPLICAS=N runs N API containers behind nginx (round robin), to
+# measure horizontal scaling: one Node.js process uses one core for JavaScript.
+#
+# Every service name starts with "load-": the stacks share the dev network,
+# where Docker's DNS answers a service name with EVERY container of that name
+# in both projects. Named "api", nginx would also send load test traffic to
+# the dev API (and the dev web to these APIs).
+#
+# Start (from the project root, the dev stack running):
+#   docker compose --env-file .env -f loadtest/docker-compose.yml up -d --build
+# Stop and remove (the dev stack is not touched):
+#   docker compose --env-file .env -f loadtest/docker-compose.yml down
+#
+# The secrets below are test-only values: the seed script signs the k6
+# users' tokens with them. Never reuse them anywhere else.
+name: etp-load
+
+x-load-env: &load-env
+  NODE_ENV: production
+  LOG_LEVEL: ${LOAD_LOG_LEVEL:-warn}
+  DATABASE_URL: postgres://${POSTGRES_USER:-etp}:${POSTGRES_PASSWORD}@postgres:5432/etp_load
+  REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/2
+  JWT_ACCESS_SECRET: load-test-only-access-secret-0123456789abcdef
+  JWT_ACCESS_TTL_SECONDS: "7200"
+  OTP_SECRET: load-test-only-otp-secret-0123456789abcdefgh
+  QR_SECRET: load-test-only-qr-secret-0123456789abcdefghi
+  SMTP_HOST: mailpit
+  SMTP_PORT: "1025"
+  SMTP_SECURE: "false"
+  SMTP_USER: ""
+  SMTP_PASS: ""
+  MAIL_FROM: Event Tickets Load <no-reply@load.test>
+  RATE_LIMIT_ENABLED: "false"
+
+services:
+  # One-shot: create the database if it does not exist yet.
+  load-db:
+    image: postgres:17-alpine
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    command:
+      - sh
+      - -c
+      - >-
+        psql -h postgres -U ${POSTGRES_USER:-etp} -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = 'etp_load'" | grep -q 1
+        || psql -h postgres -U ${POSTGRES_USER:-etp} -d postgres -c "CREATE DATABASE etp_load"
+    networks: [dev]
+    restart: "no"
+
+  load-migrate:
+    build: ../backend
+    command: ["npm", "run", "migrate:up"]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-etp}:${POSTGRES_PASSWORD}@postgres:5432/etp_load
+    depends_on:
+      load-db:
+        condition: service_completed_successfully
+    networks: [dev]
+    restart: "no"
+
+  load-api:
+    build: ../backend
+    environment:
+      <<: *load-env
+      PORT: 3000
+    deploy:
+      replicas: ${LOAD_API_REPLICAS:-1}
+    depends_on:
+      load-migrate:
+        condition: service_completed_successfully
+    networks: [dev]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  # Load balancer in front of the API container(s): k6 → :3200 → nginx → load-api:3000 (every replica).
+  load-lb:
+    image: nginx:1.27-alpine
+    volumes:
+      - ./nginx-lb.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "3200:3200"
+    depends_on:
+      load-api:
+        condition: service_healthy
+    networks: [dev]
+
+  load-worker:
+    build: ../backend
+    command: ["node", "src/worker.js"]
+    environment: *load-env
+    depends_on:
+      load-migrate:
+        condition: service_completed_successfully
+    networks: [dev]
+    stop_grace_period: 30s
+
+networks:
+  dev:
+    name: etp_default
+    external: true

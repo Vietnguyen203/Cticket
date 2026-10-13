@@ -8,6 +8,14 @@ const { closeQueues } = require('./queue/queues');
 const { RealtimeHub } = require('./realtime/hub');
 
 const server = http.createServer(createApp());
+// Behind a proxy that keeps connections open (nginx upstream keepalive, cloud
+// load balancers: 60 s idle), the API must keep an idle connection LONGER than
+// the proxy, or it closes one just as the proxy sends a request on it: the
+// proxy gets "connection reset", answers 502 and may mark the API down
+// (found by the Phase 13 load test). Node's default is 5 s.
+const KEEP_ALIVE_TIMEOUT_MS = 65_000;
+server.keepAliveTimeout = KEEP_ALIVE_TIMEOUT_MS;
+server.headersTimeout = KEEP_ALIVE_TIMEOUT_MS + 1_000; // must be larger than keepAliveTimeout
 // WebSocket endpoint /ws on the same port as the REST API.
 const realtimeHub = new RealtimeHub();
 realtimeHub.attach(server).catch((err) => logger.error({ err }, 'Failed to start the WebSocket endpoint'));

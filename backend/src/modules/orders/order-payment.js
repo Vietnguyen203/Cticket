@@ -4,6 +4,7 @@ const { publishAfterCommit } = require('../../realtime/publisher');
 const { MESSAGE, scheduleRoom, userRoom, seatUpdate, inventoryUpdate } = require('../../realtime/messages');
 const { QUEUE, enqueueAfterCommit } = require('../../queue/queues');
 const ordersRepository = require('./orders.repository');
+const { forgetTakenSeatsAfterCommit } = require('./fast-path');
 
 /**
  * Order state changes driven by payments (Phase 8). All run in the caller's
@@ -62,6 +63,7 @@ async function refundPaidOrder(client, orderId) {
   if (!changed) return null;
 
   const seats = await events.refundSeatsOfOrder(client, orderId);
+  forgetTakenSeatsAfterCommit(client, changed.schedule_id, seats.map((seat) => seat.seat_id));
   const counters = [];
   for (const line of await ordersRepository.gaLines(client, orderId)) {
     const counter = await events.refundGa(client, line);

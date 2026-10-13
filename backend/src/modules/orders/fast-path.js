@@ -15,8 +15,11 @@ const { redis, tryRedis } = require('../../redis/client');
  */
 const SEAT_LOCK_TTL_MS = 5_000; // covers the booking transaction, never the whole 10-minute hold
 const GA_HINT_TTL_SECONDS = 3;
+const SEAT_HINT_TTL_SECONDS = 3;
+const TAKEN_SEAT_STATUSES = new Set(['HELD', 'SOLD', 'BLOCKED']);
 
 const seatLockKey = (scheduleId, seatId) => `seatlock:${scheduleId}:${seatId}`;
+const seatTakenKey = (scheduleId, seatId) => `seat-taken:${scheduleId}:${seatId}`;
 const gaLeftKey = (ticketTypeId) => `ga-left:${ticketTypeId}`;
 const NOOP_RELEASE = async () => {};
 
@@ -64,4 +67,58 @@ async function rememberGaLeft(ticketTypeId, left) {
   await tryRedis('ga hint write', () => redis.set(gaLeftKey(ticketTypeId), String(left), 'EX', GA_HINT_TTL_SECONDS), null);
 }
 
-module.exports = { lockSeats, assertGaHint, rememberGaLeft, SEAT_LOCK_TTL_MS };
+/**
+ * "Seat taken" hint (Phase 13 load test): in an on-sale rush most requests
+ * target seats that are already held. Without the hint each of them still
+ * opens a transaction and locks the seat row just to answer 409, and a
+ * cancel / payment of that seat queues behind them. After PostgreSQL refused
+ * a seat, the same answer comes from Redis for a few seconds. When the seat
+ * comes back on sale (cancel, expiry, refund) the hint is deleted after the
+ * commit; if that delete fails, the hint is wrong for SEAT_HINT_TTL_SECONDS
+ * at most (an unblocked seat too: unblocking is rare and does not delete it).
+ */
+async function assertSeatHints(scheduleId, seatIds) {
+  if (seatIds.length === 0) return;
+  const hints = await tryRedis('seat hint', () => redis.mget(...seatIds.map((seatId) => seatTakenKey(scheduleId, seatId))), []);
+  const taken = seatIds.flatMap((seatId, index) => (hints[index] ? [{ seatId, status: hints[index] }] : []));
+  if (taken.length > 0) throw new AppError('SEATS_UNAVAILABLE', undefined, { details: taken });
+}
+
+/** @param {Array<{ seatId: string, status: string }>} refused  details of a SEATS_UNAVAILABLE from PostgreSQL */
+async function rememberTakenSeats(scheduleId, refused) {
+  const taken = refused.filter((seat) => TAKEN_SEAT_STATUSES.has(seat.status));
+  if (taken.length === 0) return;
+  await tryRedis(
+    'seat hint write',
+    () => {
+      const batch = redis.multi();
+      for (const seat of taken) batch.set(seatTakenKey(scheduleId, seat.seatId), seat.status, 'EX', SEAT_HINT_TTL_SECONDS);
+      return batch.exec();
+    },
+    null,
+  );
+}
+
+async function forgetTakenSeats(scheduleId, seatIds) {
+  if (seatIds.length === 0) return;
+  await tryRedis('seat hint clear', () => redis.del(...seatIds.map((seatId) => seatTakenKey(scheduleId, seatId))), 0);
+}
+
+/** Seats back on sale in this transaction: drop their hints once it commits (never inside it). */
+function forgetTakenSeatsAfterCommit(client, scheduleId, seatIds) {
+  if (seatIds.length > 0 && typeof client.afterCommit === 'function') {
+    client.afterCommit(() => forgetTakenSeats(scheduleId, seatIds));
+  }
+}
+
+module.exports = {
+  lockSeats,
+  assertGaHint,
+  rememberGaLeft,
+  assertSeatHints,
+  rememberTakenSeats,
+  forgetTakenSeats,
+  forgetTakenSeatsAfterCommit,
+  SEAT_LOCK_TTL_MS,
+  SEAT_HINT_TTL_SECONDS,
+};
