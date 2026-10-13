@@ -85,6 +85,9 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       # Browser origins of the web app (WebSocket Origin check, Phase 11).
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:8080,https://localhost:8443}
+    # Event images uploaded from the web (Phase 12.2) survive rebuilds.
+    volumes:
+      - uploads:/app/uploads
     ports:
       - "${API_PORT:-3000}:3000"
     depends_on:
@@ -140,3 +143,4 @@ services:
 
 volumes:
   pgdata:
+  uploads:

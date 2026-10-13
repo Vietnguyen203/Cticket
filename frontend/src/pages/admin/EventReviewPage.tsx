@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { changeEventStatus, getEventForReview, getSeatPlan, listTicketTypes } from '../../api/admin'
+import { changeEventStatus, getEventForReview, getSeatPlan, getVenue, listTicketTypes } from '../../api/admin'
 import { toApiError } from '../../api/errors'
 import type { Schedule } from '../../api/types'
 import { ConfirmDialog, PageHeader, StatusBadge } from '../../admin/components'
@@ -136,6 +136,7 @@ export function EventReviewPage() {
 function ScheduleReview({ schedule }: { schedule: Schedule }) {
   const ticketTypes = useAsync(() => listTicketTypes(schedule.id), `tt:${schedule.id}`)
   const plan = useAsync(() => getSeatPlan(schedule.id), `plan:${schedule.id}`)
+  const venue = useAsync(() => getVenue(schedule.venue.id), `venue:${schedule.venue.id}`)
   const seatsOf = (ticketTypeId: string) => plan.data?.ticketTypes.find((t) => t.ticketTypeId === ticketTypeId)?.seats
 
   return (
@@ -149,6 +150,21 @@ function ScheduleReview({ schedule }: { schedule: Schedule }) {
         </div>
         <StatusBadge status={schedule.status} />
       </div>
+      {venue.data?.status === 'PENDING' && (
+        <div className="mt-2">
+          <Alert tone="warning">
+            Địa điểm mới do ban tổ chức đề xuất, chưa duyệt: duyệt sự kiện sẽ duyệt luôn địa điểm này.{' '}
+            <Link to={`/admin/venues/${schedule.venue.id}`} className="font-semibold underline">
+              Xem khu và ghế
+            </Link>
+          </Alert>
+        </div>
+      )}
+      {venue.data?.status === 'INACTIVE' && (
+        <div className="mt-2">
+          <Alert>Địa điểm đã bị từ chối / ngừng dùng: sự kiện không duyệt được cho tới khi ban tổ chức đổi địa điểm.</Alert>
+        </div>
+      )}
       <p className="mt-2 text-xs text-slate-500">
         Mở bán {formatDateTime(schedule.salesStartAt)} → đóng {formatDateTime(schedule.salesEndAt)}
         {schedule.inventoryGeneratedAt ? ' · đã tạo vé' : ''}

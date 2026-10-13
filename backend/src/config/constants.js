@@ -66,6 +66,7 @@ const SCHEDULE_STATUS = Object.freeze({
 const VENUE_STATUS = Object.freeze({
   ACTIVE: 'ACTIVE',
   INACTIVE: 'INACTIVE',
+  PENDING: 'PENDING', // proposed by an organizer, waiting for an admin (Phase 12.2)
 });
 
 const ZONE_KIND = Object.freeze({

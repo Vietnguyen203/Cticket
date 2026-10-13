@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { User } from '../api/types'
-import { ADMIN_MENU, canUseAdmin, hasAny } from './permissions'
+import { ADMIN_MENU, canUseAdmin, canUseOrganizer, hasAny } from './permissions'
 
 const userWith = (permissions: string[]): User => ({
   id: 'u1', email: 'a@example.com', firstName: 'A', lastName: 'B', phone: null, status: 'ACTIVE',
@@ -19,5 +19,9 @@ describe('admin permissions', () => {
     const venueManager = userWith(['venue:manage'])
     expect(canUseAdmin(venueManager)).toBe(true)
     expect(ADMIN_MENU.filter((entry) => hasAny(venueManager, entry.anyOf)).map((entry) => entry.to)).toEqual(['/admin', '/admin/venues'])
+  })
+  test('the organizer link needs the ORGANIZER role, not just permissions (admins have every permission)', () => {
+    expect(canUseOrganizer({ ...userWith(['event:create']), roles: ['CUSTOMER', 'ORGANIZER'] })).toBe(true)
+    expect(canUseOrganizer({ ...userWith(['event:create', 'event:approve']), roles: ['ADMIN'] })).toBe(false)
   })
 })

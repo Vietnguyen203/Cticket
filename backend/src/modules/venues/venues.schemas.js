@@ -22,6 +22,8 @@ const listQuery = z.object({
   q: z.string().trim().min(1).max(100).optional(),
   city: z.string().trim().min(1).max(100).optional(),
   includeInactive: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),
+  // Venue managers only (ignored for others): e.g. PENDING proposals to review.
+  status: z.enum(Object.values(VENUE_STATUS)).optional(),
   ...paginationQuery,
 });
 

@@ -1,7 +1,7 @@
 const { z } = require('zod');
 const { EVENT_STATUS, EVENT_LIMITS } = require('../../config/constants');
 const { paginationQuery } = require('../../utils/pagination');
-const { isoDateTime, httpUrl, nonEmptyPatch } = require('../../utils/schemas');
+const { isoDateTime, imageUrl, nonEmptyPatch } = require('../../utils/schemas');
 const { SORT_ORDERS } = require('./events.repository');
 
 const MAX_DESCRIPTION_LENGTH = 20_000;
@@ -9,8 +9,8 @@ const MAX_DESCRIPTION_LENGTH = 20_000;
 const fields = {
   title: z.string().trim().min(3).max(255),
   description: z.string().trim().max(MAX_DESCRIPTION_LENGTH).nullable(),
-  bannerUrl: httpUrl.nullable(),
-  thumbnailUrl: httpUrl.nullable(),
+  bannerUrl: imageUrl.nullable(),
+  thumbnailUrl: imageUrl.nullable(),
   ageRestriction: z.number().int().min(0).max(99).nullable(),
   categoryIds: z
     .array(z.uuid())

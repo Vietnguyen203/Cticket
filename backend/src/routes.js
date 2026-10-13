@@ -10,6 +10,7 @@ const paymentsRoutes = require('./modules/payments/payments.routes');
 const promotionsRoutes = require('./modules/promotions/promotions.routes');
 const notificationsRoutes = require('./modules/notifications/notifications.routes');
 const ticketsRoutes = require('./modules/tickets/tickets.routes');
+const uploadsRoutes = require('./modules/uploads/uploads.routes');
 const { checkInsRouter, scheduleCheckInsRouter } = require('./modules/checkins/checkins.routes');
 
 /** Everything under /api/v1. Each module mounts its own router here. */
@@ -34,5 +35,6 @@ apiRouter.use('/tickets', ticketsRoutes);
 apiRouter.use('/check-ins', checkInsRouter);
 apiRouter.use('/schedules', scheduleCheckInsRouter); // GET /schedules/:id/check-ins, /check-in-stats
 apiRouter.use('/staff', staffRouter);
+apiRouter.use('/uploads', uploadsRoutes);
 
 module.exports = apiRouter;

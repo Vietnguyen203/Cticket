@@ -19,6 +19,9 @@ COPY package.json ./
 COPY src ./src
 COPY migrations ./migrations
 
+# Uploaded images (a volume in docker-compose): owned by the node user, which runs the API.
+RUN mkdir -p /app/uploads && chown node:node /app/uploads
+
 # Never run as root inside the container.
 USER node
 EXPOSE 3000

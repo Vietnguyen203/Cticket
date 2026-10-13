@@ -65,6 +65,7 @@ const ERROR_CODES = Object.freeze({
   ORDER_LIMIT_EXCEEDED: { status: 422, message: 'Too many tickets in one order.' },
   IDEMPOTENCY_KEY_REUSED: { status: 422, message: 'This Idempotency-Key was already used for a different request.' },
   PROMOTION_INVALID: { status: 422, message: 'This promotion code cannot be used for this order.' },
+  IMAGE_INVALID: { status: 422, message: 'The file must be a JPEG, PNG or WebP image.' },
   QR_INVALID: { status: 422, message: 'This QR code is not a valid ticket.' },
   WRONG_SCHEDULE: { status: 422, message: 'This ticket is for another show.' },
   CHECKIN_NOT_OPEN: { status: 422, message: 'Check-in has not opened yet for this show.' },

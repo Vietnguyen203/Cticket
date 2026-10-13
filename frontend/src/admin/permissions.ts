@@ -18,6 +18,14 @@ export const ADMIN_MENU: MenuEntry[] = [
   { to: '/admin/categories', label: 'Danh mục', anyOf: ['category:manage'] },
 ]
 
+/** Organizer area (Phase 12.2): the organizer's own events. */
+export const ORGANIZER_PERMISSIONS = ['event:create', 'event:update:own']
+
+export const ORGANIZER_MENU: MenuEntry[] = [
+  { to: '/organizer', label: 'Sự kiện của tôi', anyOf: ORGANIZER_PERMISSIONS },
+  { to: '/organizer/events/new', label: 'Tạo sự kiện', anyOf: ['event:create'] },
+]
+
 export function hasAny(user: User | null, permissions: string[]): boolean {
   const granted = user?.permissions ?? []
   return permissions.some((permission) => granted.includes(permission))
@@ -25,3 +33,10 @@ export function hasAny(user: User | null, permissions: string[]): boolean {
 
 /** Any admin page at all: shows the "Quản trị" link in the header. */
 export const canUseAdmin = (user: User | null) => ADMIN_MENU.some((entry) => hasAny(user, entry.anyOf))
+
+/**
+ * The "Ban tổ chức" link: accounts with the ORGANIZER role (an approved
+ * organizer profile). Admins hold every permission but no organizer profile,
+ * so permissions alone would show it to them for nothing.
+ */
+export const canUseOrganizer = (user: User | null) => Boolean(user?.roles?.includes('ORGANIZER'))

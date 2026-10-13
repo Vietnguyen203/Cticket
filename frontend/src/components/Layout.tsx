@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet } from 'react-router'
-import { canUseAdmin } from '../admin/permissions'
+import { canUseAdmin, canUseOrganizer } from '../admin/permissions'
 import { useAuth } from '../auth/AuthContext'
 import { Alert, Button, FullPageSpinner } from './ui'
 
@@ -20,9 +20,14 @@ export function Layout() {
             <span className="hidden sm:inline">ETP Tickets</span>
           </Link>
           <nav className="flex flex-1 items-center gap-1 overflow-x-auto">
-            <NavLink to="/" end className={navClass}>
+            <NavLink to="/events" className={navClass}>
               Sự kiện
             </NavLink>
+            {status === 'authenticated' && canUseOrganizer(user) && (
+              <NavLink to="/organizer" className={navClass}>
+                Ban tổ chức
+              </NavLink>
+            )}
             {status === 'authenticated' && canUseAdmin(user) && (
               <NavLink to="/admin" className={navClass}>
                 Quản trị

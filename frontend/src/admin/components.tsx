@@ -32,6 +32,7 @@ const STATUS: Record<string, [string, keyof typeof TONES]> = {
   SUSPENDED: ['Tạm khóa', 'red'],
   REJECTED: ['Từ chối', 'gray'],
   INACTIVE: ['Ngừng dùng', 'gray'],
+  // PENDING (venues proposed by organizers) shares "Chờ duyệt" above
   // events
   DRAFT: ['Nháp', 'gray'],
   PENDING_APPROVAL: ['Chờ duyệt', 'amber'],

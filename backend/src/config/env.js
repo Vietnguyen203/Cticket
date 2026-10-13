@@ -31,6 +31,8 @@ const envSchema = z.object({
 
   CORS_ORIGINS: z.string().default('').transform(csv),
   SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+  // Event images uploaded from the web (Phase 12.2). A Docker volume in production.
+  UPLOAD_DIR: z.string().min(1).default(path.resolve(__dirname, '../../uploads')),
 
   // Auth
   JWT_ACCESS_SECRET: secret,
