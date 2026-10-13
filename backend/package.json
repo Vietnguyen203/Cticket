@@ -18,7 +18,8 @@
     "seed:admin": "node src/scripts/seedAdmin.js",
     "mail:test": "node src/scripts/sendTestEmail.js",
     "inventory:check": "node src/scripts/checkInventory.js",
-    "test": "jest --runInBand"
+    "test": "jest --runInBand",
+    "test:coverage": "jest --runInBand --coverage"
   },
   "license": "UNLICENSED",
   "type": "commonjs",
@@ -32,7 +33,24 @@
       "<rootDir>/tests/setup/afterEnv.js"
     ],
     "globalSetup": "<rootDir>/tests/setup/globalSetup.js",
-    "testTimeout": 20000
+    "testTimeout": 20000,
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/scripts/**"
+    ],
+    "coverageReporters": [
+      "text-summary",
+      "json-summary",
+      "html"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "statements": 90,
+        "branches": 80,
+        "functions": 90,
+        "lines": 90
+      }
+    }
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
