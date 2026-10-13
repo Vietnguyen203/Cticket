@@ -11,7 +11,8 @@ export interface MenuEntry {
 }
 
 export const ADMIN_MENU: MenuEntry[] = [
-  { to: '/admin', label: 'Tổng quan', anyOf: ['event:approve', 'organizer:manage', 'venue:manage', 'category:manage', 'user:manage', 'order:manage', 'audit:read'] },
+  { to: '/admin', label: 'Tổng quan', anyOf: ['report:read:any', 'event:approve', 'organizer:manage', 'venue:manage', 'category:manage', 'user:manage', 'order:manage', 'audit:read'] },
+  { to: '/admin/reports', label: 'Doanh thu', anyOf: ['report:read:any'] },
   { to: '/admin/events', label: 'Duyệt sự kiện', anyOf: ['event:approve', 'event:manage:any'] },
   { to: '/admin/organizers', label: 'Nhà tổ chức', anyOf: ['organizer:manage'] },
   { to: '/admin/venues', label: 'Địa điểm', anyOf: ['venue:manage'] },

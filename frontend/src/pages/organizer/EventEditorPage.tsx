@@ -10,9 +10,10 @@ import { submitChecklist } from '../../organizer/readiness'
 import { ScheduleCard } from '../../organizer/ScheduleCard'
 import { loadSchedules } from '../../organizer/setup'
 import { StaffPanel } from '../../organizer/StaffPanel'
+import { EventSalesReport } from '../../reports/EventSalesReport'
 import { useAsync } from '../../utils/useAsync'
 
-type Tab = 'info' | 'schedules' | 'staff'
+type Tab = 'info' | 'schedules' | 'staff' | 'sales'
 type Action = 'submit' | 'withdraw' | 'cancel' | 'delete'
 
 const ACTIONS: Record<Action, { label: string; title: string; danger: boolean; askReason: boolean; message: string }> = {
@@ -43,6 +44,8 @@ export function EventEditorPage() {
   if (!event.data) return <FullPageSpinner />
   const e = event.data
   const checklist = setups.data ? submitChecklist(setups.data) : null
+  // Sales exist once the event went on sale (also after it ended or was cancelled: refunds).
+  const hasSales = e.status === 'PUBLISHED' || e.status === 'FINISHED' || e.status === 'CANCELLED'
   const actions: Action[] =
     e.status === 'DRAFT' ? ['submit', 'delete'] : e.status === 'PENDING_APPROVAL' ? ['withdraw', 'cancel'] : e.status === 'PUBLISHED' ? ['cancel'] : []
 
@@ -99,6 +102,7 @@ export function EventEditorPage() {
           ['info', 'Thông tin'],
           ['schedules', `Suất diễn & vé (${e.schedules.length})`],
           ['staff', 'Nhân viên soát vé'],
+          ...(hasSales ? ([['sales', 'Doanh thu']] as Array<[Tab, string]>) : []),
         ]}
       />
 
@@ -128,6 +132,8 @@ export function EventEditorPage() {
       )}
 
       {tab === 'staff' && <StaffPanel eventId={e.id} />}
+
+      {tab === 'sales' && hasSales && <EventSalesReport eventId={e.id} />}
 
       {action && (
         <ConfirmDialog
