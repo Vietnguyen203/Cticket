@@ -1,0 +1,17 @@
+{
+  "name": "etp-e2e",
+  "private": true,
+  "description": "End-to-end tests of the web app (Playwright), on their own database, Redis db and Mailpit",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "report": "playwright show-report",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0",
+    "@types/node": "^24.19.2",
+    "typescript": "~6.0.2"
+  }
+}

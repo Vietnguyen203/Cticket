@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react'
+import { useId, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react'
 
 /** Small shared building blocks, styled with Tailwind. */
 
@@ -36,7 +36,9 @@ interface TextFieldProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 export function TextField({ label, error, hint, id, className = '', ...rest }: TextFieldProps) {
-  const inputId = id ?? rest.name
+  // The label must point at the input (screen readers, getByLabel): a generated id when none is given.
+  const generatedId = useId()
+  const inputId = id ?? rest.name ?? generatedId
   return (
     <div className={className}>
       <label htmlFor={inputId} className="mb-1 block text-sm font-medium text-slate-700">

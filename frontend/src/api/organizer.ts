@@ -1,5 +1,6 @@
 import type { OrganizerProfile, ScheduleTicketType } from './admin'
 import { api } from './client'
+import { ApiError, messageFor } from './errors'
 import type { EventDetail, EventSummary, PageMeta, Schedule, SeatMap } from './types'
 
 /** API calls of the organizer pages (Phase 12.2). "Own event" rules are checked by the API. */
@@ -42,8 +43,16 @@ export async function listMyEvents(params: { status?: string; page?: number; pag
   return { events: res.data.data.events as EventSummary[], meta: res.data.meta as PageMeta }
 }
 
+/**
+ * An event for the editor. GET /events/:id also answers for ANY published
+ * event (the public page), so the editor checks it belongs to my organizer
+ * and otherwise shows "not found", as the API does for every change.
+ */
 export async function getMyEvent(id: string): Promise<EventDetail> {
-  return (await api.get(`/events/${id}`)).data.data.event
+  const event: EventDetail = (await api.get(`/events/${id}`)).data.data.event
+  const me = await getMyOrganizer()
+  if (!me || event.organizer.id !== me.id) throw new ApiError(404, 'NOT_FOUND', messageFor('NOT_FOUND'))
+  return event
 }
 
 export async function createEvent(input: EventInput): Promise<EventDetail> {
