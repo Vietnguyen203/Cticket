@@ -1,4 +1,4 @@
-# Phase 11 — Web cho khách hàng và nhân viên soát vé (đã duyệt, đang triển khai)
+# Phase 11 — Web cho khách hàng và nhân viên soát vé (đã duyệt, đã triển khai)
 
 > Mục tiêu: một trang web (chạy tốt cả trên điện thoại) đi hết luồng chính bằng API đã có:
 > tìm sự kiện → chọn suất → **chọn ghế, thấy ghế người khác giữ ngay lập tức** → thanh toán → xem vé, mã QR → **nhân viên quét QR ở cổng bằng camera điện thoại**.
@@ -292,3 +292,21 @@ Mỗi bước xong bạn chạy thử trên trình duyệt rồi commit (cùng n
 - Đã thử trên trình duyệt (API tạm, Mailpit): một người khác giữ A03, A04 qua API → trên web hai ghế đổi màu ngay, A03 đang chọn bị bỏ và có thông báo; mua A05, A06 + 1 vé đứng → mã sai bị báo "Mã không tồn tại" → mã WEB12TEST giảm 100.000đ (15%, trần 100.000đ) → checkout → thẻ bị từ chối → thanh toán lại thành công → 3 vé, xem QR.
 - Lưu ý khi dev: WebSocket kiểm tra `Origin`; web chạy ở cổng khác 5173 thì phải thêm vào `CORS_ORIGINS` của API.
 
+
+### Bước 11.4 (xong): trang nhân viên soát vé, Docker `web`
+
+- **Menu "Soát vé"** hiện khi tài khoản có vai trò STAFF. Các trang được chặn bằng quyền: `/staff` và lịch sử cần `checkin:read`, trang quét cần `checkin:create` (API vẫn kiểm tra lại mọi lần gọi).
+- **`/staff`** (APP-S01): các sự kiện mình được thêm vào đội soát vé và các suất chưa kết thúc. Ô "Tên cổng của máy này" (vd. "Cổng A") lưu trong `localStorage` của máy (chỉ cho tiện, không phải bí mật) và gửi lên làm `deviceId` của mỗi lượt quét.
+- **`/staff/scan/:scheduleId`** (APP-S02, S03):
+  - Camera sau (`getUserMedia`, `facingMode: environment`), đọc 4 lần/giây. Dùng `BarcodeDetector` có sẵn của trình duyệt (Android Chrome, Safari mới); nơi không có (Chrome trên Windows, Firefox) thì tải bản thay thế `barcode-detector` (ZXing WASM, ~1 MB, chỉ tải khi mở trang quét).
+  - Cùng một mã đứng trước camera nhiều khung hình → chỉ gửi **một lần trong 3 giây** (`createScanGate`); trong lúc kiểm tra và lúc hiện kết quả thì tạm dừng đọc.
+  - Kết quả **phủ toàn màn hình** 2,5 giây: xanh "Mời vào" + hạng vé, ghế, mã vé, "Đã vào x / y"; đỏ kèm lý do: vé đã dùng (lúc nào, ở cổng nào, nhân viên nào), sai suất, chưa tới giờ / đã hết giờ soát vé, vé không còn hiệu lực, QR không hợp lệ, không có quyền. Kèm tiếng bíp (WebAudio) và rung (điện thoại). Chạm để quét tiếp ngay.
+  - Bộ đếm "đã vào / tổng" cập nhật **real-time** khi cổng khác quét (tin `CHECK_IN_SUCCESS` vào phòng riêng của nhân viên).
+  - Không mở được camera (không phải HTTPS, bị chặn quyền, máy không có camera) → hiện hướng dẫn; luôn có ô **dán mã** (máy quét cầm tay dạng bàn phím cũng gõ vào ô này).
+- **`/staff/history/:scheduleId`** (CHK-02, CHK-03): đã vào x / y, thanh tiến độ theo từng hạng vé; danh sách lượt vào mới nhất trước (giờ, vé, cổng, nhân viên), phân trang.
+- **Docker**: service `web` (`frontend/Dockerfile`: build bằng Node rồi chạy nginx). nginx phục vụ file build và chuyển `/api`, `/ws` sang `api:3000` (một origin, giống Vite khi dev). `http://localhost:8080` cho máy tính, `https://<ip-máy-tính>:8443` cho điện thoại (camera cần HTTPS). Chứng chỉ **tự ký** tạo lúc container chạy lần đầu, lưu trong volume `webcerts` (điện thoại cảnh báo một lần, chọn tiếp tục). Chỉ dùng cho dev, không dùng production. File build có hash được cache 1 năm, `index.html` không cache.
+- **Lưu ý điện thoại**: WebSocket kiểm tra `Origin`, nên thêm `https://<ip-máy-tính>:8443` vào `CORS_ORIGINS` trong `.env` (nếu không, quét vẫn được nhưng bộ đếm chỉ tự cập nhật sau mỗi lượt quét của chính máy đó). Cookie refresh có cờ `Secure` khi production, nên trên điện thoại dùng địa chỉ https.
+- Test web: kết quả quét (vào / vé đã dùng / sai suất / lỗi khác) và chống gửi trùng (51 test).
+- Đã thử trên trình duyệt qua nginx (`http://localhost:8080`): chọn suất, đặt tên cổng; dán mã vé hợp lệ → "Mời vào", 1/3; dán lại → "Vé đã được sử dụng" kèm giờ, cổng, nhân viên; mã sai → "Mã QR không hợp lệ"; một "Cổng B" quét qua API → bộ đếm 1/3 → 2/3 ngay (WebSocket qua nginx); trang lịch sử đúng. Bộ giải mã thay thế (WASM) đọc đúng ảnh QR của vé (70 ms). 
+- **Thử trên iPhone** (Safari, `https://<ip>:8443`): camera mở được, bộ đọc thay thế đọc QR trên màn hình máy tính; vé hợp lệ → "Mời vào" (lưu cổng "Cổng A"), quét lại → "Vé đã được sử dụng"; vé của sự kiện khác → "Vé không phải của sự kiện này" (API trả `FORBIDDEN` vì nhân viên không thuộc sự kiện của vé). Lưu ý: ứng dụng quét mã có sẵn của điện thoại chỉ thấy một chuỗi (QR không chứa link), phải quét bằng trang web.
+- Sửa thêm khi thử: trên điện thoại menu bị tràn ngang (khuất "Ban tổ chức", "Soát vé") → nút ☰ mở danh sách các mục.

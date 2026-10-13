@@ -44,3 +44,6 @@ export const canUseAdmin = (user: User | null) => ADMIN_MENU.some((entry) => has
  * so permissions alone would show it to them for nothing.
  */
 export const canUseOrganizer = (user: User | null) => Boolean(user?.roles?.includes('ORGANIZER'))
+
+/** Gate staff (the role, like canUseOrganizer: an admin holds checkin:* but scans for no event). */
+export const canUseStaff = (user: User | null) => Boolean(user?.roles?.includes('STAFF'))
