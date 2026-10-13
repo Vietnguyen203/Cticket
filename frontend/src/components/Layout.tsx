@@ -1,4 +1,5 @@
 import { Link, NavLink, Outlet } from 'react-router'
+import { canUseAdmin } from '../admin/permissions'
 import { useAuth } from '../auth/AuthContext'
 import { Alert, Button, FullPageSpinner } from './ui'
 
@@ -22,6 +23,11 @@ export function Layout() {
             <NavLink to="/" end className={navClass}>
               Sự kiện
             </NavLink>
+            {status === 'authenticated' && canUseAdmin(user) && (
+              <NavLink to="/admin" className={navClass}>
+                Quản trị
+              </NavLink>
+            )}
           </nav>
           {status === 'authenticated' && user ? (
             <NavLink to="/account" className={navClass}>
