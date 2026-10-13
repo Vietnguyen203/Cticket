@@ -1,4 +1,4 @@
-# Phase 13 — Kiểm thử: E2E, load test, CI (đã duyệt, đang triển khai)
+# Phase 13 — Kiểm thử: E2E, load test, CI (đã duyệt, đã triển khai)
 
 > Mục tiêu: chứng minh hệ thống **chạy đúng từ đầu tới cuối trên trình duyệt**, **chịu được tải** (có con số cụ thể: throughput, p95, p99, tỷ lệ lỗi), **không bán trùng ghế khi bị tranh nhau**, và **tự kiểm tra mỗi lần push** lên GitHub.
 
@@ -202,3 +202,10 @@ docker compose --env-file .env -f loadtest/docker-compose.yml down             #
 **Redis dưới tải** (câu hỏi từ bước 13.1): chỉ trong kịch bản tranh ghế (API đầy CPU), 322 lệnh Redis vượt 200 ms (~0,1%): kiểm tra token bị thu hồi, khóa ghế, gợi ý ghế, cache. Tất cả **chạy tiếp không cần Redis đúng thiết kế, 0 request lỗi**; Redis chỉ dùng 15–35% CPU, độ trễ đến từ vòng lặp sự kiện của Node bị quá tải. **Giữ mặc định 200 ms**; cách giảm là thêm bản API, không phải nới timeout.
 
 **Chưa đạt, ghi nhận**: hủy đơn p95 < 800 ms trong kịch bản tranh ghế cực đoan (500 người, mỗi người bấm 3–5 lần/giây vào cùng 50 ghế). Với 3 bản API đạt 1,04 s; trên máy có nhiều nhân hơn / nhiều máy, thêm bản API sẽ tiếp tục giảm. Các kịch bản sát thực tế (1, 2, 4) đạt hết với 1 bản API.
+
+### Bước 13.3 (xong): CI và tài liệu kiểm thử
+
+- `.github/workflows/ci.yml`: 3 job chạy mỗi lần push / pull request — **Backend** (PostgreSQL 17 + Redis 7.4 dạng service container, Jest có độ phủ, tóm tắt độ phủ trên trang kết quả, tải lên báo cáo HTML), **Web** (typecheck, lint, Vitest, build), **End-to-end** (PostgreSQL + Redis + Mailpit, Chromium, Playwright; lỗi thì tải lên ảnh / video / trace). Bí mật trong workflow là giá trị dùng một lần cho database của máy CI.
+- Backend: `npm run test:coverage`; ngưỡng tối thiểu 90% statements / 80% branches / 90% functions / 90% lines (hiện tại 93,2 / 82,8 / 93,5 / 94,7) — CI fail nếu tụt.
+- Đã kiểm tra trước khi đẩy lên: YAML hợp lệ; test web chạy đúng ở múi giờ UTC (máy CI chạy UTC, máy dev UTC+7). CI chỉ chạy thật sau khi push lên GitHub.
+- `docs/testing.md`: tổng hợp 4 tầng kiểm thử, bảng test đồng thời (TEST-02), độ phủ, kết quả E2E và load test, cách chạy từng loại, CI.
