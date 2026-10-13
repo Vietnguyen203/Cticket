@@ -67,7 +67,7 @@ export function EventDetailPage() {
         <aside className="space-y-3">
           <h2 className="text-lg font-semibold">Lịch diễn</h2>
           {schedules.map((schedule) => (
-            <ScheduleBox key={schedule.id} schedule={schedule} />
+            <ScheduleBox key={schedule.id} schedule={schedule} slug={e.slug} />
           ))}
           {schedules.length === 0 && <p className="text-sm text-slate-500">Chưa có suất diễn.</p>}
         </aside>
@@ -76,7 +76,7 @@ export function EventDetailPage() {
   )
 }
 
-function ScheduleBox({ schedule }: { schedule: Schedule }) {
+function ScheduleBox({ schedule, slug }: { schedule: Schedule; slug: string }) {
   const state = saleState(schedule)
   const prices = useAsync(
     () => (schedule.inventoryGeneratedAt ? getAvailability(schedule.id) : Promise.resolve([])),
@@ -104,11 +104,17 @@ function ScheduleBox({ schedule }: { schedule: Schedule }) {
           ))}
         </ul>
       )}
-      {state === 'on-sale' && (
-        <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
-          {left === 0 ? 'Đã hết vé.' : `Còn ${left ?? '…'} vé. Chọn ghế và mua vé sẽ có ở bước tiếp theo.`}
-        </p>
-      )}
+      {state === 'on-sale' &&
+        (left === 0 ? (
+          <p className="rounded-lg bg-slate-50 px-3 py-2 text-center text-sm text-slate-500">Đã hết vé</p>
+        ) : (
+          <Link
+            to={`/events/${slug}/schedules/${schedule.id}`}
+            className="block rounded-lg bg-brand-700 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-brand-800"
+          >
+            Chọn chỗ · còn {left ?? '…'} vé
+          </Link>
+        ))}
     </Card>
   )
 }

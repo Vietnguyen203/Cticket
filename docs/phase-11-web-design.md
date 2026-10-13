@@ -280,3 +280,15 @@ Mỗi bước xong bạn chạy thử trên trình duyệt rồi commit (cùng n
 - **Kiểm chứng lý do dùng Web Locks**: 2 lần refresh cùng lúc bằng cùng cookie → lần 2 nhận `REFRESH_TOKEN_REUSED` (cả phiên bị thu hồi); bọc trong `navigator.locks` → cả hai đều thành công.
 - Test web (Vitest, 11 test): refresh chạy một lần cho nhiều request, refresh bị từ chối thì kết thúc phiên, mất mạng không đăng xuất, có dùng Web Lock, chỉ thử lại một lần, không refresh quanh `/auth/*`, refresh trước khi token hết hạn, lỗi mạng / lỗi validate ra tiếng Việt.
 
+### Bước 11.2 + 11.3 (xong): mua vé, thanh toán, vé QR
+
+(Làm sau Phase 12.1–12.3 theo yêu cầu.)
+
+- **Sự kiện**: `/events` (tìm kiếm), `/events/:slug` (lịch diễn, giá, trạng thái bán, nút "Chọn chỗ").
+- **Chọn chỗ** `/events/:slug/schedules/:id`: sơ đồ ghế theo hàng, màu theo hạng vé; vé đứng chọn số lượng; nhãn "Cập nhật trực tiếp / Đang kết nối lại"; ghế đang chọn bị người khác giữ thì tự bỏ chọn và báo; giới hạn 8 vé / đơn và tối đa mỗi hạng; "Giữ chỗ" → đơn HELD 10 phút (lỗi ghế vừa hết thì tải lại sơ đồ; đã có đơn đang giữ thì có link tới đơn đó).
+- **Đơn hàng** `/orders/:id`: đồng hồ đếm ngược **theo giờ server** (độ lệch tính từ header `Date` của mỗi response); mã giảm giá (xem trước, lý do từ chối bằng tiếng Việt); "Tiếp tục thanh toán" (checkout); thanh toán giả lập "Thanh toán" / "Giả lập thẻ bị từ chối" với **Idempotency-Key mới cho mỗi lần bấm, dùng lại đúng key nếu mạng lỗi và gửi lại**; tự tải lại khi có tin WebSocket về đơn (hết hạn, đã thanh toán, vé đã phát hành) hoặc hết giờ; hủy đơn.
+- **Đơn hàng của tôi** `/orders`, **Vé của tôi** `/tickets` (sắp diễn / đã qua), **Vé** `/tickets/:id` (ảnh QR tải bằng token → object URL, tải ảnh về, mã vé).
+- Test web: thêm đồng hồ server (48 test).
+- Đã thử trên trình duyệt (API tạm, Mailpit): một người khác giữ A03, A04 qua API → trên web hai ghế đổi màu ngay, A03 đang chọn bị bỏ và có thông báo; mua A05, A06 + 1 vé đứng → mã sai bị báo "Mã không tồn tại" → mã WEB12TEST giảm 100.000đ (15%, trần 100.000đ) → checkout → thẻ bị từ chối → thanh toán lại thành công → 3 vé, xem QR.
+- Lưu ý khi dev: WebSocket kiểm tra `Origin`; web chạy ở cổng khác 5173 thì phải thêm vào `CORS_ORIGINS` của API.
+

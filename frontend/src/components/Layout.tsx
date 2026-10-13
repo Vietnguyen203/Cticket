@@ -23,6 +23,16 @@ export function Layout() {
             <NavLink to="/events" className={navClass}>
               Sự kiện
             </NavLink>
+            {status === 'authenticated' && (
+              <>
+                <NavLink to="/tickets" className={navClass}>
+                  Vé của tôi
+                </NavLink>
+                <NavLink to="/orders" className={navClass}>
+                  Đơn hàng
+                </NavLink>
+              </>
+            )}
             {status === 'authenticated' && canUseOrganizer(user) && (
               <NavLink to="/organizer" className={navClass}>
                 Ban tổ chức
