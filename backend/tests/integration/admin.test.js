@@ -75,6 +75,45 @@ describe('users (USR-03, USR-04, USR-05)', () => {
     expect(fresh.body.data.user.roles).toEqual(['CUSTOMER', 'STAFF']);
   });
 
+  test('granting ORGANIZER makes a usable organizer: a profile is created, events can be made after the refresh', async () => {
+    const user = await createLoggedInUser(app, mailbox);
+    const id = await userIdOf(user.email);
+    await setRoles(admin.token, id, ['ORGANIZER']).expect(200);
+
+    const { rows } = await query(`SELECT id, organization_name, status FROM organizers WHERE user_id = $1`, [id]);
+    expect(rows).toEqual([expect.objectContaining({ organization_name: 'Nguyen Lan', status: 'ACTIVE' })]);
+    const audit = await query(`SELECT action FROM audit_logs WHERE entity_id = $1`, [rows[0].id]);
+    expect(audit.rows.map((r) => r.action)).toEqual(['ORGANIZER_CREATED']);
+
+    const refreshed = await request(app).post('/api/v1/auth/refresh').send({ refreshToken: user.session.refreshToken }).expect(200);
+    const category = await createCategory(app, admin.token);
+    await request(app)
+      .post('/api/v1/events')
+      .set(bearer(refreshed.body.data.accessToken))
+      .send({ title: `Granted ${randomUUID().slice(0, 6)}`, categoryIds: [category.id] })
+      .expect(201);
+
+    // Saving the same roles again changes nothing (no second profile, no second audit line).
+    await setRoles(admin.token, id, ['ORGANIZER']).expect(200);
+    expect((await query(`SELECT count(*)::int AS n FROM organizers WHERE user_id = $1`, [id])).rows[0].n).toBe(1);
+  });
+
+  test('granting ORGANIZER approves a pending application', async () => {
+    const user = await createLoggedInUser(app, mailbox);
+    const applied = await request(app)
+      .post('/api/v1/organizers')
+      .set(bearer(user.session.accessToken))
+      .send({ organizationName: 'Công ty Sự kiện Chờ duyệt' })
+      .expect(201);
+    expect(applied.body.data.organizer.status).toBe('PENDING');
+
+    await setRoles(admin.token, await userIdOf(user.email), ['ORGANIZER', 'STAFF']).expect(200);
+    const { rows } = await query(`SELECT organization_name, status FROM organizers WHERE id = $1`, [applied.body.data.organizer.id]);
+    expect(rows[0]).toEqual({ organization_name: 'Công ty Sự kiện Chờ duyệt', status: 'ACTIVE' });
+    const audit = await query(`SELECT action, old_value FROM audit_logs WHERE entity_id = $1`, [applied.body.data.organizer.id]);
+    expect(audit.rows).toEqual([{ action: 'ORGANIZER_APPROVED', old_value: { status: 'PENDING' } }]);
+  });
+
   test('an admin cannot suspend or demote themselves', async () => {
     const adminId = await userIdOf(admin.email);
     expect((await setStatus(admin.token, adminId, { status: 'SUSPENDED', reason: 'thử' })).body.error.code).toBe('CANNOT_CHANGE_SELF');

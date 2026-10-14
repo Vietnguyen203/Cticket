@@ -244,25 +244,24 @@ describe('event status machine', () => {
     expect(reopen.body.error.code).toBe('INVALID_STATE_TRANSITION');
   });
 
-  test('only DRAFT events can be deleted; a used category cannot be deleted', async () => {
+  test('an empty draft is deleted at once; any other event only with its title typed again', async () => {
     const venue = await createVenue(app, admin.token);
     const usedCategory = await createCategory(app, admin.token);
     const draft = await createEvent(app, organizerA.token, { categoryIds: [usedCategory.id] });
     await addSchedule(app, organizerA.token, draft.id, { venueId: venue.id, startAt: at(9), endAt: at(9, 14) }).expect(201);
 
-    const blocked = await request(app).delete(`/api/v1/categories/${usedCategory.id}`).set(bearer(admin.token));
-    expect(blocked.status).toBe(409);
-    expect(blocked.body.error.code).toBe('CATEGORY_IN_USE');
-
     await request(app).delete(`${api}/${draft.id}`).set(bearer(organizerA.token)).expect(204);
     await getEvent(draft.id, organizerA.token).expect(404);
+    // Nothing uses the category any more (a used one can be deleted too: catalog.test.js).
     await request(app).delete(`/api/v1/categories/${usedCategory.id}`).set(bearer(admin.token)).expect(204);
 
     const published = await createPublishedEvent(app, {
       organizer: organizerA, adminToken: admin.token, categoryIds: [category.id], venueId: venue.id, daysFromNow: 12,
     });
     const res = await request(app).delete(`${api}/${published.id}`).set(bearer(organizerA.token));
-    expect(res.body.error.code).toBe('EVENT_NOT_EDITABLE');
+    expect(res.status).toBe(422);
+    expect(res.body.error.code).toBe('DELETE_CONFIRMATION_REQUIRED');
+    await request(app).delete(`${api}/${published.id}`).set(bearer(organizerA.token)).send({ confirmTitle: published.title }).expect(204);
   });
 });
 

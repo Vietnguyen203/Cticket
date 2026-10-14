@@ -1,4 +1,5 @@
 const { sendSuccess } = require('../../utils/response');
+const { requestContext } = require('../../utils/requestContext');
 const categoriesService = require('./categories.service');
 
 const HTTP_CREATED = 201;
@@ -6,6 +7,10 @@ const HTTP_NO_CONTENT = 204;
 
 async function list(req, res) {
   return sendSuccess(res, { categories: await categoriesService.listCategories() });
+}
+
+async function usage(req, res) {
+  return sendSuccess(res, { usage: await categoriesService.categoryUsage() });
 }
 
 async function create(req, res) {
@@ -19,8 +24,8 @@ async function update(req, res) {
 }
 
 async function remove(req, res) {
-  await categoriesService.deleteCategory(req.valid.params.id);
+  await categoriesService.deleteCategory(requestContext(req), req.valid.params.id);
   return res.status(HTTP_NO_CONTENT).end();
 }
 
-module.exports = { list, create, update, remove };
+module.exports = { list, usage, create, update, remove };

@@ -122,14 +122,39 @@ async function updateEvent(context, actor, eventId, changes) {
 }
 
 /** Only a DRAFT can be deleted (nothing was ever sold or visible). */
-async function deleteEvent(context, actor, eventId) {
+/** What deleting the event would remove: shown before its owner / an admin confirms. */
+async function deletionSummary(actor, eventId) {
+  const event = await eventsRepository.findById(pool, eventId);
+  if (!event || !canManage(actor, event)) throw eventNotFound();
+  return { title: event.title, status: event.status, ...(await orders.summarizeEventSales(pool, eventId)) };
+}
+
+/**
+ * Delete an event for good (its organizer or an admin), whatever its status,
+ * with everything its schedules sold (orders, tickets, payments, check-ins:
+ * orders/order-purge.js). A draft without orders goes at once; any other event
+ * only with `confirmTitle` equal to its title, so a stray API call or click
+ * cannot wipe a sold-out show. Audited with what was removed.
+ */
+async function deleteEvent(context, actor, eventId, { confirmTitle } = {}) {
   await withTransaction(async (client) => {
     const event = await lockManageableEvent(client, actor, eventId);
-    if (event.status !== EVENT_STATUS.DRAFT) {
-      throw new AppError('EVENT_NOT_EDITABLE', 'Only DRAFT events can be deleted. Cancel it instead.');
+    const summary = await orders.summarizeEventSales(client, eventId);
+    const needsConfirmation = event.status !== EVENT_STATUS.DRAFT || summary.orders > 0;
+    if (needsConfirmation && (confirmTitle ?? '').trim() !== event.title.trim()) {
+      throw new AppError('DELETE_CONFIRMATION_REQUIRED', undefined, { details: summary });
     }
+    await orders.purgeEventSales(client, eventId);
     await schedulesRepository.removeByEvent(client, eventId);
     await eventsRepository.deleteEvent(client, eventId);
+    await recordAudit(client, {
+      context,
+      action: 'EVENT_DELETED',
+      entityType: 'event',
+      entityId: eventId,
+      oldValue: { title: event.title, status: event.status, organizerId: event.organizer_id },
+      newValue: summary,
+    });
   });
 }
 
@@ -284,6 +309,7 @@ module.exports = {
   createEvent,
   updateEvent: invalidatesAfter(changesCatalog, updateEvent),
   deleteEvent: invalidatesAfter(changesCatalog, deleteEvent),
+  deletionSummary,
   // Approval may activate proposed venues: venue lists / layouts change too.
   changeStatus: invalidatesAfter([...changesCatalog, NAMESPACE.VENUES], changeStatus),
   getEvent,

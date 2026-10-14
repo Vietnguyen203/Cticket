@@ -5,6 +5,7 @@ const AppError = require('../../utils/AppError');
 const { toLimitOffset, toPageMeta } = require('../../utils/pagination');
 const { recordAudit } = require('../audit');
 const auth = require('../auth');
+const organizers = require('../organizers');
 const adminUsersRepository = require('./admin-users.repository');
 
 function toAdminUser(row) {
@@ -94,6 +95,8 @@ async function setRoles(context, adminId, userId, { roles }) {
       const admins = await adminUsersRepository.lockActiveAdmins(client);
       if (admins.filter((id) => id !== userId).length === 0) throw new AppError('LAST_ADMIN');
     }
+    // An organizer needs a usable organizer profile, not only the role.
+    if (wanted.includes(ROLES.ORGANIZER)) await organizers.activateForUser(client, context, user);
     if (wanted.join() === [...user.roles].sort().join()) return toAdminUser(user);
 
     await adminUsersRepository.replaceRoles(client, userId, wanted);

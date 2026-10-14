@@ -26,7 +26,7 @@ async function remove(req, res) {
 }
 
 async function myEvents(req, res) {
-  return sendSuccess(res, { events: await staffService.listMyEvents(req.user.id) });
+  return sendSuccess(res, { events: await staffService.listMyEvents(req.user) });
 }
 
 module.exports = { assign, list, remove, myEvents };

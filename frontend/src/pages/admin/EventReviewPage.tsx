@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 import { changeEventStatus, getEventForReview, getSeatPlan, getVenue, listTicketTypes } from '../../api/admin'
 import { toApiError } from '../../api/errors'
 import type { Schedule } from '../../api/types'
 import { ConfirmDialog, PageHeader, StatusBadge } from '../../admin/components'
 import { useAuth } from '../../auth/AuthContext'
 import { Alert, Button, Card, FullPageSpinner } from '../../components/ui'
+import { DeleteEventDialog } from '../../organizer/DeleteEventDialog'
 import { formatDateTime, formatVnd } from '../../utils/format'
 import { useAsync } from '../../utils/useAsync'
 
@@ -38,6 +39,8 @@ const DECISIONS: Record<Decision, { status: 'PUBLISHED' | 'DRAFT' | 'CANCELLED';
   },
 }
 
+const LINK_BUTTON = 'inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50'
+
 /** EVT review: what the organizer submitted, then approve / reject / cancel. */
 export function EventReviewPage() {
   const { id = '' } = useParams()
@@ -45,7 +48,11 @@ export function EventReviewPage() {
   const event = useAsync(() => getEventForReview(id), `event:${id}`)
   const [decision, setDecision] = useState<Decision | null>(null)
   const [done, setDone] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const navigate = useNavigate()
   const canApprove = user?.permissions?.includes('event:approve') ?? false
+  const canEdit = user?.permissions?.includes('event:manage:any') ?? false
+  const canReport = user?.permissions?.includes('report:read:any') ?? false
 
   if (event.error) return <Alert>{event.error.message}</Alert>
   if (!event.data) return <FullPageSpinner />
@@ -63,11 +70,30 @@ export function EventReviewPage() {
             ← Danh sách sự kiện
           </Link>
         }
-        actions={decisions.map((d) => (
-          <Button key={d} variant={DECISIONS[d].danger ? 'secondary' : 'primary'} onClick={() => setDecision(d)}>
-            {DECISIONS[d].label}
-          </Button>
-        ))}
+        actions={
+          <>
+            {canEdit && (
+              <Link to={`/organizer/events/${e.id}`} className={LINK_BUTTON}>
+                Chỉnh sửa
+              </Link>
+            )}
+            {canReport && e.status !== 'DRAFT' && (
+              <Link to={`/admin/reports/events/${e.id}`} className={LINK_BUTTON}>
+                Doanh thu
+              </Link>
+            )}
+            {decisions.map((d) => (
+              <Button key={d} variant={DECISIONS[d].danger ? 'secondary' : 'primary'} onClick={() => setDecision(d)}>
+                {DECISIONS[d].label}
+              </Button>
+            ))}
+            {canEdit && (
+              <Button variant="danger" onClick={() => setDeleting(true)}>
+                Xóa
+              </Button>
+            )}
+          </>
+        }
       />
       {done && (
         <div className="mb-4">
@@ -128,6 +154,9 @@ export function EventReviewPage() {
             event.reload()
           }}
         />
+      )}
+      {deleting && (
+        <DeleteEventDialog eventId={e.id} onClose={() => setDeleting(false)} onDeleted={() => navigate('/admin/events', { replace: true })} />
       )}
     </>
   )

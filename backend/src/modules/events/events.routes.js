@@ -26,7 +26,8 @@ eventsRouter.get('/', authenticate.optional, validate({ query: schemas.listQuery
 eventsRouter.post('/', authenticate, authorize('event:create'), validate({ body: schemas.createEvent }), controller.create);
 eventsRouter.get('/:idOrSlug', authenticate.optional, validate({ params: schemas.idOrSlugParams }), controller.get);
 eventsRouter.patch('/:id', ...canEdit, validate({ params: schemas.idParams, body: schemas.updateEvent }), controller.update);
-eventsRouter.delete('/:id', ...canEdit, validate({ params: schemas.idParams }), controller.remove);
+eventsRouter.get('/:id/deletion-summary', ...canEdit, validate({ params: schemas.idParams }), controller.deletionSummary);
+eventsRouter.delete('/:id', ...canEdit, validate({ params: schemas.idParams, body: schemas.deleteEvent }), controller.remove);
 eventsRouter.patch(
   '/:id/status',
   ...canChangeStatus,

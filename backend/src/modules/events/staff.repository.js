@@ -44,21 +44,24 @@ async function audienceOf(db, eventId) {
   return rows.map((row) => row.user_id);
 }
 
-/** Events a staff member works at, with their schedules still to come or running (app staff: event selection). */
-async function eventsOfStaff(db, userId) {
+/**
+ * Events whose gates `userId` works, with their schedules that have not ended.
+ * `all`: every open event instead (admins may scan any event).
+ */
+async function eventsOfStaff(db, userId, { all = false } = {}) {
   const { rows } = await db.query(
     `SELECT e.id, e.title, e.status,
             coalesce(json_agg(json_build_object(
               'id', es.id, 'startAt', es.start_at, 'endAt', es.end_at, 'status', es.status, 'venueName', v.name
             ) ORDER BY es.start_at) FILTER (WHERE es.id IS NOT NULL), '[]') AS schedules
-     FROM event_staff s
-     JOIN events e ON e.id = s.event_id
+     FROM events e
      LEFT JOIN event_schedules es ON es.event_id = e.id AND es.status = 'SCHEDULED' AND es.end_at > now()
      LEFT JOIN venues v ON v.id = es.venue_id
-     WHERE s.user_id = $1 AND e.status IN ('PUBLISHED', 'DRAFT', 'PENDING_APPROVAL')
+     WHERE e.status IN ('PUBLISHED', 'DRAFT', 'PENDING_APPROVAL')
+       AND ($2::boolean OR EXISTS (SELECT 1 FROM event_staff s WHERE s.event_id = e.id AND s.user_id = $1))
      GROUP BY e.id
      ORDER BY min(es.start_at) NULLS LAST, e.title`,
-    [userId],
+    [userId, all],
   );
   return rows;
 }

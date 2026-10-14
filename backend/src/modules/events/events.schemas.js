@@ -53,4 +53,7 @@ const listQuery = z.object({
   ...paginationQuery,
 });
 
-module.exports = { idParams, idOrSlugParams, createEvent, updateEvent, changeStatus, listQuery };
+/** DELETE /events/:id: the title, typed again, for anything but an empty draft. A missing body is an empty one. */
+const deleteEvent = z.object({ confirmTitle: z.string().max(300).optional() }).optional().default({});
+
+module.exports = { idParams, idOrSlugParams, createEvent, updateEvent, changeStatus, listQuery, deleteEvent };
