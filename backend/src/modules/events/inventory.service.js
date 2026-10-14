@@ -148,7 +148,8 @@ async function loadSeatMapLayout(scheduleId) {
 async function getSeatMap(actor, scheduleId) {
   const { schedule } = await loadViewableSchedule(actor, scheduleId);
   const [layout, statuses, availability] = await Promise.all([
-    remember(NAMESPACE.CATALOG, `seatmap:${scheduleId}`, TTL.SEAT_MAP_LAYOUT, () => loadSeatMapLayout(scheduleId)),
+    // Kept parsed in process memory too: ~0.5 MB for 2.000 seats (not mutated below: seats are copied).
+    remember(NAMESPACE.CATALOG, `seatmap:${scheduleId}`, TTL.SEAT_MAP_LAYOUT, () => loadSeatMapLayout(scheduleId), { local: true }),
     inventoryRepository.seatStatuses(pool, scheduleId),
     inventoryRepository.availabilityBySchedule(pool, scheduleId),
   ]);
