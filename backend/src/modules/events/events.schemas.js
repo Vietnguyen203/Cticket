@@ -49,6 +49,8 @@ const listQuery = z.object({
   dateTo: isoDateTime.optional(),
   status: z.enum(Object.values(EVENT_STATUS)).optional(),
   mine: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),
+  // Admins: events of every status, newest first (the "Tất cả" tab of the admin events list).
+  all: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),
   sort: z.enum(Object.keys(SORT_ORDERS)).optional(),
   ...paginationQuery,
 });

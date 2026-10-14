@@ -258,7 +258,7 @@ async function getEvent(actor, idOrSlug) {
  *  - status=X: admins/approvers browse by status (e.g. the approval queue)
  */
 async function listEvents(actor, query) {
-  const { mine, status, q, categoryId, city, dateFrom, dateTo, sort, page, pageSize } = query;
+  const { mine, all, status, q, categoryId, city, dateFrom, dateTo, sort, page, pageSize } = query;
   const hasScheduleFilter = Boolean(city || dateFrom || dateTo);
   let scope;
 
@@ -277,6 +277,11 @@ async function listEvents(actor, query) {
       throw new AppError('FORBIDDEN', 'Only administrators can list events by this status.');
     }
     scope = { statuses: [status], requireSchedule: hasScheduleFilter, defaultSort: '-createdAt' };
+  } else if (all) {
+    if (!(actor.canManageAny || actor.canApprove)) {
+      throw new AppError('FORBIDDEN', 'Only administrators can list events of every status.');
+    }
+    scope = { statuses: Object.values(EVENT_STATUS), requireSchedule: hasScheduleFilter, defaultSort: '-createdAt' };
   } else {
     scope = { statuses: [EVENT_STATUS.PUBLISHED], requireSchedule: true, defaultSort: 'startAt', cacheable: true };
   }

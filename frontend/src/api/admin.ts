@@ -146,8 +146,10 @@ export async function createSeats(zoneId: string, rows: SeatRowInput[]): Promise
 
 export type EventStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'PUBLISHED' | 'CANCELLED' | 'FINISHED'
 
-export async function listEventsByStatus(params: { status: EventStatus; q?: string; page?: number; pageSize?: number }) {
-  const res = await api.get('/events', { params: { sort: '-createdAt', ...params } })
+/** Events of one status, or of every status ('ALL'), newest first. */
+export async function listEventsByStatus({ status, ...params }: { status: EventStatus | 'ALL'; q?: string; page?: number; pageSize?: number }) {
+  const filter = status === 'ALL' ? { all: true } : { status }
+  const res = await api.get('/events', { params: { sort: '-createdAt', ...filter, ...params } })
   return { events: res.data.data.events as EventSummary[], meta: res.data.meta as PageMeta }
 }
 
