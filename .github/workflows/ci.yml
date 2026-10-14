@@ -56,6 +56,8 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
+      # Known vulnerabilities in what runs in production (dev-only tools are not shipped in the image).
+      - run: npm audit --omit=dev --audit-level=high
       # Migrations up / down / up, then every integration and unit test, with coverage.
       - run: npm run test:coverage
       - name: Coverage summary
@@ -86,6 +88,7 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test

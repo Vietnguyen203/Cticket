@@ -85,6 +85,10 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       # Browser origins of the web app (WebSocket Origin check, Phase 11).
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:8080,https://localhost:8443}
+      # The web container (nginx) is the one proxy in front of the API: trust
+      # its X-Forwarded-For so rate limits count per visitor, not per proxy.
+      # Only the address nginx itself appends is used (a client cannot fake it).
+      TRUST_PROXY: ${TRUST_PROXY:-1}
     # Event images uploaded from the web (Phase 12.2) survive rebuilds.
     volumes:
       - uploads:/app/uploads

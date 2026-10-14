@@ -13,7 +13,7 @@ const JSON_BODY_LIMIT = '100kb';
 
 /**
  * Build the Express app without listening on a port, so tests can drive it
- * with Supertest and server.js can attach the HTTP (and later WebSocket) server.
+ * with Supertest and server.js can attach the HTTP server and the WebSocket hub.
  */
 function createApp() {
   const app = express();
@@ -23,8 +23,9 @@ function createApp() {
 
   app.use(requestLogger);
   app.use(helmet());
-  // The React Native app is not a browser and is unaffected by CORS.
-  // Only listed web origins (e.g. a future admin dashboard) are allowed.
+  // The web app is served from the same origin as the API (Vite / nginx proxy),
+  // so CORS is only for other listed origins; clients that are not browsers
+  // (Postman, k6) are unaffected by it.
   app.use(cors({ origin: env.CORS_ORIGINS.length > 0 ? env.CORS_ORIGINS : false }));
   app.use(express.json({ limit: JSON_BODY_LIMIT }));
 
