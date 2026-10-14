@@ -10,6 +10,7 @@ const MESSAGE = Object.freeze({
   SEAT_BLOCKED: 'SEAT_BLOCKED',
   INVENTORY_UPDATED: 'INVENTORY_UPDATED',
   // Personal (room user:{id})
+  ORDER_UPDATED: 'ORDER_UPDATED', // BKG-02: seats / tickets of a held order changed
   ORDER_EXPIRED: 'ORDER_EXPIRED',
   ORDER_CANCELLED: 'ORDER_CANCELLED',
   ORDER_PAID: 'ORDER_PAID', // Phase 8

@@ -13,6 +13,19 @@ export async function createOrder(scheduleId: string, order: NewOrder): Promise<
   return (await api.post(`/schedules/${scheduleId}/orders`, order)).data.data.order
 }
 
+/**
+ * BKG-02: replace what my HELD order holds with this WHOLE content (same shape
+ * as when booking). Sending it twice changes nothing; the hold's time does not move.
+ */
+export async function updateOrderItems(orderId: string, content: NewOrder): Promise<Order> {
+  return (await api.put(`/orders/${orderId}/items`, content)).data.data.order
+}
+
+/** BKG-02: take one seat out of my HELD order (it goes back on sale at once). */
+export async function removeOrderSeat(orderId: string, seatId: string): Promise<Order> {
+  return (await api.delete(`/orders/${orderId}/seats/${seatId}`)).data.data.order
+}
+
 export async function getOrder(orderId: string): Promise<Order> {
   return (await api.get(`/orders/${orderId}`)).data.data.order
 }
@@ -21,7 +34,7 @@ export async function cancelOrder(orderId: string): Promise<Order> {
   return (await api.post(`/orders/${orderId}/cancel`)).data.data.order
 }
 
-export async function listMyOrders(params: { status?: string; page?: number; pageSize?: number }) {
+export async function listMyOrders(params: { status?: string; scheduleId?: string; page?: number; pageSize?: number }) {
   const res = await api.get('/orders', { params })
   return { orders: res.data.data.orders as Order[], meta: res.data.meta as PageMeta }
 }

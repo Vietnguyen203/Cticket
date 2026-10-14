@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Vietnguyen203/Cticket/actions/workflows/ci.yml/badge.svg)](https://github.com/Vietnguyen203/Cticket/actions/workflows/ci.yml)
 
-> **English summary.** A ticketing platform for concerts and events, built as a learning project with production habits: a Node.js modular monolith (Express, PostgreSQL, Redis, BullMQ, WebSocket) and a React web app. Buyers pick seats on a **live seat map**, hold them for 10 minutes, pay (simulated, idempotent) and get **QR tickets**; gate staff scan them with a **phone camera**; organizers build events and seat plans and follow their sales; admins approve, refund and see platform reports. **No seat is ever sold twice**: Redis filters the rush, PostgreSQL row locks and constraints decide (proven by 100-buyers-one-seat tests and a 500-user k6 load test). 254 backend tests, 58 web tests, 11 Playwright end-to-end tests, CI on GitHub Actions. Documentation is in Vietnamese.
+> **English summary.** A ticketing platform for concerts and events, built as a learning project with production habits: a Node.js modular monolith (Express, PostgreSQL, Redis, BullMQ, WebSocket) and a React web app. Buyers pick seats on a **live seat map**, hold them for 10 minutes (and can swap seats in the held order without losing the others), pay (simulated, idempotent) and get **QR tickets**; gate staff scan them with a **phone camera**; organizers build events and seat plans and follow their sales; admins approve, refund and see platform reports. **No seat is ever sold twice**: Redis filters the rush, PostgreSQL row locks and constraints decide (proven by 100-buyers-one-seat tests and a 500-user k6 load test). 269 backend tests, 63 web tests, 12 Playwright end-to-end tests, CI on GitHub Actions. Documentation is in Vietnamese.
 
 Nền tảng bán vé sự kiện (concert, sân khấu…), làm như một dự án học tập nhưng theo thói quen của sản phẩm thật: thiết kế trước rồi mới code, test ở nhiều tầng, đo tải, tài liệu cho từng phase.
 
@@ -14,6 +14,7 @@ Nền tảng bán vé sự kiện (concert, sân khấu…), làm như một d�
 - Tìm sự kiện (không dấu cũng tìm được), xem lịch diễn và giá.
 - **Sơ đồ ghế cập nhật trực tiếp**: ghế người khác vừa giữ đổi màu ngay, không cần tải lại; ghế đang chọn bị người khác lấy thì tự bỏ ra và báo.
 - Giữ chỗ 10 phút (đồng hồ theo giờ server), mã giảm giá, thanh toán giả lập (bấm hai lần không bị trừ tiền hai lần).
+- **Đổi / bỏ ghế trong đơn đang giữ**: ghế cũ vẫn là của mình cho tới khi đổi xong, không phải hủy đơn rồi đặt lại.
 - Vé có **mã QR** (ký số, cấp lại được), email xác nhận, thông báo.
 
 **Ban tổ chức**
@@ -128,9 +129,9 @@ API này nghe cổng 3000 (`PORT` trong `backend/.env`); việc nền chạy b�
 
 | Tầng | Lệnh | Số lượng |
 |---|---|---|
-| Backend (Jest, PostgreSQL + Redis thật) | `cd backend` → `npm test` / `npm run test:coverage` | 254 test, độ phủ 94,7% dòng (CI chặn nếu dưới 90%) |
-| Web (Vitest) | `cd frontend` → `npm test` | 58 test |
-| End-to-end (Playwright) | `cd e2e` → `npm install` → `npx playwright install chromium` → `npm test` | 11 kịch bản (có cảnh 2 trình duyệt cùng xem sơ đồ ghế) |
+| Backend (Jest, PostgreSQL + Redis thật) | `cd backend` → `npm test` / `npm run test:coverage` | 269 test, độ phủ 94,8% dòng (CI chặn nếu dưới 90%) |
+| Web (Vitest) | `cd frontend` → `npm test` | 63 test |
+| End-to-end (Playwright) | `cd e2e` → `npm install` → `npx playwright install chromium` → `npm test` | 12 kịch bản (có cảnh 2 trình duyệt cùng xem sơ đồ ghế) |
 | Tải (k6) | xem `docs/testing.md` | 4 kịch bản |
 
 Test đồng thời đáng chú ý: **100 người cùng giữ 1 ghế → đúng 1 người được** (kể cả khi tắt Redis); 2 cổng quét cùng 1 vé cùng lúc → vào đúng 1 lần; cùng `Idempotency-Key` gửi 5 lần → thanh toán 1 lần.
@@ -153,13 +154,13 @@ docs/        Thiết kế từng phase, kiến trúc, kiểm thử, checklist pr
 ## Tài liệu
 
 - [Kiến trúc](docs/architecture.md) · [Kiểm thử](docs/testing.md) · [Checklist production](docs/production-checklist.md)
-- Thiết kế và ghi chú theo phase: [4 sơ đồ ghế, tồn kho](docs/phase-4-inventory-design.md) · [5 đặt chỗ](docs/phase-5-booking-design.md) · [6 Redis](docs/phase-6-redis-design.md) · [7 WebSocket](docs/phase-7-websocket-design.md) · [8 thanh toán](docs/phase-8-payments-design.md) · [9 hàng đợi](docs/phase-9-queue-design.md) · [10 soát vé](docs/phase-10-checkin-design.md) · [11 web](docs/phase-11-web-design.md) · [12 quản trị](docs/phase-12-admin-web-design.md) · [12.4 báo cáo](docs/phase-12.4-reports-design.md) · [13 kiểm thử](docs/phase-13-testing-design.md) · [14 hardening](docs/phase-14-hardening-design.md)
+- Thiết kế và ghi chú theo phase: [4 sơ đồ ghế, tồn kho](docs/phase-4-inventory-design.md) · [5 đặt chỗ](docs/phase-5-booking-design.md) · [6 Redis](docs/phase-6-redis-design.md) · [7 WebSocket](docs/phase-7-websocket-design.md) · [8 thanh toán](docs/phase-8-payments-design.md) · [9 hàng đợi](docs/phase-9-queue-design.md) · [10 soát vé](docs/phase-10-checkin-design.md) · [11 web](docs/phase-11-web-design.md) · [12 quản trị](docs/phase-12-admin-web-design.md) · [12.4 báo cáo](docs/phase-12.4-reports-design.md) · [13 kiểm thử](docs/phase-13-testing-design.md) · [14 hardening](docs/phase-14-hardening-design.md) · [BKG-02 đổi ghế trong đơn đang giữ](docs/bkg-02-edit-held-order-design.md)
 
 Ảnh chụp màn hình được tạo tự động (`cd e2e` → `npm run screenshots`, dữ liệu mẫu).
 
 ## Giới hạn và hướng phát triển
 
 - **Thanh toán là giả lập**: thay bằng cổng thật (webhook có chữ ký, đối soát) — xem checklist production.
-- Chưa có: thêm / bớt ghế trong đơn đang giữ (BKG-02), xác thực hai lớp, khóa tài khoản sau nhiều lần sai mật khẩu (đã có rate limit theo IP), triển khai lên cloud.
+- Chưa có: xác thực hai lớp, khóa tài khoản sau nhiều lần sai mật khẩu (đã có rate limit theo IP), triển khai lên cloud.
 - Ảnh tải lên lưu trên ổ đĩa của API: nhiều máy chủ thì chuyển sang kho chung (S3…).
 - Một tiến trình Node.js dùng một nhân CPU: tải lớn thì chạy nhiều bản API sau load balancer (đã thử trong load test).

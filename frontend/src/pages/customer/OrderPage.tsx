@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router'
 import { ApiError, toApiError } from '../../api/errors'
-import { cancelOrder, checkoutOrder, getOrder, payOrder, previewPromotion, type PromotionPreview } from '../../api/orders'
+import { cancelOrder, checkoutOrder, getOrder, payOrder, previewPromotion, removeOrderSeat, type PromotionPreview } from '../../api/orders'
 import { OrderStatusBadge } from '../../admin/OrderStatusBadge'
 import { Alert, Button, Card, FullPageSpinner } from '../../components/ui'
 import { realtime } from '../../realtime'
@@ -23,8 +23,17 @@ const PROMO_REASONS: Record<string, string> = {
 const messageOf = (err: ApiError) =>
   err.code === 'PROMOTION_INVALID' ? (PROMO_REASONS[(err.details as { reason?: string })?.reason ?? ''] ?? err.message) : err.message
 
-/** Messages about this order pushed over the WebSocket (Phase 7–9): reload when one arrives. */
-const ORDER_MESSAGES = ['ORDER_EXPIRED', 'ORDER_CANCELLED', 'ORDER_PAID', 'ORDER_REFUNDED', 'PAYMENT_SUCCEEDED', 'PAYMENT_FAILED', 'TICKET_ISSUED']
+/** Messages about this order pushed over the WebSocket (Phase 7–9, BKG-02): reload when one arrives. */
+const ORDER_MESSAGES = [
+  'ORDER_UPDATED',
+  'ORDER_EXPIRED',
+  'ORDER_CANCELLED',
+  'ORDER_PAID',
+  'ORDER_REFUNDED',
+  'PAYMENT_SUCCEEDED',
+  'PAYMENT_FAILED',
+  'TICKET_ISSUED',
+]
 
 /** APP-C04: the held order → checkout (discount code) → pay (simulated) → tickets. */
 export function OrderPage() {
@@ -33,9 +42,12 @@ export function OrderPage() {
   const [error, setError] = useState<ApiError | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [code, setCode] = useState('')
-  const [preview, setPreview] = useState<PromotionPreview | null>(null)
+  const [checked, setChecked] = useState<PromotionPreview | null>(null)
   const o = order.data
+  // A code checked against another subtotal (seats changed since: BKG-02) is not shown.
+  const preview = checked && checked.subtotal === o?.subtotal ? checked : null
   const payable = o && ['HELD', 'PAYMENT_PENDING', 'PAYMENT_FAILED'].includes(o.status)
+  const ticketCount = o?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0
   const secondsLeft = useCountdown(payable ? o?.expiresAt : null)
   const { reload } = order
 
@@ -75,9 +87,9 @@ export function OrderPage() {
     e.preventDefault()
     setError(null)
     try {
-      setPreview(await previewPromotion(id, code.trim()))
+      setChecked(await previewPromotion(id, code.trim()))
     } catch (err) {
-      setPreview(null)
+      setChecked(null)
       setError(toApiError(err))
     }
   }
@@ -119,7 +131,21 @@ export function OrderPage() {
               <tr key={item.id} className="border-t border-slate-100">
                 <td className="py-1.5">{item.seatLabel ?? `${item.ticketTypeName} × ${item.quantity}`}</td>
                 <td className="py-1.5 text-slate-500">{item.ticketTypeName}</td>
-                <td className="py-1.5 text-right">{formatVnd(item.totalAmount)}</td>
+                <td className="py-1.5 text-right">
+                  {formatVnd(item.totalAmount)}
+                  {/* BKG-02: one seat out of the held order; the last ticket goes with "Hủy giữ chỗ". */}
+                  {o.status === 'HELD' && item.seatId && ticketCount > 1 && (
+                    <button
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={() => run(`remove:${item.seatId}`, () => removeOrderSeat(id, item.seatId!))}
+                      className="ml-3 text-xs font-semibold text-red-700 hover:underline disabled:text-slate-400"
+                      aria-label={`Bỏ ghế ${item.seatLabel}`}
+                    >
+                      {busy === `remove:${item.seatId}` ? '…' : 'Bỏ'}
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
             {(o.discountAmount > 0 || preview) && (
@@ -147,7 +173,7 @@ export function OrderPage() {
               value={code}
               onChange={(e) => {
                 setCode(e.target.value.toUpperCase())
-                setPreview(null)
+                setChecked(null)
               }}
               placeholder="Mã giảm giá (nếu có)"
               aria-label="Mã giảm giá"
@@ -166,6 +192,12 @@ export function OrderPage() {
               Hủy giữ chỗ
             </Button>
           </div>
+          <Link
+            to={`/events/${o.event.slug}/schedules/${o.schedule.id}`}
+            className="block text-center text-sm font-semibold text-brand-700 hover:underline"
+          >
+            Đổi / thêm ghế
+          </Link>
         </Card>
       )}
 

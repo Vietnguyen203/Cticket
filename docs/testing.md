@@ -4,9 +4,9 @@ Dự án có 4 tầng kiểm thử, từ nhanh / hẹp tới chậm / rộng:
 
 | Tầng | Công cụ | Số lượng | Chạy ở đâu | Thời gian |
 |---|---|---|---|---|
-| Unit + integration (backend) | Jest + Supertest, PostgreSQL và Redis thật | **246 test**, 23 file | máy dev, CI | ≈ 1–2 phút |
-| Unit (web) | Vitest | **58 test**, 13 file | máy dev, CI | ≈ 2 giây |
-| End-to-end (trình duyệt) | Playwright (Chromium, desktop + điện thoại) | **11 kịch bản** | máy dev, CI | ≈ 45 giây |
+| Unit + integration (backend) | Jest + Supertest, PostgreSQL và Redis thật | **269 test**, 25 file | máy dev, CI | ≈ 1–2 phút |
+| Unit (web) | Vitest | **63 test**, 13 file | máy dev, CI | ≈ 2 giây |
+| End-to-end (trình duyệt) | Playwright (Chromium, desktop + điện thoại) | **12 kịch bản** | máy dev, CI | ≈ 45 giây |
 | Tải (load) | k6 | **4 kịch bản** | chạy tay | 1–5 phút / kịch bản |
 
 Mỗi lần push hoặc mở pull request, **GitHub Actions** chạy 3 tầng đầu (`.github/workflows/ci.yml`). Load test chạy tay vì lâu và số đo phụ thuộc máy.
@@ -29,6 +29,7 @@ Test chạy trên **PostgreSQL và Redis thật** (không giả lập database),
 | Sự kiện, suất, hạng vé, duyệt, danh mục, nhà tổ chức, địa điểm đề xuất | `events`, `catalog`, `organizers`, `venue-proposals` | 34 |
 | Sơ đồ ghế, tồn kho, khóa / mở ghế | `inventory` | 16 |
 | Giữ chỗ, đơn hàng, khóa Redis, gợi ý ghế | `orders`, `booking-redis` | 25 |
+| Đổi / bỏ ghế trong đơn đang giữ (BKG-02) | `order-edit` | 15 |
 | Thanh toán (idempotency), mã giảm giá, hoàn tiền | `payments` | 16 |
 | Vé, QR, soát vé | `checkins` | 16 |
 | WebSocket real-time | `websocket` | 12 |
@@ -47,6 +48,9 @@ Các tình huống "nhiều người cùng làm một việc tại cùng một t
 | Như trên nhưng **tắt Redis** | vẫn đúng 1 người được (PostgreSQL tự quyết) |
 | 50 người cùng giữ 1 ghế (test từ Phase 5) | đúng 1 |
 | 50 người tranh 10 vé đứng cuối cùng | đúng 10 người được |
+| **20 người cùng thêm 1 ghế vào đơn đang giữ của mình** (có và không có Redis) | đúng 1 người được |
+| Sửa đơn và checkout cùng một đơn cùng lúc | đơn được chốt giá đúng bằng những gì nó đang giữ |
+| 2 người đổi chéo ghế cho nhau cùng lúc (10 cặp) | không deadlock, cả hai bị từ chối gọn gàng |
 | 10 lần khóa 15 vé đứng cùng lúc khi còn 70 | không bao giờ vượt sức chứa |
 | **2 cổng quét cùng 1 vé cùng lúc** | đúng 1 lần vào |
 | Cùng một `Idempotency-Key` gửi 5 lần cùng lúc | 1 lần thanh toán, 5 câu trả lời giống hệt |
@@ -62,7 +66,7 @@ Các tình huống "nhiều người cùng làm một việc tại cùng một t
 
 | Statements | Branches | Functions | Lines |
 |---|---|---|---|
-| **93,2%** | **82,8%** | **93,5%** | **94,7%** |
+| **93,2%** | **83,1%** | **93,8%** | **94,8%** |
 
 CI **fail** nếu tụt dưới 90% / 80% / 90% / 90%. Phần thấp: `server.js` và `worker.js` (file khởi động tiến trình, Jest không chạy; E2E và load test chạy chúng).
 
@@ -80,7 +84,7 @@ Cần Docker đang chạy `postgres` và `redis`; `TEST_DATABASE_URL`, `TEST_RED
 
 ## 2. Web: Vitest
 
-Phần logic không cần trình duyệt: gộp cập nhật sơ đồ ghế real-time (phiên bản, ghế bị người khác lấy), client WebSocket (kết nối lại, đăng nhập lại khi token hết hạn), refresh token chỉ chạy một lần cho nhiều request và nhiều tab, giờ server, giờ Việt Nam, kết quả quét vé, kiểm tra trước khi gửi duyệt, quyền menu, CSV (BOM, chống CSV injection), số trên biểu đồ.
+Phần logic không cần trình duyệt: gộp cập nhật sơ đồ ghế real-time (phiên bản, ghế bị người khác lấy, chế độ sửa đơn đang giữ), client WebSocket (kết nối lại, đăng nhập lại khi token hết hạn), refresh token chỉ chạy một lần cho nhiều request và nhiều tab, giờ server, giờ Việt Nam, kết quả quét vé, kiểm tra trước khi gửi duyệt, quyền menu, CSV (BOM, chống CSV injection), số trên biểu đồ.
 
 ```
 cd frontend
@@ -102,6 +106,7 @@ Trình duyệt thật chạy các luồng chính trên giao diện. Môi trườ
 | Mua 2 ghế + 1 vé đứng | mã giảm giá sai rồi đúng, thẻ bị từ chối rồi trả lại, 3 vé có QR |
 | **2 trình duyệt cùng xem sơ đồ** | A giữ ghế → B thấy đổi màu ngay, ghế B đang chọn bị bỏ kèm thông báo |
 | Giữ chỗ hết hạn | đơn báo hết hạn, ghế trở lại trống |
+| **Đổi ghế trong đơn đang giữ** (BKG-02) | quay lại sơ đồ từ trang đơn, đổi 1 ghế, bỏ 1 ghế ở trang đơn; trình duyệt thứ hai thấy từng thay đổi |
 | **Ban tổ chức tạo sự kiện hoàn toàn bằng giao diện** → admin duyệt → khách thấy và chọn ghế | các form quản trị |
 | Soát vé trên **điện thoại** | vào 1 lần, quét lại bị từ chối, lịch sử |
 | Admin hoàn tiền | vé hết hiệu lực, báo cáo doanh thu của ban tổ chức đổi đúng |

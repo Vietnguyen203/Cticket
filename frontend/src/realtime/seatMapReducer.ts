@@ -12,6 +12,9 @@ import type { SeatMap, SeatStatus, TicketTypeAvailability } from '../api/types'
  * - A seat this user picked that someone else takes is unpicked, and the
  *   user is told — except while this user's own hold request is in flight
  *   (their own seats turning HELD is not news).
+ * - Changing a held order (BKG-02): the picks start as what the order holds.
+ *   Its seats are HELD on the shared map but stay pickable for this user, and
+ *   its standing tickets count as available to them.
  */
 
 /** Per order (backend ORDER_LIMITS.MAX_TICKETS_PER_ORDER); each ticket type's maxPerOrder applies too. */
@@ -31,6 +34,15 @@ export interface InventoryUpdateMessage {
 
 export type LiveUpdate = SeatUpdateMessage | InventoryUpdateMessage
 
+/** The held order being changed, as it is on the server. */
+export interface EditedOrder {
+  id: string
+  orderCode: string
+  expiresAt: string
+  seatIds: string[]
+  gaQuantities: Record<string, number>
+}
+
 export interface SeatMapState {
   map: SeatMap | null
   seats: Record<string, { status: SeatStatus; version: number }>
@@ -46,6 +58,8 @@ export interface SeatMapState {
   holding: boolean
   /** Why the last pick was refused (limits) */
   notice: string | null
+  /** BKG-02: the held order the picks will replace */
+  editing: EditedOrder | null
 }
 
 export type SeatMapAction =
@@ -56,6 +70,8 @@ export type SeatMapAction =
   | { type: 'holdStarted' }
   | { type: 'holdFailed' }
   | { type: 'dismissNotices' }
+  /** Start (or refresh) changing a held order; null when it is no longer held */
+  | { type: 'editOrder'; order: EditedOrder | null }
 
 export const initialSeatMapState: SeatMapState = {
   map: null,
@@ -67,6 +83,7 @@ export const initialSeatMapState: SeatMapState = {
   taken: [],
   holding: false,
   notice: null,
+  editing: null,
 }
 
 export function seatMapReducer(state: SeatMapState, action: SeatMapAction): SeatMapState {
@@ -97,6 +114,13 @@ export function seatMapReducer(state: SeatMapState, action: SeatMapAction): Seat
       return dropUnavailable({ ...state, holding: false })
     case 'dismissNotices':
       return { ...state, notice: null, taken: [] }
+    case 'editOrder':
+      if (action.order) {
+        const { seatIds, gaQuantities } = action.order
+        return { ...state, editing: action.order, selected: seatIds, gaQuantities, notice: null, taken: [] }
+      }
+      // The order ended (expired, paid…): its picks go with it. Not editing: nothing to do.
+      return state.editing ? { ...state, editing: null, selected: [], gaQuantities: {}, notice: null } : state
     default:
       return state
   }
@@ -118,13 +142,23 @@ function applyLive(state: SeatMapState, message: LiveUpdate): SeatMapState {
   return seats === state.seats ? state : { ...state, seats }
 }
 
+export const isMine = (state: SeatMapState, seatId: string) => state.editing?.seatIds.includes(seatId) ?? false
+
+/** A seat this user may pick: available, or held by the order being changed. */
+const pickable = (state: SeatMapState, seatId: string) =>
+  state.seats[seatId]?.status === 'AVAILABLE' || (state.seats[seatId]?.status === 'HELD' && isMine(state, seatId))
+
+/** Standing tickets this user can have: what is left for everyone plus what their order already holds. */
+export const gaLeftFor = (state: SeatMapState, ticketTypeId: string) =>
+  (state.gaAvailable[ticketTypeId] ?? 0) + (state.editing?.gaQuantities[ticketTypeId] ?? 0)
+
 /** Unpick seats that are no longer available, and standing tickets beyond what is left. */
 function dropUnavailable(state: SeatMapState): SeatMapState {
   if (state.holding) return state
-  const lost = state.selected.filter((seatId) => state.seats[seatId]?.status !== 'AVAILABLE')
+  const lost = state.selected.filter((seatId) => !pickable(state, seatId))
   let gaQuantities = state.gaQuantities
   for (const [ticketTypeId, quantity] of Object.entries(state.gaQuantities)) {
-    const left = state.gaAvailable[ticketTypeId] ?? 0
+    const left = gaLeftFor(state, ticketTypeId)
     if (quantity > left) gaQuantities = { ...gaQuantities, [ticketTypeId]: left }
   }
   if (lost.length === 0 && gaQuantities === state.gaQuantities) return state
@@ -156,9 +190,12 @@ function toggleSeat(state: SeatMapState, seatId: string): SeatMapState {
   if (state.selected.includes(seatId)) {
     return { ...state, selected: state.selected.filter((id) => id !== seatId), notice: null }
   }
-  if (state.seats[seatId]?.status !== 'AVAILABLE') return state
+  if (!pickable(state, seatId)) return state
   const ticketType = ticketTypeOf(state, seatId)
-  if (!ticketType || ticketType.status !== 'ACTIVE') return { ...state, notice: 'Ghế này hiện không bán.' }
+  // A seat the order already holds can be picked back even if its type was paused meanwhile.
+  if (!ticketType || (ticketType.status !== 'ACTIVE' && !isMine(state, seatId))) {
+    return { ...state, notice: 'Ghế này hiện không bán.' }
+  }
   if (totalPicked(state) >= MAX_TICKETS_PER_ORDER) {
     return { ...state, notice: `Mỗi đơn tối đa ${MAX_TICKETS_PER_ORDER} vé.` }
   }
@@ -177,7 +214,7 @@ function setGaQuantity(state: SeatMapState, ticketTypeId: string, wanted: number
   const limits: Array<[number, string]> = [
     [MAX_TICKETS_PER_ORDER - others, `Mỗi đơn tối đa ${MAX_TICKETS_PER_ORDER} vé.`],
     [ticketType.maxPerOrder, `Hạng ${ticketType.name}: tối đa ${ticketType.maxPerOrder} vé mỗi đơn.`],
-    [state.gaAvailable[ticketTypeId] ?? 0, `Hạng ${ticketType.name} chỉ còn ${state.gaAvailable[ticketTypeId] ?? 0} vé.`],
+    [gaLeftFor(state, ticketTypeId), `Hạng ${ticketType.name} chỉ còn ${gaLeftFor(state, ticketTypeId)} vé.`],
   ]
   let quantity = Math.max(0, Math.floor(wanted))
   let notice: string | null = null
@@ -226,4 +263,21 @@ export function selectionSummary(state: SeatMapState): { lines: SelectionLine[];
     count: lines.reduce((sum, line) => sum + line.quantity, 0),
     total: lines.reduce((sum, line) => sum + line.amount, 0),
   }
+}
+
+/** BKG-02: what "Cập nhật đơn" would change in the held order (standing tickets as old → new quantity). */
+export function editChanges(state: SeatMapState): {
+  added: string[]
+  removed: string[]
+  ga: Array<{ ticketTypeId: string; from: number; to: number }>
+  none: boolean
+} {
+  const order = state.editing
+  if (!order) return { added: [], removed: [], ga: [], none: true }
+  const added = state.selected.filter((seatId) => !order.seatIds.includes(seatId))
+  const removed = order.seatIds.filter((seatId) => !state.selected.includes(seatId))
+  const ga = [...new Set([...Object.keys(order.gaQuantities), ...Object.keys(state.gaQuantities)])]
+    .map((ticketTypeId) => ({ ticketTypeId, from: order.gaQuantities[ticketTypeId] ?? 0, to: state.gaQuantities[ticketTypeId] ?? 0 }))
+    .filter((change) => change.from !== change.to)
+  return { added, removed, ga, none: added.length + removed.length + ga.length === 0 }
 }

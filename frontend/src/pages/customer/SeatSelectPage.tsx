@@ -1,20 +1,50 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { ApiError, toApiError } from '../../api/errors'
 import { getEvent } from '../../api/events'
-import { createOrder } from '../../api/orders'
-import type { Seat, SeatMap, TicketTypeAvailability } from '../../api/types'
+import { createOrder, listMyOrders, updateOrderItems } from '../../api/orders'
+import type { Order, Seat, SeatMap, TicketTypeAvailability } from '../../api/types'
 import { useAuth } from '../../auth/AuthContext'
 import { Alert, Button, Card, FullPageSpinner } from '../../components/ui'
-import { selectionSummary, MAX_TICKETS_PER_ORDER, type SeatMapAction, type SeatMapState } from '../../realtime/seatMapReducer'
+import { realtime } from '../../realtime'
+import {
+  editChanges,
+  gaLeftFor,
+  isMine,
+  selectionSummary,
+  MAX_TICKETS_PER_ORDER,
+  type EditedOrder,
+  type SeatMapAction,
+  type SeatMapState,
+} from '../../realtime/seatMapReducer'
 import { useRealtimeState, useScheduleSeats } from '../../realtime/useScheduleSeats'
 import { formatDateTime, formatVnd } from '../../utils/format'
 import { useAsync } from '../../utils/useAsync'
+import { mmss, useCountdown } from '../../utils/useCountdown'
 
 /** One colour per ticket type (in the order the API lists them). */
 const TYPE_COLORS = ['bg-violet-500', 'bg-sky-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-teal-500']
 
-/** APP-C03: pick seats on the live map (and standing tickets), then hold them for 10 minutes. */
+const OPEN_STATUSES = ['HELD', 'PAYMENT_PENDING', 'PAYMENT_FAILED']
+
+/** My unfinished order for this schedule, if any (at most one: uq_orders_active_cart). */
+async function findMyOpenOrder(scheduleId: string): Promise<Order | null> {
+  const { orders } = await listMyOrders({ scheduleId, pageSize: 10 })
+  return orders.find((order) => OPEN_STATUSES.includes(order.status)) ?? null
+}
+
+const toEdited = (order: Order): EditedOrder => ({
+  id: order.id,
+  orderCode: order.orderCode,
+  expiresAt: order.expiresAt ?? '',
+  seatIds: order.items.flatMap((item) => (item.seatId ? [item.seatId] : [])),
+  gaQuantities: Object.fromEntries(order.items.filter((item) => !item.seatId).map((item) => [item.ticketTypeId, item.quantity])),
+})
+
+/**
+ * APP-C03: pick seats on the live map (and standing tickets), then hold them for 10 minutes.
+ * BKG-02: with a held order for this schedule, the same page changes that order instead.
+ */
 export function SeatSelectPage() {
   const { slug = '', scheduleId = '' } = useParams()
   const event = useAsync(() => getEvent(slug), `event:${slug}`)
@@ -25,10 +55,35 @@ export function SeatSelectPage() {
   const location = useLocation()
   const [holdError, setHoldError] = useState<ApiError | null>(null)
 
+  const myOrder = useAsync(
+    () => (status === 'authenticated' ? findMyOpenOrder(scheduleId) : Promise.resolve(null)),
+    `my-open-order:${scheduleId}:${status}`,
+  )
+  const heldOrder = myOrder.data?.status === 'HELD' ? myOrder.data : null
+  const awaitingPayment = myOrder.data && myOrder.data.status !== 'HELD' ? myOrder.data : null
+  const { reload: reloadMyOrder } = myOrder
+  const myOrderId = myOrder.data?.id
+
+  // The picks start as what the held order holds; they follow it when it changes (another tab, expiry).
+  useEffect(() => {
+    dispatch({ type: 'editOrder', order: heldOrder ? toEdited(heldOrder) : null })
+  }, [heldOrder, dispatch])
+  useEffect(() => {
+    if (!myOrderId) return undefined
+    return realtime.onPersonalMessage((message) => {
+      if (message.orderId === myOrderId) reloadMyOrder()
+    })
+  }, [myOrderId, reloadMyOrder])
+  const secondsLeft = useCountdown(state.editing?.expiresAt)
+  useEffect(() => {
+    if (secondsLeft === 0) reloadMyOrder() // the API expires it and frees the seats
+  }, [secondsLeft, reloadMyOrder])
+
   const schedule = event.data?.schedules.find((s) => s.id === scheduleId)
   const summary = selectionSummary(state)
+  const changes = editChanges(state)
 
-  async function hold() {
+  async function submit() {
     if (status !== 'authenticated') {
       navigate(`/login?next=${encodeURIComponent(location.pathname)}`)
       return
@@ -39,16 +94,18 @@ export function SeatSelectPage() {
       const items = Object.entries(state.gaQuantities)
         .filter(([, quantity]) => quantity > 0)
         .map(([ticketTypeId, quantity]) => ({ ticketTypeId, quantity }))
-      const order = await createOrder(scheduleId, {
+      const content = {
         ...(state.selected.length > 0 ? { seatIds: state.selected } : {}),
         ...(items.length > 0 ? { items } : {}),
-      })
+      }
+      const order = state.editing ? await updateOrderItems(state.editing.id, content) : await createOrder(scheduleId, content)
       navigate(`/orders/${order.id}`)
     } catch (err) {
       const apiError = toApiError(err)
       dispatch({ type: 'holdFailed' })
       setHoldError(apiError)
       if (['SEATS_UNAVAILABLE', 'INSUFFICIENT_INVENTORY'].includes(apiError.code)) void reload()
+      if (['ACTIVE_ORDER_EXISTS', 'ORDER_EXPIRED', 'INVALID_STATE_TRANSITION'].includes(apiError.code)) reloadMyOrder()
     }
   }
 
@@ -64,6 +121,7 @@ export function SeatSelectPage() {
   }
   if (!state.map) return <FullPageSpinner />
   const map = state.map
+  const editing = state.editing
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
@@ -72,7 +130,7 @@ export function SeatSelectPage() {
           <Link to={`/events/${slug}`} className="text-sm text-brand-700 hover:underline">
             ← {event.data?.title ?? 'Sự kiện'}
           </Link>
-          <h1 className="text-xl font-bold sm:text-2xl">Chọn chỗ</h1>
+          <h1 className="text-xl font-bold sm:text-2xl">{editing ? 'Đổi ghế' : 'Chọn chỗ'}</h1>
           {schedule && (
             <p className="text-sm text-slate-600">
               {formatDateTime(schedule.startAt)} · {schedule.venue.name}
@@ -90,11 +148,36 @@ export function SeatSelectPage() {
         </span>
       </div>
 
-      <Notices state={state} map={map} dispatch={dispatch} holdError={holdError} />
+      <div className="mb-4 space-y-2">
+        {editing && (
+          <Alert tone="info">
+            Bạn đang giữ đơn <strong>{editing.orderCode}</strong>
+            {secondsLeft !== null && (
+              <>
+                {' '}
+                · còn <strong className="font-mono">{mmss(secondsLeft)}</strong>
+              </>
+            )}
+            . Chạm để bỏ hoặc thêm ghế, rồi bấm "Cập nhật đơn".{' '}
+            <Link to={`/orders/${editing.id}`} className="font-semibold underline">
+              Mở đơn
+            </Link>
+          </Alert>
+        )}
+        {awaitingPayment && (
+          <Alert tone="warning">
+            Bạn có đơn <strong>{awaitingPayment.orderCode}</strong> đang chờ thanh toán ở suất này.{' '}
+            <Link to={`/orders/${awaitingPayment.id}`} className="font-semibold underline">
+              Mở đơn
+            </Link>
+          </Alert>
+        )}
+        <Notices state={state} map={map} dispatch={dispatch} holdError={holdError} />
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
         <div className="space-y-4">
-          <Legend ticketTypes={map.ticketTypes} />
+          <Legend ticketTypes={map.ticketTypes} editing={editing !== null} />
           {map.zones.map((zone) =>
             zone.kind === 'SEATED' ? (
               <Card key={zone.id} className="!p-4">
@@ -117,9 +200,11 @@ export function SeatSelectPage() {
 
         <aside className="lg:sticky lg:top-20 lg:self-start">
           <Card className="space-y-3 !p-4">
-            <h2 className="font-semibold">Bạn đã chọn</h2>
+            <h2 className="font-semibold">{editing ? `Đơn ${editing.orderCode} sau khi đổi` : 'Bạn đã chọn'}</h2>
             {summary.lines.length === 0 ? (
-              <p className="text-sm text-slate-500">Chạm vào ghế trống trên sơ đồ, hoặc chọn số vé đứng.</p>
+              <p className="text-sm text-slate-500">
+                {editing ? 'Muốn bỏ hết thì bấm "Hủy giữ chỗ" ở trang đơn.' : 'Chạm vào ghế trống trên sơ đồ, hoặc chọn số vé đứng.'}
+              </p>
             ) : (
               <ul className="space-y-1 text-sm">
                 {summary.lines.map((line) => (
@@ -133,18 +218,53 @@ export function SeatSelectPage() {
                 ))}
               </ul>
             )}
+            {editing && !changes.none && <ChangeList changes={changes} map={map} />}
             <div className="flex justify-between border-t border-slate-200 pt-2 font-semibold">
               <span>Tạm tính ({summary.count}/{MAX_TICKETS_PER_ORDER} vé)</span>
               <span>{formatVnd(summary.total)}</span>
             </div>
-            <Button className="w-full" loading={state.holding} disabled={summary.count === 0} onClick={hold}>
-              {status === 'authenticated' ? 'Giữ chỗ (10 phút)' : 'Đăng nhập để giữ chỗ'}
+            <Button
+              className="w-full"
+              loading={state.holding}
+              disabled={summary.count === 0 || (editing !== null && changes.none) || awaitingPayment !== null}
+              onClick={submit}
+            >
+              {editing ? 'Cập nhật đơn' : status === 'authenticated' ? 'Giữ chỗ (10 phút)' : 'Đăng nhập để giữ chỗ'}
             </Button>
-            <p className="text-xs text-slate-500">Giá cuối cùng do hệ thống tính lúc giữ chỗ. Ghế được giữ 10 phút để bạn thanh toán.</p>
+            <p className="text-xs text-slate-500">
+              {editing
+                ? 'Ghế bạn bỏ ra được mở bán lại ngay. Thời gian giữ chỗ không đổi.'
+                : 'Giá cuối cùng do hệ thống tính lúc giữ chỗ. Ghế được giữ 10 phút để bạn thanh toán.'}
+            </p>
           </Card>
         </aside>
       </div>
     </div>
+  )
+}
+
+/** "Thêm: A07 · Bỏ: A05 · Vé đứng: 2 → 3" */
+function ChangeList({ changes, map }: { changes: ReturnType<typeof editChanges>; map: SeatMap }) {
+  const codeOf = (seatId: string) => map.zones.flatMap((z) => z.seats).find((s) => s.seatId === seatId)?.code ?? '?'
+  const nameOf = (ticketTypeId: string) => map.ticketTypes.find((tt) => tt.id === ticketTypeId)?.name ?? 'Vé đứng'
+  return (
+    <ul className="space-y-0.5 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700" aria-label="Thay đổi">
+      {changes.added.length > 0 && (
+        <li>
+          <span className="font-semibold text-emerald-700">Thêm:</span> {changes.added.map(codeOf).join(', ')}
+        </li>
+      )}
+      {changes.removed.length > 0 && (
+        <li>
+          <span className="font-semibold text-red-700">Bỏ:</span> {changes.removed.map(codeOf).join(', ')}
+        </li>
+      )}
+      {changes.ga.map((change) => (
+        <li key={change.ticketTypeId}>
+          <span className="font-semibold">{nameOf(change.ticketTypeId)}:</span> {change.from} → {change.to}
+        </li>
+      ))}
+    </ul>
   )
 }
 
@@ -155,7 +275,7 @@ function Notices({ state, map, dispatch, holdError }: { state: SeatMapState; map
     ? (holdError.details as Array<{ seatId: string }>).map((d) => codeOf(d.seatId))
     : []
   return (
-    <div className="mb-4 space-y-2">
+    <>
       {state.taken.length > 0 && (
         <Alert tone="warning">
           Ghế {state.taken.map(codeOf).join(', ')} vừa có người khác giữ, đã bỏ khỏi lựa chọn của bạn.{' '}
@@ -179,11 +299,11 @@ function Notices({ state, map, dispatch, holdError }: { state: SeatMapState; map
           )}
         </Alert>
       )}
-    </div>
+    </>
   )
 }
 
-function Legend({ ticketTypes }: { ticketTypes: TicketTypeAvailability[] }) {
+function Legend({ ticketTypes, editing }: { ticketTypes: TicketTypeAvailability[]; editing: boolean }) {
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-600">
       {ticketTypes
@@ -196,6 +316,11 @@ function Legend({ ticketTypes }: { ticketTypes: TicketTypeAvailability[] }) {
       <span className="flex items-center gap-1.5">
         <span className="h-4 w-4 rounded bg-brand-800 ring-2 ring-brand-300" /> Bạn chọn
       </span>
+      {editing && (
+        <span className="flex items-center gap-1.5">
+          <span className="h-4 w-4 rounded bg-slate-400 opacity-60 outline-2 outline-dashed outline-red-500" /> Ghế bạn bỏ ra
+        </span>
+      )}
       <span className="flex items-center gap-1.5">
         <span className="h-4 w-4 rounded bg-amber-200" /> Đang có người giữ
       </span>
@@ -220,23 +345,37 @@ function SeatRows({ seats, state, ticketTypes, dispatch }: { seats: Seat[]; stat
             .map((seat) => {
               const live = state.seats[seat.seatId]?.status ?? seat.status
               const selected = state.selected.includes(seat.seatId)
+              // BKG-02: a seat my held order holds (HELD on everyone's map), which I may unpick or pick back.
+              const mine = isMine(state, seat.seatId) && live === 'HELD'
               const typeIndex = reserved.findIndex((tt) => tt.id === seat.ticketTypeId)
-              const sellable = live === 'AVAILABLE' && typeIndex >= 0
+              const typeColor = TYPE_COLORS[typeIndex % TYPE_COLORS.length]
+              const sellable = (live === 'AVAILABLE' || mine) && typeIndex >= 0
               const color = selected
                 ? 'bg-brand-800 text-white ring-2 ring-brand-300'
-                : live === 'HELD'
-                  ? 'bg-amber-200 text-amber-800'
-                  : sellable
-                    ? `${TYPE_COLORS[typeIndex % TYPE_COLORS.length]} text-white hover:brightness-110`
-                    : 'bg-slate-300 text-slate-500'
+                : mine
+                  ? `${typeColor} text-white opacity-60 outline-2 outline-dashed outline-red-500`
+                  : live === 'HELD'
+                    ? 'bg-amber-200 text-amber-800'
+                    : sellable
+                      ? `${typeColor} text-white hover:brightness-110`
+                      : 'bg-slate-300 text-slate-500'
               const typeName = reserved[typeIndex]?.name ?? 'không bán'
+              const statusText = mine
+                ? selected
+                  ? 'ghế của bạn'
+                  : 'ghế của bạn, sẽ bỏ ra khi cập nhật'
+                : live === 'AVAILABLE'
+                  ? 'còn trống'
+                  : live === 'HELD'
+                    ? 'đang có người giữ'
+                    : 'không còn'
               return (
                 <button
                   key={seat.seatId}
                   type="button"
                   disabled={!sellable && !selected}
                   aria-pressed={selected}
-                  aria-label={`Ghế ${seat.code}, ${typeName}, ${live === 'AVAILABLE' ? 'còn trống' : live === 'HELD' ? 'đang có người giữ' : 'không còn'}`}
+                  aria-label={`Ghế ${seat.code}, ${typeName}, ${statusText}`}
                   title={`${seat.code} · ${typeName}${seat.price ? ` · ${formatVnd(seat.price)}` : ''}`}
                   onClick={() => dispatch({ type: 'toggleSeat', seatId: seat.seatId })}
                   className={`h-7 w-7 shrink-0 rounded-md text-[10px] font-medium transition sm:h-8 sm:w-8 ${color} disabled:cursor-not-allowed`}
@@ -276,7 +415,8 @@ function StandingZone({ name, ticketTypes, state, dispatch }: { name: string; ti
                 <span className="w-6 text-center font-semibold" aria-live="polite">
                   {quantity}
                 </span>
-                <Button variant="secondary" className="!px-3" disabled={left === 0} onClick={() => set(quantity + 1)} aria-label={`Thêm ${tt.name}`}>
+                {/* A held order's own standing tickets count as available to its buyer (BKG-02). */}
+                <Button variant="secondary" className="!px-3" disabled={gaLeftFor(state, tt.id) === 0} onClick={() => set(quantity + 1)} aria-label={`Thêm ${tt.name}`}>
                   +
                 </Button>
               </div>

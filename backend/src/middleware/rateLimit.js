@@ -54,6 +54,7 @@ const LIMITS = Object.freeze({
   otpVerify: { name: 'otp-verify', limit: 30, windowSeconds: 900 },
   refresh: { name: 'refresh', limit: 60, windowSeconds: 60 },
   booking: { name: 'booking', limit: 10, windowSeconds: 60, key: (req) => req.user?.id },
+  orderEdit: { name: 'order-edit', limit: 30, windowSeconds: 60, key: (req) => req.user?.id },
   upload: { name: 'upload', limit: 30, windowSeconds: 3600, key: (req) => req.user?.id },
 });
 

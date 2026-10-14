@@ -59,6 +59,7 @@ const MESSAGES: Record<string, string> = {
   SALES_CLOSED: 'Đã hết thời gian bán vé.',
   TICKET_TYPE_UNAVAILABLE: 'Hạng vé này hiện không bán.',
   ORDER_LIMIT_EXCEEDED: 'Số vé vượt quá giới hạn cho một đơn.',
+  ORDER_CANNOT_BE_EMPTY: 'Đơn phải còn ít nhất 1 vé. Muốn bỏ hết thì hủy giữ chỗ.',
   IDEMPOTENCY_KEY_REUSED: 'Yêu cầu thanh toán không hợp lệ, vui lòng thử lại.',
   PROMOTION_INVALID: 'Mã giảm giá không dùng được cho đơn này.',
   TICKET_ALREADY_USED: 'Vé đã được sử dụng.',

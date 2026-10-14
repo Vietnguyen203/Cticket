@@ -24,6 +24,15 @@ ordersRouter.post(
   validate({ params: schemas.idParams, body: schemas.checkout }),
   controller.checkout,
 );
+// BKG-02: the buyer changes the seats / tickets of their HELD order (checked in the service).
+const canEdit = [authenticate, rateLimit(LIMITS.orderEdit), authorize('booking:create')];
+ordersRouter.put(
+  '/:id/items',
+  ...canEdit,
+  validate({ params: schemas.idParams, body: schemas.updateItems }),
+  controller.updateItems,
+);
+ordersRouter.delete('/:id/seats/:seatId', ...canEdit, validate({ params: schemas.seatParams }), controller.removeSeat);
 
 /** Mounted at /api/v1/schedules (next to the events module's schedule routes). */
 const scheduleOrdersRouter = Router();
