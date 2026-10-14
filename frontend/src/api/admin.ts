@@ -46,6 +46,12 @@ export async function deleteCategory(id: string): Promise<void> {
   await api.delete(`/categories/${id}`)
 }
 
+/** Events (any status) per category id: a used category cannot be deleted. */
+export async function getCategoryUsage(): Promise<Record<string, number>> {
+  const usage: Array<{ categoryId: string; events: number }> = (await api.get('/categories/usage')).data.data.usage
+  return Object.fromEntries(usage.map((u) => [u.categoryId, u.events]))
+}
+
 // --- Venues, zones, seats ---------------------------------------------------
 
 export type VenueStatus = 'ACTIVE' | 'INACTIVE' | 'PENDING'

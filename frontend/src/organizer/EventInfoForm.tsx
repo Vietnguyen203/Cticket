@@ -5,6 +5,8 @@ import type { EventInput } from '../api/organizer'
 import type { EventDetail } from '../api/types'
 import { ImageField } from '../components/ImageField'
 import { Alert, Button, TextField } from '../components/ui'
+import { hasAny } from '../admin/permissions'
+import { useAuth } from '../auth/AuthContext'
 import { useAsync } from '../utils/useAsync'
 
 /** Once PUBLISHED, only these may still change (backend EDITABLE_WHEN_PUBLISHED). */
@@ -23,7 +25,10 @@ function initialForm(event?: EventDetail) {
 
 /** Title, description, images (links), age, categories. New event, or the info tab of the editor. */
 export function EventInfoForm({ event, onSubmit, submitLabel }: { event?: EventDetail; onSubmit: (input: Partial<EventInput>) => Promise<void>; submitLabel: string }) {
-  const categories = useAsync(listCategories, 'categories')
+  const [categoryRound, setCategoryRound] = useState(0)
+  const categories = useAsync(listCategories, `categories:${categoryRound}`)
+  // Admins fix category names from here (in a new tab), then reload the list.
+  const canManageCategories = hasAny(useAuth().user, ['category:manage'])
   const [form, setForm] = useState(() => initialForm(event))
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [error, setError] = useState<ApiError | null>(null)
@@ -124,7 +129,19 @@ export function EventInfoForm({ event, onSubmit, submitLabel }: { event?: EventD
         className="sm:w-1/2"
       />
       <fieldset disabled={locked('categoryIds')}>
-        <legend className="mb-2 text-sm font-medium text-slate-700">Danh mục (chọn ít nhất một)</legend>
+        <legend className="mb-2 flex w-full flex-wrap items-center gap-x-3 text-sm font-medium text-slate-700">
+          Danh mục (chọn ít nhất một)
+          {canManageCategories && (
+            <>
+              <a href="/admin/categories" target="_blank" rel="noreferrer" className="font-normal text-brand-700 hover:underline">
+                Quản lý danh mục ↗
+              </a>
+              <button type="button" onClick={() => setCategoryRound((r) => r + 1)} className="font-normal text-brand-700 hover:underline">
+                Tải lại danh sách
+              </button>
+            </>
+          )}
+        </legend>
         <div className="flex flex-wrap gap-2">
           {categories.data?.map((category) => (
             <label

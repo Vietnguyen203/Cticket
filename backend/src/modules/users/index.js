@@ -10,6 +10,7 @@ module.exports = {
   insertUser: usersRepository.insertUser,
   findByEmail: usersRepository.findByEmail,
   addRole: usersRepository.addRole,
+  lockUser: usersRepository.lockUser,
   findRoleCodes: usersRepository.findRoleCodes,
   markEmailVerified: usersRepository.markEmailVerified,
   updatePasswordHash: usersRepository.updatePasswordHash,

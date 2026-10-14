@@ -83,10 +83,14 @@ async function listOrganizers({ status, page, pageSize }) {
  */
 async function changeStatus(context, organizerId, { status, reason }) {
   const row = await withTransaction(async (client) => {
-    const organizer = await organizersRepository.findById(client, organizerId, { forUpdate: true });
-    if (!organizer) {
+    // Lock order users → organizers (as the admin Users page does): read the
+    // profile to learn whose it is, lock that user, then lock the profile.
+    const found = await organizersRepository.findById(client, organizerId);
+    if (!found) {
       throw new AppError('NOT_FOUND', 'Organizer not found.');
     }
+    await users.lockUser(client, found.user_id);
+    const organizer = await organizersRepository.findById(client, organizerId, { forUpdate: true });
     const transition = TRANSITIONS.find((t) => t.from === organizer.status && t.to === status);
     if (!transition) {
       throw new AppError('INVALID_STATE_TRANSITION', `Cannot change an organizer from ${organizer.status} to ${status}.`);
@@ -113,9 +117,35 @@ async function changeStatus(context, organizerId, { status, reason }) {
   return toPublicOrganizer(row);
 }
 
+/**
+ * Admin Users page (USR-05): making a user ORGANIZER also makes their profile
+ * usable — created and named after the user if missing, activated if it is
+ * pending, rejected or suspended (granting the role is the approval).
+ * The caller holds the user row lock (lock order users → organizers).
+ * @param {{ id: string, first_name: string, last_name: string }} user
+ */
+async function activateForUser(client, context, user) {
+  const existing = await organizersRepository.findByUserId(client, user.id, { forUpdate: true });
+  if (existing?.status === ORGANIZER_STATUS.ACTIVE) return existing;
+  const profile =
+    existing ??
+    // Vietnamese order, as the admin pages show it: family name, then given name.
+    (await organizersRepository.insert(client, { userId: user.id, organizationName: `${user.last_name} ${user.first_name}`.trim() }));
+  const row = await organizersRepository.updateStatus(client, profile.id, { from: profile.status, to: ORGANIZER_STATUS.ACTIVE });
+  await recordAudit(client, {
+    context,
+    action: existing ? 'ORGANIZER_APPROVED' : 'ORGANIZER_CREATED',
+    entityType: 'organizer',
+    entityId: row.id,
+    oldValue: existing ? { status: existing.status } : null,
+    newValue: { status: ORGANIZER_STATUS.ACTIVE, reason: 'ORGANIZER role granted by an admin' },
+  });
+  return row;
+}
+
 /** For other modules: the organizer profile of a user, or null. */
 async function findOrganizerByUserId(userId) {
   return organizersRepository.findByUserId(pool, userId);
 }
 
-module.exports = { apply, getMyOrganizer, listOrganizers, changeStatus, findOrganizerByUserId, toPublicOrganizer };
+module.exports = { apply, getMyOrganizer, listOrganizers, changeStatus, activateForUser, findOrganizerByUserId, toPublicOrganizer };

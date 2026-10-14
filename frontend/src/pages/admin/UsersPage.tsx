@@ -10,6 +10,12 @@ import { useAsync } from '../../utils/useAsync'
 
 const ROLE_LABELS: Record<Role, string> = { CUSTOMER: 'Khách hàng', ORGANIZER: 'Ban tổ chức', STAFF: 'Soát vé', ADMIN: 'Quản trị' }
 const GRANTABLE: Role[] = ['ORGANIZER', 'STAFF', 'ADMIN']
+/** What each role gives, shown under its checkbox. */
+const ROLE_HINTS: Partial<Record<Role, string>> = {
+  ORGANIZER: 'Tạo và quản lý sự kiện của mình. Hồ sơ nhà tổ chức được tạo / duyệt luôn.',
+  STAFF: 'Soát vé ở các sự kiện mà ban tổ chức thêm người này vào.',
+  ADMIN: 'Toàn quyền quản trị, như tài khoản admin.',
+}
 const STATUS_LABELS: Record<string, string> = {
   ACTIVE: 'Hoạt động',
   PENDING_VERIFICATION: 'Chưa xác minh email',
@@ -219,13 +225,17 @@ function RolesDialog({ user, onClose, onSaved }: { user: AdminUser; onClose: () 
             <input type="checkbox" checked disabled /> Khách hàng (luôn có)
           </label>
           {GRANTABLE.map((role) => (
-            <label key={role} className="flex items-center gap-2 text-sm">
+            <label key={role} className="flex items-start gap-2 text-sm">
               <input
                 type="checkbox"
+                className="mt-1"
                 checked={roles.includes(role)}
                 onChange={(e) => setRoles(e.target.checked ? [...roles, role] : roles.filter((r) => r !== role))}
               />
-              {ROLE_LABELS[role]}
+              <span>
+                {ROLE_LABELS[role]}
+                {ROLE_HINTS[role] && <span className="block text-xs text-slate-500">{ROLE_HINTS[role]}</span>}
+              </span>
             </label>
           ))}
         </div>

@@ -61,6 +61,15 @@ async function addRole(db, userId, roleCode) {
   );
 }
 
+/**
+ * Lock a user row until the transaction ends. Lock order across modules:
+ * users → organizers (admin role changes and organizer approvals both touch
+ * a user's roles and organizer profile).
+ */
+async function lockUser(db, userId) {
+  await db.query(`SELECT 1 FROM users WHERE id = $1 FOR UPDATE`, [userId]);
+}
+
 async function findRoleCodes(db, userId) {
   const { rows } = await db.query(
     `SELECT r.code
@@ -102,6 +111,7 @@ module.exports = {
   findByEmail,
   findById,
   addRole,
+  lockUser,
   findRoleCodes,
   markEmailVerified,
   updatePasswordHash,

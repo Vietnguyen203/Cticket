@@ -47,9 +47,11 @@ export async function listMyEvents(params: { status?: string; page?: number; pag
  * An event for the editor. GET /events/:id also answers for ANY published
  * event (the public page), so the editor checks it belongs to my organizer
  * and otherwise shows "not found", as the API does for every change.
+ * `anyEvent`: an admin (event:manage:any), whom the API lets change any event.
  */
-export async function getMyEvent(id: string): Promise<EventDetail> {
+export async function getMyEvent(id: string, { anyEvent = false } = {}): Promise<EventDetail> {
   const event: EventDetail = (await api.get(`/events/${id}`)).data.data.event
+  if (anyEvent) return event
   const me = await getMyOrganizer()
   if (!me || event.organizer.id !== me.id) throw new ApiError(404, 'NOT_FOUND', messageFor('NOT_FOUND'))
   return event
@@ -63,8 +65,25 @@ export async function updateEvent(id: string, input: Partial<EventInput>): Promi
   return (await api.patch(`/events/${id}`, input)).data.data.event
 }
 
-export async function deleteEvent(id: string): Promise<void> {
-  await api.delete(`/events/${id}`)
+export interface DeletionSummary {
+  title: string
+  status: string
+  schedules: number
+  orders: number
+  paidOrders: number
+  revenue: number
+  tickets: number
+  checkIns: number
+}
+
+/** What deleting the event would remove (its organizer or an admin). */
+export async function getDeletionSummary(id: string): Promise<DeletionSummary> {
+  return (await api.get(`/events/${id}/deletion-summary`)).data.data.summary
+}
+
+/** For good, with everything it sold. Anything but an empty draft needs its title typed again. */
+export async function deleteEvent(id: string, confirmTitle?: string): Promise<void> {
+  await api.delete(`/events/${id}`, { data: confirmTitle === undefined ? undefined : { confirmTitle } })
 }
 
 /** Submit (PENDING_APPROVAL), withdraw (DRAFT) or cancel (CANCELLED + reason). */

@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { toApiError } from '../../api/errors'
-import { deleteEvent, getMyEvent, setEventStatus, updateEvent } from '../../api/organizer'
+import { getMyEvent, setEventStatus, updateEvent } from '../../api/organizer'
 import { ConfirmDialog, PageHeader, StatusBadge, Tabs } from '../../admin/components'
+import { hasAny } from '../../admin/permissions'
+import { useAuth } from '../../auth/AuthContext'
 import { Alert, Button, Card, FullPageSpinner } from '../../components/ui'
+import { DeleteEventDialog } from '../../organizer/DeleteEventDialog'
 import { EventInfoForm } from '../../organizer/EventInfoForm'
 import { NewScheduleForm } from '../../organizer/NewScheduleForm'
 import { submitChecklist } from '../../organizer/readiness'
@@ -20,7 +23,8 @@ const ACTIONS: Record<Action, { label: string; title: string; danger: boolean; a
   submit: { label: 'Gửi duyệt', title: 'Gửi sự kiện cho quản trị viên duyệt?', danger: false, askReason: false, message: 'Trong lúc chờ duyệt bạn không sửa được; muốn sửa thì rút lại.' },
   withdraw: { label: 'Rút lại', title: 'Rút lại về nháp?', danger: false, askReason: false, message: 'Sự kiện trở về dạng nháp để bạn sửa tiếp.' },
   cancel: { label: 'Hủy sự kiện', title: 'Hủy sự kiện?', danger: true, askReason: true, message: 'Không thể hoàn tác. Đơn đang giữ chỗ bị hủy, đơn đã thanh toán được hoàn tiền.' },
-  delete: { label: 'Xóa', title: 'Xóa sự kiện nháp?', danger: true, askReason: false, message: 'Sự kiện, suất diễn và hạng vé bị xóa hẳn.' },
+  // Shown by DeleteEventDialog (what goes, title typed again), not by the generic confirm.
+  delete: { label: 'Xóa', title: '', danger: true, askReason: false, message: '' },
 }
 
 /** Event editor of the organizer: info → schedules / ticket types / seat plan → submit; then run it. */
@@ -30,7 +34,9 @@ export function EventEditorPage() {
   const [params, setParams] = useSearchParams()
   const tab = (params.get('tab') as Tab) ?? 'info'
   const [round, setRound] = useState(0)
-  const event = useAsync(() => getMyEvent(id), `event:${id}:${round}`)
+  const { user } = useAuth()
+  const anyEvent = hasAny(user, ['event:manage:any']) // an admin edits any organizer's event
+  const event = useAsync(() => getMyEvent(id, { anyEvent }), `event:${id}:${round}:${anyEvent}`)
   // Reloads after every change, and when the reloaded event brings different schedules.
   const setups = useAsync(
     () => (event.data ? loadSchedules(event.data) : Promise.resolve([])),
@@ -47,7 +53,13 @@ export function EventEditorPage() {
   // Sales exist once the event went on sale (also after it ended or was cancelled: refunds).
   const hasSales = e.status === 'PUBLISHED' || e.status === 'FINISHED' || e.status === 'CANCELLED'
   const actions: Action[] =
-    e.status === 'DRAFT' ? ['submit', 'delete'] : e.status === 'PENDING_APPROVAL' ? ['withdraw', 'cancel'] : e.status === 'PUBLISHED' ? ['cancel'] : []
+    e.status === 'DRAFT'
+      ? ['submit', 'delete']
+      : e.status === 'PENDING_APPROVAL'
+        ? ['withdraw', 'cancel', 'delete']
+        : e.status === 'PUBLISHED'
+          ? ['cancel', 'delete']
+          : ['delete'] // finished / cancelled: can still be deleted for good
 
   return (
     <>
@@ -135,7 +147,15 @@ export function EventEditorPage() {
 
       {tab === 'sales' && hasSales && <EventSalesReport eventId={e.id} />}
 
-      {action && (
+      {action === 'delete' && (
+        <DeleteEventDialog
+          eventId={e.id}
+          onClose={() => setAction(null)}
+          onDeleted={() => navigate(anyEvent ? '/admin/events' : '/organizer', { replace: true })}
+        />
+      )}
+
+      {action && action !== 'delete' && (
         <ConfirmDialog
           open
           title={ACTIONS[action].title}
@@ -146,11 +166,6 @@ export function EventEditorPage() {
           onClose={() => setAction(null)}
           onConfirm={async (reason) => {
             try {
-              if (action === 'delete') {
-                await deleteEvent(e.id)
-                navigate('/organizer', { replace: true })
-                return
-              }
               const target = { submit: 'PENDING_APPROVAL', withdraw: 'DRAFT', cancel: 'CANCELLED' } as const
               await setEventStatus(e.id, target[action], reason || undefined)
             } catch (err) {

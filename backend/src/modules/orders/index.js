@@ -17,6 +17,7 @@ const {
 } = require('./order-payment');
 const { findInventoryMismatches, completeOrdersOfFinishedSchedules } = require('./orders.repository');
 const { previewPromotion } = require('./orders.service');
+const { summarizeEventSales, purgeEventSales } = require('./order-purge');
 
 module.exports = {
   cancelHeldOrdersOfEvent,
@@ -34,4 +35,6 @@ module.exports = {
   PAYABLE_STATUSES: PAYABLE,
   findInventoryMismatches,
   previewPromotion,
+  summarizeEventSales,
+  purgeEventSales,
 };

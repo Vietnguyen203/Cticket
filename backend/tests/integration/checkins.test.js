@@ -196,6 +196,23 @@ describe('event staff', () => {
     ]);
   });
 
+  test('an admin may check in anywhere, so the staff page lists every open event for them', async () => {
+    const { event, schedule } = await paidTickets();
+    const [staff] = await addStaff(event.id);
+    const { event: other } = await paidTickets(); // nobody on its gate team
+
+    const forAdmin = (await request(app).get('/api/v1/staff/events').set(bearer(admin.token)).expect(200)).body.data.events;
+    expect(forAdmin).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: event.id, schedules: [expect.objectContaining({ id: schedule.id })] }),
+        expect.objectContaining({ id: other.id }),
+      ]),
+    );
+    // Staff still see only their own events.
+    const forStaff = (await request(app).get('/api/v1/staff/events').set(bearer(staff.token)).expect(200)).body.data.events;
+    expect(forStaff.map((e) => e.id)).toEqual([event.id]);
+  });
+
   test('only the owner or an admin manages staff; the email must be an active account', async () => {
     const { event } = await paidTickets();
     const [person] = await createCustomers(1);

@@ -6,7 +6,7 @@ const users = require('../users');
 const { recordAudit } = require('../audit');
 const eventsRepository = require('./events.repository');
 const staffRepository = require('./staff.repository');
-const { canManage, eventNotFound, lockManageableEvent } = require('./event-access');
+const { canManage, eventNotFound, lockManageableEvent, resolveActor } = require('./event-access');
 
 const CLOSED_STATUSES = [EVENT_STATUS.CANCELLED, EVENT_STATUS.FINISHED];
 
@@ -72,9 +72,10 @@ async function removeStaff(context, actor, eventId, userId) {
   });
 }
 
-/** APP-S01: the events I work at, with their upcoming / running schedules. */
-async function listMyEvents(userId) {
-  return staffRepository.eventsOfStaff(pool, userId);
+/** APP-S01: the events I scan for; an admin (event:manage:any, who may check in anywhere) sees every open event. */
+async function listMyEvents(user) {
+  const actor = await resolveActor(user);
+  return staffRepository.eventsOfStaff(pool, user.id, { all: actor.canManageAny });
 }
 
 module.exports = { assignStaff, listStaff, removeStaff, listMyEvents };

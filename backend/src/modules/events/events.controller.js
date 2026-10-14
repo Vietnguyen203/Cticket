@@ -32,8 +32,12 @@ async function update(req, res) {
 }
 
 async function remove(req, res) {
-  await eventsService.deleteEvent(requestContext(req), await resolveActor(req.user), req.valid.params.id);
+  await eventsService.deleteEvent(requestContext(req), await resolveActor(req.user), req.valid.params.id, req.valid.body ?? {});
   return res.status(HTTP_NO_CONTENT).end();
+}
+
+async function deletionSummary(req, res) {
+  return sendSuccess(res, { summary: await eventsService.deletionSummary(await resolveActor(req.user), req.valid.params.id) });
 }
 
 async function changeStatus(req, res) {
@@ -46,4 +50,4 @@ async function changeStatus(req, res) {
   return sendSuccess(res, { event });
 }
 
-module.exports = { list, get, create, update, remove, changeStatus };
+module.exports = { list, get, create, update, remove, deletionSummary, changeStatus };

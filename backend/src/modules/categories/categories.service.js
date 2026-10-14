@@ -1,11 +1,10 @@
 const { pool } = require('../../database/pool');
-const { PG_ERROR } = require('../../database/errors');
+const { withTransaction } = require('../../database/transaction');
+const { recordAudit } = require('../audit');
 const AppError = require('../../utils/AppError');
 const { slugify } = require('../../utils/slug');
 const { remember, invalidatesAfter, NAMESPACE, TTL } = require('../../redis/cache');
 const categoriesRepository = require('./categories.repository');
-
-const CATEGORY_USAGE_FK = 'event_categories_category_id_fkey';
 
 function toPublicCategory(row) {
   return {
@@ -24,14 +23,19 @@ async function listCategories() {
   );
 }
 
-async function createCategory({ name, slug, description }) {
-  // A duplicate slug is rejected by the UNIQUE constraint → 409 CATEGORY_SLUG_TAKEN.
-  const row = await categoriesRepository.insert(pool, { name, slug: slug ?? slugify(name), description });
+/**
+ * The slug is always made from the name ("Âm nhạc" → am-nhac), never given:
+ * two categories with the same name hit the UNIQUE slug → 409 CATEGORY_SLUG_TAKEN.
+ */
+async function createCategory({ name, description }) {
+  const row = await categoriesRepository.insert(pool, { name, slug: slugify(name), description });
   return toPublicCategory(row);
 }
 
+/** A rename renames the slug too, so the two never drift apart. */
 async function updateCategory(id, changes) {
-  const row = await categoriesRepository.update(pool, id, changes);
+  const withSlug = changes.name !== undefined ? { ...changes, slug: slugify(changes.name) } : changes;
+  const row = await categoriesRepository.update(pool, id, withSlug);
   if (!row) {
     throw new AppError('NOT_FOUND', 'Category not found.');
   }
@@ -39,23 +43,34 @@ async function updateCategory(id, changes) {
 }
 
 /**
- * The foreign key from event_categories is ON DELETE RESTRICT, so PostgreSQL
- * itself refuses to delete a category that events still use. Checking usage
- * with a SELECT first would race with an event being tagged in between.
+ * Delete a category, also when events use it (decided with the product owner):
+ * it is taken off those events first, so an event that had only this category
+ * is left with none until its organizer picks one again. Audited, because it
+ * changes other people's events. The row is locked first, so an event cannot
+ * be tagged with it in between (that request waits, then fails).
  */
-async function deleteCategory(id) {
-  let deleted;
-  try {
-    deleted = await categoriesRepository.remove(pool, id);
-  } catch (err) {
-    if (err.code === PG_ERROR.FOREIGN_KEY_VIOLATION && err.constraint === CATEGORY_USAGE_FK) {
-      throw new AppError('CATEGORY_IN_USE', undefined, { cause: err });
+async function deleteCategory(context, id) {
+  await withTransaction(async (client) => {
+    const category = await categoriesRepository.lockById(client, id);
+    if (!category) {
+      throw new AppError('NOT_FOUND', 'Category not found.');
     }
-    throw err;
-  }
-  if (!deleted) {
-    throw new AppError('NOT_FOUND', 'Category not found.');
-  }
+    const events = await categoriesRepository.unlinkEvents(client, id);
+    await categoriesRepository.remove(client, id);
+    await recordAudit(client, {
+      context,
+      action: 'CATEGORY_DELETED',
+      entityType: 'category',
+      entityId: id,
+      oldValue: { name: category.name, slug: category.slug },
+      newValue: { removedFromEvents: events },
+    });
+  });
+}
+
+/** Admin page: events per category (drafts included, so not public and not cached). */
+async function categoryUsage() {
+  return (await categoriesRepository.usage(pool)).map((row) => ({ categoryId: row.category_id, events: row.events }));
 }
 
 // Category names also appear in event lists and pages.
@@ -63,6 +78,7 @@ const changesCategories = [NAMESPACE.CATEGORIES, NAMESPACE.CATALOG];
 
 module.exports = {
   listCategories,
+  categoryUsage,
   createCategory: invalidatesAfter(changesCategories, createCategory),
   updateCategory: invalidatesAfter(changesCategories, updateCategory),
   deleteCategory: invalidatesAfter(changesCategories, deleteCategory),

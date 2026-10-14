@@ -9,6 +9,7 @@ const router = Router();
 const canManage = [authenticate, authorize('category:manage')];
 
 router.get('/', controller.list);
+router.get('/usage', ...canManage, controller.usage);
 router.post('/', ...canManage, validate({ body: schemas.createCategory }), controller.create);
 router.patch('/:id', ...canManage, validate({ params: schemas.idParams, body: schemas.updateCategory }), controller.update);
 router.delete('/:id', ...canManage, validate({ params: schemas.idParams }), controller.remove);
