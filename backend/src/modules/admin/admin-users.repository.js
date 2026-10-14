@@ -3,7 +3,8 @@
  */
 const { escapeLike } = require('../../utils/pagination');
 
-const COLUMNS = `u.id, u.email, u.first_name, u.last_name, u.phone, u.status, u.email_verified_at, u.created_at`;
+const COLUMNS = `u.id, u.email, u.first_name, u.last_name, u.phone, u.status, u.email_verified_at, u.created_at,
+  EXISTS (SELECT 1 FROM user_totp t WHERE t.user_id = u.id AND t.enabled_at IS NOT NULL) AS two_factor_enabled`;
 const ROLES = `coalesce((SELECT array_agg(r.code ORDER BY r.code) FROM user_roles ur JOIN roles r ON r.id = ur.role_id
                          WHERE ur.user_id = u.id), '{}') AS roles`;
 

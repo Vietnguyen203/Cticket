@@ -16,6 +16,7 @@
     "migrate:down": "npm run migrate -- down",
     "migrate:create": "npm run migrate -- create",
     "seed:admin": "node src/scripts/seedAdmin.js",
+    "2fa:reset": "node src/scripts/resetTwoFactor.js",
     "mail:test": "node src/scripts/sendTestEmail.js",
     "inventory:check": "node src/scripts/checkInventory.js",
     "test": "jest --runInBand",

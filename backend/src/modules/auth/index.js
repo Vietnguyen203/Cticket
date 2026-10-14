@@ -7,6 +7,7 @@ const { verifyAccessToken } = require('./auth.tokens');
 const { isRevoked, revokeAllTokensOfUser } = require('./denylist');
 const { sendOtpEmail } = require('./otp.service');
 const { revokeAllRefreshTokensOfUser } = require('./auth.repository');
+const twoFactor = require('./two-factor.service');
 
 module.exports = {
   verifyAccessToken,
@@ -15,4 +16,11 @@ module.exports = {
   /** Every refresh token of the user (in the caller's transaction): no new access tokens. */
   revokeSessionsOfUser: revokeAllRefreshTokensOfUser,
   sendOtpEmail,
+  // Phase 15
+  sendTwoFactorAlert: twoFactor.sendAlertEmail,
+  /** Two-factor off for a user who lost their phone, in the caller's transaction. */
+  resetTwoFactor: twoFactor.resetTwoFactor,
+  enableKnownTotpSecret: twoFactor.enableKnownSecret,
+  /** Queue the "two-factor was reset" email for a user row (email, first_name). */
+  alertTwoFactorReset: (user) => twoFactor.queueAlert(user, twoFactor.ALERT.RESET),
 };

@@ -21,6 +21,11 @@ async function setUserRoles(req, res) {
   return sendSuccess(res, { user });
 }
 
+async function resetUserTwoFactor(req, res) {
+  const user = await adminUsersService.resetTwoFactor(requestContext(req), req.user.id, req.valid.params.id, req.valid.body);
+  return sendSuccess(res, { user });
+}
+
 function toAuditLog(row) {
   return {
     id: row.id,
@@ -52,4 +57,4 @@ async function reissueQr(req, res) {
   return sendSuccess(res, { ticket: await tickets.reissueQr(requestContext(req), req.valid.params.id) });
 }
 
-module.exports = { listUsers, changeUserStatus, setUserRoles, listAuditLogs, listAuditActions, reissueQr };
+module.exports = { listUsers, changeUserStatus, setUserRoles, resetUserTwoFactor, listAuditLogs, listAuditActions, reissueQr };

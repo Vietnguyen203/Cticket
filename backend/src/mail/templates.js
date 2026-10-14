@@ -82,4 +82,42 @@ function orderRefundedEmail({ order }) {
   };
 }
 
-module.exports = { otpEmail, orderConfirmedEmail, orderRefundedEmail, escapeHtml };
+const TWO_FACTOR_COPY = {
+  ENABLED: {
+    subject: 'Đã bật xác thực hai lớp',
+    body: () => 'Xác thực hai lớp vừa được bật cho tài khoản của bạn. Từ nay khi đăng nhập, bạn cần thêm mã từ ứng dụng xác thực trên điện thoại.',
+  },
+  DISABLED: {
+    subject: 'Đã tắt xác thực hai lớp',
+    body: () => 'Xác thực hai lớp vừa được tắt cho tài khoản của bạn. Đăng nhập giờ chỉ cần mật khẩu.',
+  },
+  RESET: {
+    subject: 'Xác thực hai lớp đã được đặt lại',
+    body: () =>
+      'Quản trị viên vừa đặt lại xác thực hai lớp cho tài khoản của bạn và đăng xuất bạn khỏi mọi thiết bị. Nếu tài khoản của bạn bắt buộc dùng xác thực hai lớp, hãy thiết lập lại ở lần đăng nhập tới.',
+  },
+  RECOVERY_CODE_USED: {
+    subject: 'Một mã khôi phục vừa được dùng',
+    body: ({ codesLeft }) =>
+      `Một mã khôi phục vừa được dùng để đăng nhập vào tài khoản của bạn. Còn ${codesLeft} mã chưa dùng; khi sắp hết, hãy tạo bộ mã mới trong trang tài khoản.`,
+  },
+};
+
+/**
+ * Phase 15: security notice after a two-factor change, so an account owner
+ * notices a change they did not make.
+ * @param {{ alert: keyof TWO_FACTOR_COPY, firstName?: string|null, codesLeft?: number }} params
+ */
+function twoFactorEmail({ alert, firstName, codesLeft }) {
+  const copy = TWO_FACTOR_COPY[alert];
+  const greeting = firstName ? `Xin chào ${firstName},` : 'Xin chào,';
+  const body = copy.body({ codesLeft });
+  const warning = 'Nếu không phải bạn, hãy đổi mật khẩu ngay và liên hệ quản trị viên.';
+  return {
+    subject: copy.subject,
+    text: `${greeting}\n\n${body}\n\n${warning}`,
+    html: `<p>${escapeHtml(greeting)}</p>\n<p>${escapeHtml(body)}</p>\n<p><strong>${warning}</strong></p>`,
+  };
+}
+
+module.exports = { otpEmail, orderConfirmedEmail, orderRefundedEmail, twoFactorEmail, escapeHtml };

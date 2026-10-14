@@ -5,6 +5,7 @@ import type { Role } from '../../api/types'
 import { updateMe, type ProfileChanges } from '../../api/users'
 import { useAuth } from '../../auth/AuthContext'
 import { Alert, Button, Card, TextField } from '../../components/ui'
+import { TwoFactorSection } from './TwoFactorSection'
 
 const ROLE_LABELS: Record<Role, string> = {
   CUSTOMER: 'Khách hàng',
@@ -109,6 +110,8 @@ export function ProfilePage() {
           </Button>
         </form>
       </Card>
+
+      <TwoFactorSection email={user.email} />
 
       <Card className="flex items-center justify-between gap-4">
         <p className="text-sm text-slate-600">

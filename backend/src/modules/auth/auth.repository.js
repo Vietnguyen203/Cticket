@@ -8,12 +8,13 @@
 // Refresh tokens
 // ---------------------------------------------------------------------------
 
-async function insertRefreshToken(db, { userId, tokenHash, familyId, ttlDays, ipAddress, userAgent }) {
+/** `mfa`: the session was opened with two-factor (Phase 15); kept by every rotation. */
+async function insertRefreshToken(db, { userId, tokenHash, familyId, ttlDays, ipAddress, userAgent, mfa = false }) {
   const { rows } = await db.query(
-    `INSERT INTO refresh_tokens (user_id, token_hash, family_id, expires_at, ip_address, user_agent)
-     VALUES ($1, $2, $3, now() + make_interval(days => $4), $5, $6)
+    `INSERT INTO refresh_tokens (user_id, token_hash, family_id, expires_at, ip_address, user_agent, mfa)
+     VALUES ($1, $2, $3, now() + make_interval(days => $4), $5, $6, $7)
      RETURNING id`,
-    [userId, tokenHash, familyId, ttlDays, ipAddress, userAgent],
+    [userId, tokenHash, familyId, ttlDays, ipAddress, userAgent, mfa],
   );
   return rows[0].id;
 }
@@ -21,7 +22,7 @@ async function insertRefreshToken(db, { userId, tokenHash, familyId, ttlDays, ip
 /** Locks the token row so two refreshes of the same token run one after the other. */
 async function findRefreshTokenForUpdate(db, tokenHash) {
   const { rows } = await db.query(
-    `SELECT rt.id, rt.user_id, rt.family_id, rt.revoked_at, rt.replaced_by_id,
+    `SELECT rt.id, rt.user_id, rt.family_id, rt.revoked_at, rt.replaced_by_id, rt.mfa,
             rt.expires_at <= now() AS expired,
             u.status AS user_status
      FROM refresh_tokens rt

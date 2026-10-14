@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { Role, User } from '../api/types'
+import type { LoginResult, MfaChallenge, Role, User } from '../api/types'
 
 export type AuthStatus = 'loading' | 'authenticated' | 'anonymous' | 'unreachable'
 
@@ -11,8 +11,13 @@ export interface AuthValue {
   /** e.g. "your session expired", shown once by the layout */
   notice: string | null
   clearNotice: () => void
-  /** remember: stay logged in for 7 days; otherwise until the site's tabs / the browser are closed */
-  login: (email: string, password: string, remember?: boolean) => Promise<void>
+  /**
+   * remember: stay logged in for 7 days; otherwise until the site's tabs / the browser are closed.
+   * Returns the two-factor challenge when a code is needed (no session yet), else null.
+   */
+  login: (email: string, password: string, remember?: boolean) => Promise<MfaChallenge | null>
+  /** Start using a session from the two-factor step. */
+  completeLogin: (result: LoginResult, remember: boolean) => Promise<void>
   logout: () => Promise<void>
   setUser: (user: User) => void
   /** New access token + profile: picks up a role granted meanwhile (e.g. organizer approved). */

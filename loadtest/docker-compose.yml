@@ -31,6 +31,7 @@ x-load-env: &load-env
   JWT_ACCESS_TTL_SECONDS: "7200"
   OTP_SECRET: load-test-only-otp-secret-0123456789abcdefgh
   QR_SECRET: load-test-only-qr-secret-0123456789abcdefghi
+  TOTP_ENCRYPTION_KEY: bG9hZC10ZXN0LW9ubHktdG90cC1rZXktMzItYnl0ZXM=
   SMTP_HOST: mailpit
   SMTP_PORT: "1025"
   SMTP_SECURE: "false"

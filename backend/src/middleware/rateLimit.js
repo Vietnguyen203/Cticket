@@ -49,6 +49,10 @@ function rateLimit({ name, limit, windowSeconds, key = (req) => req.ip }) {
 const LIMITS = Object.freeze({
   api: { name: 'api', limit: 600, windowSeconds: 60 },
   login: { name: 'login', limit: 5, windowSeconds: 60 },
+  // The code step of a login, per IP (each sign-in step also allows only 5 wrong codes).
+  loginTwoFactor: { name: 'login-2fa', limit: 10, windowSeconds: 60 },
+  // Two-factor settings of a signed-in user (password / code checks).
+  twoFactor: { name: '2fa', limit: 10, windowSeconds: 60, key: (req) => req.user?.id },
   register: { name: 'register', limit: 10, windowSeconds: 3600 },
   otpRequest: { name: 'otp', limit: 10, windowSeconds: 3600 },
   otpVerify: { name: 'otp-verify', limit: 30, windowSeconds: 900 },

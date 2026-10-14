@@ -19,6 +19,7 @@ const { closePool } = require('../database/pool');
 const logger = require('../utils/logger');
 const users = require('../modules/users');
 const { hashPassword } = require('../modules/auth/auth.service');
+const { enableKnownTotpSecret } = require('../modules/auth');
 
 const DEV_DEFAULT_ADMIN = Object.freeze({
   email: 'admin@etp.local',
@@ -32,13 +33,19 @@ function resolveCredentials() {
   if (env.NODE_ENV === 'production' && password === DEV_DEFAULT_ADMIN.password) {
     throw new Error('Refusing to create an admin with the development default password in production. Set ADMIN_PASSWORD.');
   }
-  return { email, password };
+  // A two-factor secret known in advance is for test stacks (E2E) only: anyone
+  // who reads it can compute the admin's codes. In production the admin sets
+  // two-factor up at the first login.
+  if (env.NODE_ENV === 'production' && env.ADMIN_TOTP_SECRET) {
+    throw new Error('ADMIN_TOTP_SECRET is for test stacks only. Unset it: the admin sets up two-factor at the first login.');
+  }
+  return { email, password, totpSecret: env.ADMIN_TOTP_SECRET };
 }
 
 /**
  * @returns {Promise<{ userId: string, email: string, created: boolean }>}
  */
-async function seedAdmin({ email, password } = resolveCredentials()) {
+async function seedAdmin({ email, password, totpSecret } = resolveCredentials()) {
   const passwordHash = await hashPassword(password);
 
   return withTransaction(async (client) => {
@@ -56,6 +63,7 @@ async function seedAdmin({ email, password } = resolveCredentials()) {
       });
     }
     await users.addRole(client, user.id, ROLES.ADMIN);
+    if (totpSecret) await enableKnownTotpSecret(client, user.id, totpSecret);
     return { userId: user.id, email: user.email, created };
   });
 }

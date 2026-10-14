@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { listUsers, setUserRoles, setUserStatus, type AdminUser } from '../../api/admin'
+import { listUsers, resetUserTwoFactor, setUserRoles, setUserStatus, type AdminUser } from '../../api/admin'
 import { toApiError } from '../../api/errors'
 import type { Role } from '../../api/types'
 import { ConfirmDialog, EmptyRow, PageHeader, Pagination, StatusBadge, TableCard } from '../../admin/components'
@@ -29,6 +29,7 @@ export function UsersPage() {
   const [draft, setDraft] = useState('')
   const [filters, setFilters] = useState({ q: '', role: '', status: '', page: 1 })
   const [suspending, setSuspending] = useState<AdminUser | null>(null)
+  const [resetting, setResetting] = useState<AdminUser | null>(null)
   const [editingRoles, setEditingRoles] = useState<AdminUser | null>(null)
   const [message, setMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
   const list = useAsync(
@@ -97,6 +98,7 @@ export function UsersPage() {
             <th>Người dùng</th>
             <th>Vai trò</th>
             <th>Trạng thái</th>
+            <th>2FA</th>
             <th>Tạo lúc</th>
             <th />
           </tr>
@@ -126,6 +128,9 @@ export function UsersPage() {
                     <StatusBadge status={user.status} />
                   )}
                 </td>
+                <td className="text-xs">
+                  {user.twoFactorEnabled ? <span className="font-semibold text-emerald-700">Bật</span> : <span className="text-slate-400">—</span>}
+                </td>
                 <td className="whitespace-nowrap text-slate-600">{formatDateTime(user.createdAt)}</td>
                 <td className="whitespace-nowrap text-right">
                   {isMe ? (
@@ -135,6 +140,11 @@ export function UsersPage() {
                       <Button variant="ghost" onClick={() => setEditingRoles(user)}>
                         Phân quyền
                       </Button>
+                      {user.twoFactorEnabled && (
+                        <Button variant="ghost" onClick={() => setResetting(user)}>
+                          Đặt lại 2FA
+                        </Button>
+                      )}
                       {user.status === 'SUSPENDED' ? (
                         <Button variant="ghost" onClick={() => void reactivate(user)}>
                           Mở khóa
@@ -150,7 +160,7 @@ export function UsersPage() {
               </tr>
             )
           })}
-          {list.data?.users.length === 0 && <EmptyRow colSpan={5}>Không có người dùng nào.</EmptyRow>}
+          {list.data?.users.length === 0 && <EmptyRow colSpan={6}>Không có người dùng nào.</EmptyRow>}
         </tbody>
       </TableCard>
       <Pagination meta={list.data?.meta} onPage={(page) => setFilters({ ...filters, page })} />
@@ -171,6 +181,26 @@ export function UsersPage() {
               throw toApiError(err)
             }
             setMessage({ tone: 'success', text: `Đã khóa ${suspending.email}.` })
+            list.reload()
+          }}
+        />
+      )}
+      {resetting && (
+        <ConfirmDialog
+          open
+          title={`Đặt lại xác thực hai lớp của ${resetting.email}?`}
+          message="Dùng khi người này mất điện thoại và mã khôi phục. Xác thực hai lớp bị tắt, họ bị đăng xuất khỏi mọi thiết bị và nhận email báo; quản trị viên sẽ phải thiết lập lại ở lần đăng nhập tới."
+          confirmLabel="Đặt lại 2FA"
+          danger
+          askReason
+          onClose={() => setResetting(null)}
+          onConfirm={async (reason) => {
+            try {
+              await resetUserTwoFactor(resetting.id, reason)
+            } catch (err) {
+              throw toApiError(err)
+            }
+            setMessage({ tone: 'success', text: `Đã đặt lại xác thực hai lớp của ${resetting.email}.` })
             list.reload()
           }}
         />

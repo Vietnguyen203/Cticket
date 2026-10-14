@@ -1,6 +1,5 @@
 import { createCategory, createOrganizer, createSeatedVenue, unique } from '../support/api'
-import { E2E_ADMIN } from '../stack.mjs'
-import { expect, signIn, test } from '../support/fixtures'
+import { expect, signIn, signInAdmin, test } from '../support/fixtures'
 
 /** "YYYY-MM-DD" in Vietnam, N days from now. */
 const vnDate = (daysFromNow: number) =>
@@ -66,7 +65,7 @@ test('organizer builds an event in the pages, submits it; the admin approves; it
   // 6. The admin approves
   const adminContext = await browser.newContext()
   const adminPage = await adminContext.newPage()
-  await signIn(adminPage, E2E_ADMIN.email, E2E_ADMIN.password, `/admin/events/${eventId}`)
+  await signInAdmin(adminPage, `/admin/events/${eventId}`)
   await adminPage.getByRole('button', { name: 'Duyệt và mở bán' }).click()
   await adminPage.getByRole('dialog').getByRole('button', { name: 'Duyệt và mở bán' }).click()
   await expect(adminPage.getByText('Đang bán').first()).toBeVisible()

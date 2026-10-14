@@ -6,12 +6,15 @@ Bản Docker trong repo là **môi trường phát triển / demo**: chứng ch�
 
 - [ ] `JWT_ACCESS_SECRET`, `OTP_SECRET`, `QR_SECRET`: chuỗi ngẫu nhiên **≥ 32 ký tự, khác nhau**, lưu trong nơi quản lý secret (không trong repo, không trong image). Tạo bằng `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"`.
 - [ ] Đổi `QR_SECRET` = **mọi mã QR đã phát hết hiệu lực** (khách phải mở lại vé để lấy QR mới) → chỉ đổi khi bị lộ.
+- [ ] `TOTP_ENCRYPTION_KEY` (Phase 15): đúng **32 byte ngẫu nhiên, base64** (`node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`). Nó mã hóa secret 2FA của mọi người dùng: **mất khóa = ai cũng phải thiết lập lại 2FA**, nên sao lưu cùng các secret khác; lộ khóa (cùng bản sao database) = tính được mã của mọi người → đổi khóa và đặt lại 2FA của tất cả.
 - [ ] `POSTGRES_PASSWORD`, `REDIS_PASSWORD` mạnh và riêng cho production.
 - [ ] Không dùng lại các secret **chỉ-để-test** trong `e2e/start-api.mjs` và `loadtest/docker-compose.yml`; không triển khai hai stack này.
 
 ## 2. Tài khoản
 
 - [ ] Tạo admin bằng `npm run seed:admin` với `ADMIN_EMAIL` / `ADMIN_PASSWORD` riêng (script **từ chối** mật khẩu mặc định khi `NODE_ENV=production`).
+- [ ] **Xác thực hai lớp** (Phase 15): admin đầu tiên quét QR ở lần đăng nhập đầu và **cất 10 mã khôi phục** ở nơi an toàn. `TWO_FACTOR_REQUIRED_ROLES` giữ `ADMIN` (không để trống). **Không** đặt `ADMIN_TOTP_SECRET` (chỉ cho môi trường test; script từ chối khi `NODE_ENV=production`).
+- [ ] Nên có **ít nhất 2 admin**: một người mất điện thoại thì người kia "Đặt lại 2FA" trong trang Người dùng. Không còn ai: chạy `npm run 2fa:reset -- <email>` trong container API (có ghi audit log).
 - [ ] Không có tài khoản thử (`admin@etp.local`, `webtest-*`, mật khẩu `admin`…) trong database production.
 
 ## 3. Mạng và HTTPS

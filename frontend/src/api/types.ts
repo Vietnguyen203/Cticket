@@ -22,6 +22,33 @@ export interface LoginResult {
   user: User
 }
 
+/**
+ * Phase 15: the password was right, a second step is needed. `mfaRequired`:
+ * enter a code from the authenticator app; `mfaSetupRequired`: an admin who
+ * must set two-factor up first. The mfaToken lasts 5 minutes.
+ */
+export interface MfaChallenge {
+  mfaRequired?: true
+  mfaSetupRequired?: true
+  mfaToken: string
+  expiresIn: number
+}
+
+/** What the phone needs: the QR code, or the key typed in by hand. */
+export interface TwoFactorSetup {
+  secret: string
+  otpauthUri: string
+  qrDataUrl: string
+}
+
+export interface TwoFactorStatus {
+  enabled: boolean
+  enabledAt: string | null
+  /** Required for this account's roles (admins): cannot be turned off */
+  required: boolean
+  recoveryCodesLeft: number
+}
+
 export type OtpPurpose = 'EMAIL_VERIFICATION' | 'PASSWORD_RESET'
 
 export interface PageMeta {

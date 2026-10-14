@@ -1,6 +1,7 @@
 const { randomUUID } = require('node:crypto');
 const request = require('supertest');
 const mailer = require('../../src/mail/mailer');
+const { totpAt } = require('../../src/utils/totp');
 
 const OTP_PATTERN = /\b(\d{6})\b/;
 const DEFAULT_PASSWORD = 'Secret123';
@@ -18,6 +19,8 @@ function useFakeMailbox() {
 
   return {
     count: (email) => messagesTo(email).length,
+    subjects: (email) => messagesTo(email).map((message) => message.subject),
+    latestText: (email) => messagesTo(email).at(-1)?.text,
     /** The 6-digit code from the most recent email to this address. */
     latestOtp(email) {
       const messages = messagesTo(email);
@@ -48,6 +51,19 @@ function login(app, email, password = DEFAULT_PASSWORD) {
   return request(app).post('/api/v1/auth/login').send({ email, password });
 }
 
+/**
+ * Phase 15: the TOTP secret of every admin the tests seed. Tests compute its
+ * codes; each admin has its own "last used step", so admins never collide.
+ */
+const ADMIN_TOTP_SECRET = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
+
+/** Password, then the code from the "authenticator app": a full session (the 200 response of step 2). */
+async function loginWithTwoFactor(app, email, password, secret = ADMIN_TOTP_SECRET) {
+  const first = await login(app, email, password).expect(200);
+  if (!first.body.data.mfaRequired) throw new Error(`Expected a two-factor step for ${email}`);
+  return request(app).post('/api/v1/auth/login/2fa').send({ mfaToken: first.body.data.mfaToken, code: totpAt(secret) }).expect(200);
+}
+
 /** Register + verify; returns credentials of an ACTIVE customer. */
 async function createVerifiedUser(app, mailbox) {
   const { email, password } = await registerUser(app);
@@ -69,6 +85,8 @@ module.exports = {
   registerUser,
   verifyEmail,
   login,
+  ADMIN_TOTP_SECRET,
+  loginWithTwoFactor,
   createVerifiedUser,
   createLoggedInUser,
 };

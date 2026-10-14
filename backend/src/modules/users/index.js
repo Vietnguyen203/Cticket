@@ -9,6 +9,7 @@ const rbac = require('./rbac');
 module.exports = {
   insertUser: usersRepository.insertUser,
   findByEmail: usersRepository.findByEmail,
+  findById: usersRepository.findById,
   addRole: usersRepository.addRole,
   lockUser: usersRepository.lockUser,
   findRoleCodes: usersRepository.findRoleCodes,

@@ -18,6 +18,7 @@ function toAdminUser(row) {
     status: row.status,
     emailVerifiedAt: row.email_verified_at,
     roles: row.roles,
+    twoFactorEnabled: row.two_factor_enabled,
     createdAt: row.created_at,
   };
 }
@@ -113,4 +114,31 @@ async function setRoles(context, adminId, userId, { roles }) {
   });
 }
 
-module.exports = { listUsers, changeStatus, setRoles };
+/**
+ * Phase 15: turn off the two-factor of someone who lost their phone (and
+ * their recovery codes). They are logged out everywhere; an admin will have
+ * to set it up again at the next login. Never for oneself: another admin
+ * must do it (or the server script, when there is no other admin).
+ */
+async function resetTwoFactor(context, adminId, userId, { reason }) {
+  if (userId === adminId) throw new AppError('CANNOT_CHANGE_SELF');
+  const user = await withTransaction(async (client) => {
+    const found = await adminUsersRepository.findForUpdate(client, userId);
+    if (!found) throw userNotFound();
+    if (!(await auth.resetTwoFactor(client, userId))) throw new AppError('TWO_FACTOR_NOT_ENABLED');
+    await endSessionsAfterCommit(client, userId);
+    await recordAudit(client, {
+      context,
+      action: 'TWO_FACTOR_RESET',
+      entityType: 'user',
+      entityId: userId,
+      oldValue: { twoFactorEnabled: found.two_factor_enabled },
+      newValue: { twoFactorEnabled: false, reason },
+    });
+    return { ...found, two_factor_enabled: false };
+  });
+  await auth.alertTwoFactorReset(user);
+  return toAdminUser(user);
+}
+
+module.exports = { listUsers, changeStatus, setRoles, resetTwoFactor };

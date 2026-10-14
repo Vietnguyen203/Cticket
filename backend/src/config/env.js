@@ -46,6 +46,18 @@ const envSchema = z.object({
   // bcrypt work factor: each +1 doubles hashing time. 12 ≈ 250 ms per hash.
   BCRYPT_COST: z.coerce.number().int().min(4).max(15).default(12),
 
+  // Two-factor authentication (Phase 15). The key encrypts every TOTP secret
+  // in the database (AES-256-GCM): 32 random bytes, base64. Losing it means
+  // every user has to set two-factor up again, so back it up like the others.
+  TOTP_ENCRYPTION_KEY: z
+    .string()
+    .transform((value) => Buffer.from(value, 'base64'))
+    .refine((key) => key.length === 32, 'must be 32 random bytes, base64-encoded'),
+  // Roles that cannot use the platform without two-factor (comma-separated). Keep ADMIN in production.
+  TWO_FACTOR_REQUIRED_ROLES: z.string().default('ADMIN').transform(csv),
+  // The name authenticator apps show next to the code.
+  TOTP_ISSUER: z.string().min(1).max(50).default('ETP Tickets'),
+
   // Email (SMTP). In development this points to the Mailpit container.
   SMTP_HOST: z.string().default('localhost'),
   SMTP_PORT: z.coerce.number().int().positive().default(1025),
@@ -89,6 +101,8 @@ const envSchema = z.object({
   // Used only by `npm run seed:admin`.
   ADMIN_EMAIL: z.string().optional(),
   ADMIN_PASSWORD: z.string().optional(),
+  // Test stacks only (E2E): the seeded admin gets this TOTP secret, so tests can compute its codes.
+  ADMIN_TOTP_SECRET: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

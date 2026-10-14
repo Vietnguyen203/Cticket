@@ -1,9 +1,9 @@
 import path from 'node:path'
 import { devices, type Page } from '@playwright/test'
 import { addStaff, buy, createCustomer, createOrganizer, createPromotion, createPublishedEvent, qrTokenOf } from '../support/api'
-import { openGates, sql } from '../support/db'
+import { createAdminAccount, openGates, sql } from '../support/db'
 import { expect, signIn, test } from '../support/fixtures'
-import { E2E_ADMIN, ROOT_DIR } from '../stack.mjs'
+import { E2E_TOTP_SECRET, ROOT_DIR } from '../stack.mjs'
 
 /**
  * The README screenshots (docs/images), on the E2E stack with made-up data.
@@ -30,7 +30,8 @@ test('README screenshots', async ({ browser, api, admin }) => {
   const organizer = await createOrganizer(api, admin)
   await sql(`UPDATE organizers SET organization_name = 'Công ty Sự kiện Ánh Sao' WHERE id = $1`, [organizer.organizerId])
   await sql(`UPDATE users SET first_name = 'Minh', last_name = 'Trần' WHERE id = $1`, [organizer.id])
-  await sql(`UPDATE users SET first_name = 'Quản trị', last_name = 'viên' WHERE email = $1`, [E2E_ADMIN.email])
+  const reviewer = await createAdminAccount({ firstName: 'Quản trị' })
+  await sql(`UPDATE users SET last_name = 'viên' WHERE email = $1`, [reviewer.email])
 
   // Three shows on sale with readable names, renamed in the database before
   // anyone reads a list or a page (so nothing stale is cached).
@@ -108,7 +109,7 @@ test('README screenshots', async ({ browser, api, admin }) => {
 
   // 5. Admin dashboard
   const adminPage = await desktop.newPage()
-  await signIn(adminPage, E2E_ADMIN.email, E2E_ADMIN.password, '/admin')
+  await signIn(adminPage, reviewer.email, reviewer.password, '/admin', E2E_TOTP_SECRET)
   await expect(adminPage.getByText('Bán chạy 30 ngày')).toBeVisible()
   await shot(adminPage, '05-admin-dashboard')
   await adminPage.close()

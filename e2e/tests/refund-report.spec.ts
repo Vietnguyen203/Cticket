@@ -1,6 +1,5 @@
 import { buy, createCustomer, createOrganizer, createPublishedEvent } from '../support/api'
-import { E2E_ADMIN } from '../stack.mjs'
-import { expect, signIn, test } from '../support/fixtures'
+import { expect, signIn, signInAdmin, test } from '../support/fixtures'
 
 test('an admin refund: the ticket is void and the organizer’s sales report moves it from revenue to refunds', async ({ browser, api, admin }) => {
   const organizer = await createOrganizer(api, admin)
@@ -23,7 +22,7 @@ test('an admin refund: the ticket is void and the organizer’s sales report mov
   // The admin refunds the B01 order, with a reason.
   const adminContext = await browser.newContext()
   const adminPage = await adminContext.newPage()
-  await signIn(adminPage, E2E_ADMIN.email, E2E_ADMIN.password, `/admin/orders/${refunded.order.id}`)
+  await signInAdmin(adminPage, `/admin/orders/${refunded.order.id}`)
   await adminPage.getByRole('button', { name: 'Hoàn tiền' }).click()
   const dialog = adminPage.getByRole('dialog')
   await dialog.getByLabel('Lý do').fill('Khách xin hủy (E2E)')

@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Vietnguyen203/Cticket/actions/workflows/ci.yml/badge.svg)](https://github.com/Vietnguyen203/Cticket/actions/workflows/ci.yml)
 
-> **English summary.** A ticketing platform for concerts and events, built as a learning project with production habits: a Node.js modular monolith (Express, PostgreSQL, Redis, BullMQ, WebSocket) and a React web app. Buyers pick seats on a **live seat map**, hold them for 10 minutes (and can swap seats in the held order without losing the others), pay (simulated, idempotent) and get **QR tickets**; gate staff scan them with a **phone camera**; organizers build events and seat plans and follow their sales; admins approve, refund and see platform reports. **No seat is ever sold twice**: Redis filters the rush, PostgreSQL row locks and constraints decide (proven by 100-buyers-one-seat tests and a 500-user k6 load test). 269 backend tests, 63 web tests, 12 Playwright end-to-end tests, CI on GitHub Actions. Documentation is in Vietnamese.
+> **English summary.** A ticketing platform for concerts and events, built as a learning project with production habits: a Node.js modular monolith (Express, PostgreSQL, Redis, BullMQ, WebSocket) and a React web app. Buyers pick seats on a **live seat map**, hold them for 10 minutes (and can swap seats in the held order without losing the others), pay (simulated, idempotent) and get **QR tickets**; gate staff scan them with a **phone camera**; organizers build events and seat plans and follow their sales; admins approve, refund and see platform reports. **Two-factor authentication** with an authenticator app (TOTP, written from RFC 6238), required for admins. **No seat is ever sold twice**: Redis filters the rush, PostgreSQL row locks and constraints decide (proven by 100-buyers-one-seat tests and a 500-user k6 load test). 302 backend tests, 66 web tests, 14 Playwright end-to-end tests, CI on GitHub Actions. Documentation is in Vietnamese.
 
 Nền tảng bán vé sự kiện (concert, sân khấu…), làm như một dự án học tập nhưng theo thói quen của sản phẩm thật: thiết kế trước rồi mới code, test ở nhiều tầng, đo tải, tài liệu cho từng phase.
 
@@ -23,6 +23,9 @@ Nền tảng bán vé sự kiện (concert, sân khấu…), làm như một d�
 
 **Nhân viên soát vé**
 - Quét QR bằng **camera điện thoại** ngay trên web (hoặc máy quét cầm tay): màn hình xanh "Mời vào" / đỏ kèm lý do (vé đã dùng lúc nào, ở cổng nào, sai suất…), bộ đếm cập nhật trực tiếp giữa các cổng.
+
+**Tài khoản**
+- **Xác thực hai lớp** bằng ứng dụng trên điện thoại (Google / Microsoft Authenticator, Authy): mã 6 số đổi mỗi 30 giây, 10 mã khôi phục dùng một lần, email cảnh báo khi bật / tắt / bị đặt lại. **Bắt buộc với quản trị viên**; người khác tự chọn bật.
 
 **Quản trị**
 - Duyệt nhà tổ chức và sự kiện, quản lý địa điểm / sơ đồ ghế, danh mục, người dùng và vai trò, đơn hàng và **hoàn tiền**, mã giảm giá, **audit log**, dashboard và báo cáo doanh thu toàn hệ thống.
@@ -51,7 +54,7 @@ flowchart LR
 - **Modular monolith**: 17 module (auth, events, orders, payments, tickets, checkins, reports…), mỗi module `routes → controller → service → repository`, gọi nhau qua API công khai của module.
 - **Không bán trùng ghế**: Redis chặn sớm phần lớn request tranh cùng ghế (gợi ý ghế đã có người lấy, khóa ngắn hạn), **PostgreSQL quyết định** (khóa dòng theo thứ tự cố định, cập nhật có điều kiện, ràng buộc `UNIQUE` / `CHECK`). Redis hỏng thì chậm hơn, không sai.
 - Việc bên ngoài DB (WebSocket, hàng đợi) chỉ chạy **sau khi commit**; worker phát vé, gửi email, hết hạn giữ chỗ, tự phát bù vé nếu job bị mất.
-- Xác thực: access token trong bộ nhớ, refresh token **cookie httpOnly** xoay vòng và phát hiện dùng lại, denylist khi đăng xuất / khóa tài khoản, RBAC.
+- Xác thực: access token trong bộ nhớ, refresh token **cookie httpOnly** xoay vòng và phát hiện dùng lại, denylist khi đăng xuất / khóa tài khoản, RBAC, **2FA (TOTP)** với secret mã hóa AES-256-GCM và mỗi mã chỉ dùng một lần.
 
 Chi tiết: [docs/architecture.md](docs/architecture.md).
 
@@ -80,6 +83,12 @@ Mở `.env`, đặt `POSTGRES_PASSWORD`, `REDIS_PASSWORD` và 3 secret `JWT_ACCE
 node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 ```
 
+và `TOTP_ENCRYPTION_KEY` (đúng 32 byte, mã hóa secret xác thực hai lớp):
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
 Khởi động (lần đầu build vài phút; migration tự chạy):
 
 ```bash
@@ -99,7 +108,7 @@ docker compose exec -e ADMIN_EMAIL=admin@example.com -e ADMIN_PASSWORD=MatKhauMa
 | http://localhost:8025 | Mailpit: hộp thư nhận mọi email (mã OTP khi đăng ký) |
 | http://localhost:3001/health/ready | API (cổng đổi bằng `API_PORT`) |
 
-Đăng ký một tài khoản (lấy mã OTP trong Mailpit), đăng nhập admin để duyệt nhà tổ chức / sự kiện. Muốn gửi email thật thì đặt `SMTP_*` trong `.env`.
+Lần đầu đăng nhập admin, trang sẽ yêu cầu **thiết lập xác thực hai lớp**: quét mã QR bằng ứng dụng xác thực trên điện thoại, nhập mã 6 số, cất 10 mã khôi phục. Đăng ký một tài khoản khách (lấy mã OTP trong Mailpit), đăng nhập admin để duyệt nhà tổ chức / sự kiện. Muốn gửi email thật thì đặt `SMTP_*` trong `.env`.
 
 ## Phát triển
 
@@ -129,9 +138,9 @@ API này nghe cổng 3000 (`PORT` trong `backend/.env`); việc nền chạy b�
 
 | Tầng | Lệnh | Số lượng |
 |---|---|---|
-| Backend (Jest, PostgreSQL + Redis thật) | `cd backend` → `npm test` / `npm run test:coverage` | 269 test, độ phủ 94,8% dòng (CI chặn nếu dưới 90%) |
-| Web (Vitest) | `cd frontend` → `npm test` | 63 test |
-| End-to-end (Playwright) | `cd e2e` → `npm install` → `npx playwright install chromium` → `npm test` | 12 kịch bản (có cảnh 2 trình duyệt cùng xem sơ đồ ghế) |
+| Backend (Jest, PostgreSQL + Redis thật) | `cd backend` → `npm test` / `npm run test:coverage` | 302 test, độ phủ 95,2% dòng (CI chặn nếu dưới 90%) |
+| Web (Vitest) | `cd frontend` → `npm test` | 66 test |
+| End-to-end (Playwright) | `cd e2e` → `npm install` → `npx playwright install chromium` → `npm test` | 14 kịch bản (có cảnh 2 trình duyệt cùng xem sơ đồ ghế, admin thiết lập 2FA lần đầu) |
 | Tải (k6) | xem `docs/testing.md` | 4 kịch bản |
 
 Test đồng thời đáng chú ý: **100 người cùng giữ 1 ghế → đúng 1 người được** (kể cả khi tắt Redis); 2 cổng quét cùng 1 vé cùng lúc → vào đúng 1 lần; cùng `Idempotency-Key` gửi 5 lần → thanh toán 1 lần.
@@ -154,13 +163,13 @@ docs/        Thiết kế từng phase, kiến trúc, kiểm thử, checklist pr
 ## Tài liệu
 
 - [Kiến trúc](docs/architecture.md) · [Kiểm thử](docs/testing.md) · [Checklist production](docs/production-checklist.md)
-- Thiết kế và ghi chú theo phase: [4 sơ đồ ghế, tồn kho](docs/phase-4-inventory-design.md) · [5 đặt chỗ](docs/phase-5-booking-design.md) · [6 Redis](docs/phase-6-redis-design.md) · [7 WebSocket](docs/phase-7-websocket-design.md) · [8 thanh toán](docs/phase-8-payments-design.md) · [9 hàng đợi](docs/phase-9-queue-design.md) · [10 soát vé](docs/phase-10-checkin-design.md) · [11 web](docs/phase-11-web-design.md) · [12 quản trị](docs/phase-12-admin-web-design.md) · [12.4 báo cáo](docs/phase-12.4-reports-design.md) · [13 kiểm thử](docs/phase-13-testing-design.md) · [14 hardening](docs/phase-14-hardening-design.md) · [BKG-02 đổi ghế trong đơn đang giữ](docs/bkg-02-edit-held-order-design.md)
+- Thiết kế và ghi chú theo phase: [4 sơ đồ ghế, tồn kho](docs/phase-4-inventory-design.md) · [5 đặt chỗ](docs/phase-5-booking-design.md) · [6 Redis](docs/phase-6-redis-design.md) · [7 WebSocket](docs/phase-7-websocket-design.md) · [8 thanh toán](docs/phase-8-payments-design.md) · [9 hàng đợi](docs/phase-9-queue-design.md) · [10 soát vé](docs/phase-10-checkin-design.md) · [11 web](docs/phase-11-web-design.md) · [12 quản trị](docs/phase-12-admin-web-design.md) · [12.4 báo cáo](docs/phase-12.4-reports-design.md) · [13 kiểm thử](docs/phase-13-testing-design.md) · [14 hardening](docs/phase-14-hardening-design.md) · [BKG-02 đổi ghế trong đơn đang giữ](docs/bkg-02-edit-held-order-design.md) · [15 xác thực hai lớp](docs/phase-15-two-factor-design.md)
 
 Ảnh chụp màn hình được tạo tự động (`cd e2e` → `npm run screenshots`, dữ liệu mẫu).
 
 ## Giới hạn và hướng phát triển
 
 - **Thanh toán là giả lập**: thay bằng cổng thật (webhook có chữ ký, đối soát) — xem checklist production.
-- Chưa có: xác thực hai lớp, khóa tài khoản sau nhiều lần sai mật khẩu (đã có rate limit theo IP), triển khai lên cloud.
+- Chưa có: khóa tài khoản sau nhiều lần sai mật khẩu (đã có rate limit theo IP), triển khai lên cloud.
 - Ảnh tải lên lưu trên ổ đĩa của API: nhiều máy chủ thì chuyển sang kho chung (S3…).
 - Một tiến trình Node.js dùng một nhân CPU: tải lớn thì chạy nhiều bản API sau load balancer (đã thử trong load test).

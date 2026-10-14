@@ -199,12 +199,18 @@ export interface AdminUser {
   status: 'PENDING_VERIFICATION' | 'ACTIVE' | 'INACTIVE' | 'SUSPENDED'
   emailVerifiedAt: string | null
   roles: Role[]
+  twoFactorEnabled: boolean
   createdAt: string
 }
 
 export async function listUsers(params: { q?: string; role?: Role; status?: string; page?: number; pageSize?: number }) {
   const res = await api.get('/admin/users', { params })
   return { users: res.data.data.users as AdminUser[], meta: res.data.meta as PageMeta }
+}
+
+/** Phase 15: someone lost their phone: two-factor off, logged out everywhere (reason required). */
+export async function resetUserTwoFactor(id: string, reason: string): Promise<AdminUser> {
+  return (await api.post(`/admin/users/${id}/2fa/reset`, { reason })).data.data.user
 }
 
 /** Suspending logs the user out everywhere at once (reason required). */
