@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node src/server.js",
     "worker": "node src/worker.js",
-    "dev": "nodemon --watch src src/server.js",
+    "dev": "node --watch-path=src src/server.js",
     "migrate": "node --env-file-if-exists=.env node_modules/node-pg-migrate/bin/node-pg-migrate.js -m migrations -j sql --migration-filename-format utc",
     "migrate:up": "npm run migrate -- up",
     "migrate:down": "npm run migrate -- down",
@@ -72,7 +72,6 @@
   },
   "devDependencies": {
     "jest": "^30.5.2",
-    "nodemon": "^3.1.14",
     "pino-pretty": "^13.2.0",
     "supertest": "^7.3.1"
   }
