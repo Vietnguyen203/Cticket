@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import * as authApi from '../api/auth'
 import { getMe } from '../api/users'
-import type { Role, User } from '../api/types'
+import type { LoginResult, MfaChallenge, Role, User } from '../api/types'
 import { AuthContext, type AuthStatus, type AuthValue } from './AuthContext'
 import { decodeJwt } from './jwt'
 import { isRemembered, setRemembered } from './remember'
-import { getAccessToken, onAccessTokenChange, refreshAccessToken, setAccessToken } from './session'
+import { getAccessToken, onAccessTokenChange, refreshAccessToken, setAccessToken, takeSessionEndReason } from './session'
 import { isFreshOpen, type PresenceMessage } from './tabPresence'
 
 const SESSION_EXPIRED = 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.'
+const MFA_REQUIRED = 'Tài khoản của bạn cần xác thực hai lớp. Vui lòng đăng nhập lại.'
 
 // Tells the other tabs of this browser about a login / logout (they share the refresh cookie).
 type TabMessage = { type: 'login' } | { type: 'logout' } | PresenceMessage
@@ -73,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (token) return
         setUser(null)
         setStatus('anonymous')
-        if (!loggingOut.current) setNotice(SESSION_EXPIRED)
+        if (!loggingOut.current) setNotice(takeSessionEndReason() === 'MFA_REQUIRED' ? MFA_REQUIRED : SESSION_EXPIRED)
       }),
     [],
   )
@@ -95,8 +96,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => channel.removeEventListener('message', onMessage)
   }, [restore])
 
-  const login = useCallback(async (email: string, password: string, remember = false) => {
-    const result = await authApi.login(email, password, remember)
+  /** A session obtained (password alone, or after the two-factor step): start using it. */
+  const completeLogin = useCallback(async (result: LoginResult, remember: boolean) => {
     setRemembered(remember)
     setAccessToken(result.accessToken)
     // The profile carries the permissions (what menus to show); fall back to the login answer.
@@ -105,6 +106,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setNotice(null)
     channel?.postMessage({ type: 'login' } satisfies TabMessage)
   }, [])
+
+  /** Step 1. With two-factor (Phase 15) there is no session yet: the challenge goes to the login page. */
+  const login = useCallback(
+    async (email: string, password: string, remember = false): Promise<MfaChallenge | null> => {
+      const result = await authApi.login(email, password, remember)
+      if (authApi.isMfaChallenge(result)) return result
+      await completeLogin(result, remember)
+      return null
+    },
+    [completeLogin],
+  )
 
   const logout = useCallback(async () => {
     loggingOut.current = true
@@ -130,6 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       notice,
       clearNotice: () => setNotice(null),
       login,
+      completeLogin,
       logout,
       setUser,
       refreshSession: async () => {
@@ -140,7 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         void restore(true)
       },
     }),
-    [status, user, roles, notice, login, logout, restore],
+    [status, user, roles, notice, login, completeLogin, logout, restore],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

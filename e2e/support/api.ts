@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { expect, type APIRequestContext, type APIResponse } from '@playwright/test'
-import { E2E_ADMIN, MAILPIT_URL } from '../stack.mjs'
+import { E2E_TOTP_SECRET, MAILPIT_URL } from '../stack.mjs'
+import { createAdminAccount } from './db'
+import { totpCode } from './totp'
 
 /**
  * Background data made through the API (fast, stable); the part a test is
@@ -50,12 +52,18 @@ export interface Account {
   id: string
 }
 
-export async function login(api: APIRequestContext, email: string, password = PASSWORD): Promise<Account> {
-  const data = await ok(api.post('auth/login', { data: { email, password } }))
+/** Password, then (Phase 15) the code from the "authenticator app" when the account uses two-factor. */
+export async function login(api: APIRequestContext, email: string, password = PASSWORD, totpSecret = E2E_TOTP_SECRET): Promise<Account> {
+  let data = await ok(api.post('auth/login', { data: { email, password } }))
+  if (data.mfaRequired) data = await ok(api.post('auth/login/2fa', { data: { mfaToken: data.mfaToken, code: totpCode(totpSecret) } }))
   return { email, password, token: data.accessToken, id: data.user.id }
 }
 
-export const loginAdmin = (api: APIRequestContext) => login(api, E2E_ADMIN.email, E2E_ADMIN.password)
+/** A new admin of its own (support/db.ts), signed in with two-factor. */
+export async function loginAdmin(api: APIRequestContext): Promise<Account> {
+  const admin = await createAdminAccount()
+  return login(api, admin.email, admin.password)
+}
 
 /** Registered, email verified (code from Mailpit), signed in. */
 export async function createCustomer(api: APIRequestContext, firstName = 'Khách'): Promise<Account> {

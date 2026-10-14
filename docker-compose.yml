@@ -75,6 +75,9 @@ services:
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?Set JWT_ACCESS_SECRET in .env}
       OTP_SECRET: ${OTP_SECRET:?Set OTP_SECRET in .env}
       QR_SECRET: ${QR_SECRET:?Set QR_SECRET in .env}
+      # Phase 15: encrypts two-factor secrets; roles that must use two-factor.
+      TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:?Set TOTP_ENCRYPTION_KEY in .env}
+      TWO_FACTOR_REQUIRED_ROLES: ${TWO_FACTOR_REQUIRED_ROLES:-ADMIN}
       # Defaults to the local Mailpit inbox; set SMTP_* in .env to send real email.
       SMTP_HOST: ${SMTP_HOST:-mailpit}
       SMTP_PORT: ${SMTP_PORT:-1025}
@@ -124,6 +127,9 @@ services:
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?Set JWT_ACCESS_SECRET in .env}
       OTP_SECRET: ${OTP_SECRET:?Set OTP_SECRET in .env}
       QR_SECRET: ${QR_SECRET:?Set QR_SECRET in .env}
+      # Phase 15: encrypts two-factor secrets; roles that must use two-factor.
+      TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:?Set TOTP_ENCRYPTION_KEY in .env}
+      TWO_FACTOR_REQUIRED_ROLES: ${TWO_FACTOR_REQUIRED_ROLES:-ADMIN}
       # Defaults to the local Mailpit inbox; set SMTP_* in .env to send real email.
       SMTP_HOST: ${SMTP_HOST:-mailpit}
       SMTP_PORT: ${SMTP_PORT:-1025}

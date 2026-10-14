@@ -22,6 +22,15 @@ type Listener = (token: string | null) => void
 let accessToken: string | null = null
 let refreshing: Promise<string | null> | null = null
 const listeners = new Set<Listener>()
+/** Why the API ended the session at the last refresh (e.g. MFA_REQUIRED), for the message shown. */
+let endReason: string | null = null
+
+/** The error code that ended the session, once (then forgotten). */
+export function takeSessionEndReason(): string | null {
+  const reason = endReason
+  endReason = null
+  return reason
+}
 
 /** HTTP client for the refresh call only: no interceptors, so a refresh can never trigger another refresh. */
 export const refreshHttp = axios.create()
@@ -72,6 +81,7 @@ async function requestNewAccessToken(): Promise<string | null> {
   } catch (err) {
     const status = axios.isAxiosError(err) ? err.response?.status : undefined
     if (status === 401 || status === 403) {
+      endReason = axios.isAxiosError(err) ? (err.response?.data?.error?.code ?? null) : null
       setAccessToken(null) // no / expired / revoked session, or disabled account
       return null
     }

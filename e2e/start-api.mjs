@@ -10,7 +10,7 @@ import { execFileSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import os from 'node:os'
 import path from 'node:path'
-import { API_PORT, BACKEND_DIR, E2E_ADMIN, MAILPIT_SMTP_PORT, WEB_URL, stackUrls } from './stack.mjs'
+import { API_PORT, BACKEND_DIR, E2E_ADMIN, E2E_TOTP_SECRET, MAILPIT_SMTP_PORT, WEB_URL, stackUrls } from './stack.mjs'
 
 const require = createRequire(path.join(BACKEND_DIR, 'package.json'))
 const { Client } = require('pg')
@@ -59,6 +59,8 @@ Object.assign(process.env, {
   JWT_ACCESS_SECRET: 'e2e-only-secret-that-is-at-least-32-characters',
   OTP_SECRET: 'e2e-only-otp-secret-at-least-32-characters-long',
   QR_SECRET: 'e2e-only-qr-secret-at-least-32-characters-long',
+  TOTP_ENCRYPTION_KEY: Buffer.from('e2e-only-totp-key-of-32-bytes!!!').toString('base64'),
+  TWO_FACTOR_REQUIRED_ROLES: 'ADMIN',
   SMTP_HOST: 'localhost',
   SMTP_PORT: MAILPIT_SMTP_PORT,
   SMTP_SECURE: 'false',
@@ -78,6 +80,7 @@ Object.assign(process.env, {
   UPLOAD_DIR: path.join(os.tmpdir(), 'etp-e2e-uploads'),
   ADMIN_EMAIL: E2E_ADMIN.email,
   ADMIN_PASSWORD: E2E_ADMIN.password,
+  ADMIN_TOTP_SECRET: E2E_TOTP_SECRET,
 })
 
 // 3. Admin

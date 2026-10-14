@@ -4,9 +4,9 @@ Dự án có 4 tầng kiểm thử, từ nhanh / hẹp tới chậm / rộng:
 
 | Tầng | Công cụ | Số lượng | Chạy ở đâu | Thời gian |
 |---|---|---|---|---|
-| Unit + integration (backend) | Jest + Supertest, PostgreSQL và Redis thật | **269 test**, 25 file | máy dev, CI | ≈ 1–2 phút |
-| Unit (web) | Vitest | **63 test**, 13 file | máy dev, CI | ≈ 2 giây |
-| End-to-end (trình duyệt) | Playwright (Chromium, desktop + điện thoại) | **12 kịch bản** | máy dev, CI | ≈ 45 giây |
+| Unit + integration (backend) | Jest + Supertest, PostgreSQL và Redis thật | **302 test**, 27 file | máy dev, CI | ≈ 1–2 phút |
+| Unit (web) | Vitest | **66 test**, 14 file | máy dev, CI | ≈ 2 giây |
+| End-to-end (trình duyệt) | Playwright (Chromium, desktop + điện thoại) | **14 kịch bản** | máy dev, CI | ≈ 1 phút |
 | Tải (load) | k6 | **4 kịch bản** | chạy tay | 1–5 phút / kịch bản |
 
 Mỗi lần push hoặc mở pull request, **GitHub Actions** chạy 3 tầng đầu (`.github/workflows/ci.yml`). Load test chạy tay vì lâu và số đo phụ thuộc máy.
@@ -25,6 +25,7 @@ Test chạy trên **PostgreSQL và Redis thật** (không giả lập database),
 | Nhóm | File | Số test khai báo |
 |---|---|---|
 | Đăng ký, đăng nhập, OTP, refresh token xoay vòng, cookie | `auth`, `redis-auth` | 37 |
+| Xác thực hai lớp: TOTP (test vector RFC 6238), mã hóa secret, đăng nhập 2 bước, mã khôi phục, refresh chặn phiên thiếu 2FA, admin đặt lại | `two-factor`, `totp` | 32 |
 | Schema, ràng buộc DB, transaction | `schema`, `transaction`, `databaseErrors` | 31 |
 | Sự kiện, suất, hạng vé, duyệt, danh mục, nhà tổ chức, địa điểm đề xuất | `events`, `catalog`, `organizers`, `venue-proposals` | 34 |
 | Sơ đồ ghế, tồn kho, khóa / mở ghế | `inventory` | 16 |
@@ -49,6 +50,7 @@ Các tình huống "nhiều người cùng làm một việc tại cùng một t
 | 50 người cùng giữ 1 ghế (test từ Phase 5) | đúng 1 |
 | 50 người tranh 10 vé đứng cuối cùng | đúng 10 người được |
 | **20 người cùng thêm 1 ghế vào đơn đang giữ của mình** (có và không có Redis) | đúng 1 người được |
+| 5 lần đăng nhập cùng nhập **một mã 2FA** cùng lúc | đúng 1 phiên; mã đã dùng không dùng lại được |
 | Sửa đơn và checkout cùng một đơn cùng lúc | đơn được chốt giá đúng bằng những gì nó đang giữ |
 | 2 người đổi chéo ghế cho nhau cùng lúc (10 cặp) | không deadlock, cả hai bị từ chối gọn gàng |
 | 10 lần khóa 15 vé đứng cùng lúc khi còn 70 | không bao giờ vượt sức chứa |
@@ -66,7 +68,7 @@ Các tình huống "nhiều người cùng làm một việc tại cùng một t
 
 | Statements | Branches | Functions | Lines |
 |---|---|---|---|
-| **93,2%** | **83,1%** | **93,8%** | **94,8%** |
+| **93,5%** | **83,7%** | **94,2%** | **95,2%** |
 
 CI **fail** nếu tụt dưới 90% / 80% / 90% / 90%. Phần thấp: `server.js` và `worker.js` (file khởi động tiến trình, Jest không chạy; E2E và load test chạy chúng).
 
@@ -99,6 +101,8 @@ npm run lint
 
 Trình duyệt thật chạy các luồng chính trên giao diện. Môi trường riêng, **không đụng dữ liệu dev, không gửi mail thật**: database `etp_e2e` (tạo lại mỗi lần chạy), Redis database 14, mail về Mailpit (đọc mã OTP qua API của Mailpit), API cổng 3100 và Vite cổng 5180 do Playwright tự bật / tắt.
 
+Admin bắt buộc xác thực hai lớp (Phase 15): admin của môi trường E2E được tạo với một secret TOTP biết trước, test tự tính mã như ứng dụng trên điện thoại (`e2e/support/totp.ts`). Mỗi mã chỉ dùng được một lần cho mỗi tài khoản, nên mỗi test đăng nhập bằng **một bản sao admin của riêng nó** (`createAdminAccount` trong `e2e/support/db.ts`); các test chạy song song không bao giờ dùng mất mã của nhau.
+
 | Kịch bản | Kiểm tra gì |
 |---|---|
 | Đăng ký → mã trong Mailpit → đăng nhập → tải lại → đăng xuất → đăng nhập lại | cookie refresh httpOnly + SameSite=Strict, không token trong localStorage |
@@ -110,6 +114,7 @@ Trình duyệt thật chạy các luồng chính trên giao diện. Môi trườ
 | **Ban tổ chức tạo sự kiện hoàn toàn bằng giao diện** → admin duyệt → khách thấy và chọn ghế | các form quản trị |
 | Soát vé trên **điện thoại** | vào 1 lần, quét lại bị từ chối, lịch sử |
 | Admin hoàn tiền | vé hết hiệu lực, báo cáo doanh thu của ban tổ chức đổi đúng |
+| **Xác thực hai lớp** (2 test) | admin mới bị buộc thiết lập (đọc khóa trên trang, tính mã như điện thoại), lưu mã khôi phục, đăng nhập lại bằng mã khôi phục; khách tự bật ở trang tài khoản rồi đăng nhập bằng mã |
 | Phân quyền (3 test) | khách không vào được trang admin; ban tổ chức không mở được sự kiện của người khác; chưa đăng nhập → trang đăng nhập rồi quay lại |
 
 E2E đã tìm ra 2 lỗi giao diện (trang chỉnh sửa mở được sự kiện của nhà tổ chức khác; một ô nhập không gắn nhãn) và 1 điểm yếu khi máy quá tải (mã OTP chỉ nằm trong Redis) — xem `docs/phase-13-testing-design.md`, mục 8.

@@ -35,6 +35,14 @@ const OTP = Object.freeze({
   MAX_PER_HOUR: 5,
 });
 
+/** Phase 15: two-factor authentication (TOTP codes come from src/utils/totp.js). */
+const TWO_FACTOR = Object.freeze({
+  // Between the password and the code: how long the login may wait, and how many wrong codes it gets.
+  MFA_TOKEN_TTL_SECONDS: 300,
+  MAX_ATTEMPTS: 5,
+  RECOVERY_CODES: 10,
+});
+
 const PASSWORD = Object.freeze({
   MIN_LENGTH: 8,
   // bcrypt ignores everything after 72 BYTES. Vietnamese letters take 2-3
@@ -170,6 +178,7 @@ module.exports = {
   USER_STATUS,
   OTP_PURPOSE,
   OTP,
+  TWO_FACTOR,
   PASSWORD,
   ORGANIZER_STATUS,
   EVENT_STATUS,

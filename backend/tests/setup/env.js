@@ -29,6 +29,9 @@ process.env.RATE_LIMIT_ENABLED = 'false';
 process.env.JWT_ACCESS_SECRET ??= TEST_SECRET;
 process.env.OTP_SECRET ??= TEST_SECRET;
 process.env.QR_SECRET ??= TEST_SECRET;
+// 32 bytes, base64: encrypts TOTP secrets (Phase 15). Admins must use two-factor, as in production.
+process.env.TOTP_ENCRYPTION_KEY ??= Buffer.from('test-only-totp-key-of-32-bytes!!').toString('base64');
+process.env.TWO_FACTOR_REQUIRED_ROLES = 'ADMIN';
 // Jobs run inline, inside the request, so tests see emails and tickets at
 // once; the queue tests switch to real BullMQ workers.
 process.env.QUEUE_MODE = 'inline';

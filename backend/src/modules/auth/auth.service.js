@@ -1,7 +1,6 @@
-const { randomUUID } = require('node:crypto');
 const bcrypt = require('bcrypt');
 const env = require('../../config/env');
-const { ROLES, USER_STATUS, OTP_PURPOSE } = require('../../config/constants');
+const { ROLES, USER_STATUS, OTP_PURPOSE, TWO_FACTOR } = require('../../config/constants');
 const { pool } = require('../../database/pool');
 const { withTransaction } = require('../../database/transaction');
 const AppError = require('../../utils/AppError');
@@ -11,6 +10,8 @@ const authRepository = require('./auth.repository');
 const tokens = require('./auth.tokens');
 const otpService = require('./otp.service');
 const denylist = require('./denylist');
+const sessions = require('./sessions');
+const twoFactor = require('./two-factor.service');
 
 /** Account status a user must have to receive / use a code for each purpose. */
 const REQUIRED_STATUS = {
@@ -31,24 +32,6 @@ let dummyHashPromise;
 function getDummyHash() {
   dummyHashPromise ??= hashPassword('timing-equalizer-not-a-real-password');
   return dummyHashPromise;
-}
-
-async function issueRefreshToken(db, { userId, familyId, meta }) {
-  const { token, hash } = tokens.createRefreshToken();
-  const id = await authRepository.insertRefreshToken(db, {
-    userId,
-    tokenHash: hash,
-    familyId,
-    ttlDays: env.REFRESH_TOKEN_TTL_DAYS,
-    ipAddress: meta.ip,
-    userAgent: meta.userAgent,
-  });
-  return { id, token };
-}
-
-function buildTokenResponse({ userId, roles, refreshToken }) {
-  const { accessToken, expiresIn } = tokens.signAccessToken({ id: userId, roles });
-  return { tokenType: 'Bearer', accessToken, expiresIn, refreshToken };
 }
 
 // ---------------------------------------------------------------------------
@@ -137,7 +120,12 @@ async function verifyOtp({ email, purpose, otp, newPassword }) {
 // Sessions
 // ---------------------------------------------------------------------------
 
-async function login({ email, password }, meta) {
+/**
+ * Step 1 of a login. With two-factor (Phase 15) the answer is not a session
+ * yet but an mfaToken for step 2: { mfaRequired } (enter a code) or
+ * { mfaSetupRequired } (a role that requires two-factor, not set up yet).
+ */
+async function login({ email, password, remember }, meta) {
   const user = await users.findByEmail(pool, email);
   const passwordMatches = await bcrypt.compare(password, user?.password_hash ?? (await getDummyHash()));
 
@@ -154,13 +142,15 @@ async function login({ email, password }, meta) {
   }
 
   const roles = await users.findRoleCodes(pool, user.id);
-  // A new login starts a new token family (= one session on one device).
-  const refreshToken = await issueRefreshToken(pool, { userId: user.id, familyId: randomUUID(), meta });
-
-  return {
-    ...buildTokenResponse({ userId: user.id, roles, refreshToken: refreshToken.token }),
-    user: users.toPublicUser(user, roles),
-  };
+  const challenge = await twoFactor.loginChallenge(pool, user, roles);
+  if (challenge) {
+    return {
+      [challenge === 'verify' ? 'mfaRequired' : 'mfaSetupRequired']: true,
+      mfaToken: tokens.signMfaToken({ userId: user.id, purpose: challenge, remember }),
+      expiresIn: TWO_FACTOR.MFA_TOKEN_TTL_SECONDS,
+    };
+  }
+  return sessions.openSession(pool, { user, roles, meta });
 }
 
 /**
@@ -189,11 +179,23 @@ async function refresh({ refreshToken }, meta) {
       await authRepository.revokeRefreshTokenFamily(client, current.family_id);
       return { error: 'ACCOUNT_DISABLED' };
     }
-
-    const next = await issueRefreshToken(client, { userId: current.user_id, familyId: current.family_id, meta });
-    await authRepository.markRefreshTokenRotated(client, current.id, next.id);
     // Roles are re-read here, so a role change takes effect at the next refresh.
     const roles = await users.findRoleCodes(client, current.user_id);
+    // Phase 15: a session opened without two-factor ends for a user who needs
+    // it (sessions from before, a user just made an admin, other devices of
+    // someone who just turned it on).
+    if (!current.mfa && (await twoFactor.needsTwoFactor(client, current.user_id, roles))) {
+      await authRepository.revokeRefreshTokenFamily(client, current.family_id);
+      return { error: 'MFA_REQUIRED' };
+    }
+
+    const next = await sessions.issueRefreshToken(client, {
+      userId: current.user_id,
+      familyId: current.family_id,
+      meta,
+      mfa: current.mfa,
+    });
+    await authRepository.markRefreshTokenRotated(client, current.id, next.id);
     return { userId: current.user_id, roles, refreshToken: next.token };
   });
 
@@ -201,7 +203,7 @@ async function refresh({ refreshToken }, meta) {
   if (outcome.error) {
     throw new AppError(outcome.error);
   }
-  return buildTokenResponse(outcome);
+  return sessions.buildTokenResponse(outcome);
 }
 
 /**

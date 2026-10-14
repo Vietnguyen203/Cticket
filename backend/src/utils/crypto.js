@@ -43,4 +43,33 @@ function safeEqualHex(a, b) {
   return left.length === right.length && crypto.timingSafeEqual(left, right);
 }
 
-module.exports = { randomToken, sha256, hmacSha256, randomNumericCode, safeEqualHex };
+const ENCRYPTION_VERSION = 'v1';
+const GCM_IV_BYTES = 12;
+
+/**
+ * Encrypt a secret the server must be able to READ again later (a TOTP
+ * secret: a hash would not do, the server computes codes from it).
+ * AES-256-GCM: a fresh random IV per value, and an auth tag, so a value that
+ * was tampered with fails to decrypt instead of decrypting to garbage.
+ * Stored as "v1:iv:tag:ciphertext" (base64url); the version allows a key
+ * change later.
+ * @param {string} plaintext
+ * @param {Buffer} key 32 bytes
+ */
+function encryptSecret(plaintext, key) {
+  const iv = crypto.randomBytes(GCM_IV_BYTES);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const data = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  return [ENCRYPTION_VERSION, iv, cipher.getAuthTag(), data].map((part) => (Buffer.isBuffer(part) ? part.toString('base64url') : part)).join(':');
+}
+
+/** @throws if the value was tampered with or encrypted with another key */
+function decryptSecret(box, key) {
+  const [version, iv, tag, data] = box.split(':');
+  if (version !== ENCRYPTION_VERSION || !iv || !tag || data === undefined) throw new Error('Unknown encrypted value format');
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(iv, 'base64url'));
+  decipher.setAuthTag(Buffer.from(tag, 'base64url'));
+  return Buffer.concat([decipher.update(Buffer.from(data, 'base64url')), decipher.final()]).toString('utf8');
+}
+
+module.exports = { randomToken, sha256, hmacSha256, randomNumericCode, safeEqualHex, encryptSecret, decryptSecret };

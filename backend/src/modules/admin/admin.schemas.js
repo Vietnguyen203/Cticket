@@ -26,6 +26,9 @@ const setUserRoles = z.object({
   roles: z.array(z.enum(Object.values(ROLES))).max(Object.values(ROLES).length),
 });
 
+// Phase 15: why an admin turned someone's two-factor off (kept in the audit log).
+const resetTwoFactor = z.object({ reason: z.string().trim().min(3).max(500) });
+
 const listAuditQuery = z.object({
   entityType: z.string().trim().min(1).max(100).optional(),
   entityId: z.uuid().optional(),
@@ -36,4 +39,4 @@ const listAuditQuery = z.object({
   ...paginationQuery,
 });
 
-module.exports = { idParams, listUsersQuery, changeUserStatus, setUserRoles, listAuditQuery };
+module.exports = { idParams, listUsersQuery, changeUserStatus, setUserRoles, resetTwoFactor, listAuditQuery };

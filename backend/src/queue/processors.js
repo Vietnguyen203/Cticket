@@ -48,6 +48,7 @@ const HANDLERS = {
   },
   [QUEUE.EMAILS]: {
     otp: (data) => auth.sendOtpEmail(data),
+    'two-factor-alert': (data) => auth.sendTwoFactorAlert(data),
     'order-confirmed': sendOrderConfirmation,
     'order-refunded': sendRefundConfirmation,
   },

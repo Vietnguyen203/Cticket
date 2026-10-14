@@ -6,7 +6,7 @@ const authenticate = require('../../src/middleware/authenticate');
 const authorize = require('../../src/middleware/authorize');
 const errorHandler = require('../../src/middleware/errorHandler');
 const { seedAdmin } = require('../../src/scripts/seedAdmin');
-const { useFakeMailbox, uniqueEmail, login, createLoggedInUser } = require('../helpers/auth');
+const { useFakeMailbox, uniqueEmail, login, createLoggedInUser, loginWithTwoFactor, ADMIN_TOTP_SECRET } = require('../helpers/auth');
 
 const app = createApp();
 const mailbox = useFakeMailbox();
@@ -33,8 +33,14 @@ describe('seedAdmin (npm run seed:admin)', () => {
     expect(first.created).toBe(true);
     expect(second).toMatchObject({ userId: first.userId, created: false });
 
-    // The second run did not overwrite the password.
-    const res = await login(app, email, password).expect(200);
+    // The second run did not overwrite the password: it is still right, and
+    // an admin without two-factor is sent to set it up first (Phase 15).
+    const first2 = await login(app, email, password).expect(200);
+    expect(first2.body.data).toMatchObject({ mfaSetupRequired: true, mfaToken: expect.any(String) });
+    expect(first2.body.data.accessToken).toBeUndefined();
+
+    await seedAdmin({ email, password, totpSecret: ADMIN_TOTP_SECRET });
+    const res = await loginWithTwoFactor(app, email, password);
     expect(res.body.data.user.roles).toEqual(['ADMIN']);
 
     const me = await request(app)
@@ -60,8 +66,8 @@ describe('authorize(permission)', () => {
 
   test('an ADMIN is allowed', async () => {
     const email = uniqueEmail();
-    await seedAdmin({ email, password: 'AdminPass123' });
-    const { body } = await login(app, email, 'AdminPass123').expect(200);
+    await seedAdmin({ email, password: 'AdminPass123', totpSecret: ADMIN_TOTP_SECRET });
+    const { body } = await loginWithTwoFactor(app, email, 'AdminPass123');
 
     await request(protectedApp)
       .get('/admin-only')

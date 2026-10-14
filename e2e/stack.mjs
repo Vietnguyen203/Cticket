@@ -27,6 +27,12 @@ export const MAILPIT_SMTP_PORT = process.env.MAILPIT_SMTP_PORT ?? '1025'
 
 /** The admin seeded into the E2E database at every run (test-only account). */
 export const E2E_ADMIN = { email: 'admin@e2e.test', password: 'E2e-Admin-Pass-2026' }
+/**
+ * Phase 15: admins must use two-factor. The seeded admin's TOTP secret is known
+ * here, so tests compute its codes (support/totp.ts); every admin a test signs
+ * in as is a copy of it (support/db.ts), each with its own "last used step".
+ */
+export const E2E_TOTP_SECRET = 'KRSXG5CTMVRXEZLUKN2XAZLSKNSWG4TF'
 
 /** Read only the two TEST_* addresses from backend/.env, never the rest (it may hold real SMTP credentials). */
 function testAddresses() {

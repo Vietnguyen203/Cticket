@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const authRoutes = require('./modules/auth/auth.routes');
 const usersRoutes = require('./modules/users/users.routes');
+const twoFactorRoutes = require('./modules/auth/two-factor.routes');
 const categoriesRoutes = require('./modules/categories/categories.routes');
 const { venuesRouter, zonesRouter, seatsRouter } = require('./modules/venues/venues.routes');
 const organizersRoutes = require('./modules/organizers/organizers.routes');
@@ -19,6 +20,7 @@ const { checkInsRouter, scheduleCheckInsRouter } = require('./modules/checkins/c
 const apiRouter = Router();
 
 apiRouter.use('/auth', authRoutes);
+apiRouter.use('/users/me/2fa', twoFactorRoutes); // Phase 15: my two-factor settings
 apiRouter.use('/users', usersRoutes);
 apiRouter.use('/categories', categoriesRoutes);
 apiRouter.use('/venues', venuesRouter);

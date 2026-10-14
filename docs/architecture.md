@@ -38,7 +38,7 @@ flowchart LR
 
 | Module | Việc |
 |---|---|
-| `auth` | Đăng ký, OTP email, đăng nhập, refresh token xoay vòng, đăng xuất, denylist |
+| `auth` | Đăng ký, OTP email, đăng nhập, xác thực hai lớp (TOTP), refresh token xoay vòng, đăng xuất, denylist |
 | `users` | Hồ sơ, vai trò và quyền (RBAC, bảng quyền cache trong bộ nhớ) |
 | `organizers` | Đăng ký làm nhà tổ chức, duyệt |
 | `categories`, `venues` | Danh mục; địa điểm, khu, ghế (sinh hàng loạt), địa điểm do nhà tổ chức đề xuất |
@@ -117,6 +117,11 @@ sequenceDiagram
 - JavaScript của trang **không đọc được** refresh token (httpOnly) → XSS không lấy được phiên lâu dài; CSP chặn script chèn vào trang.
 - Nhiều tab: chỉ **một** tab refresh tại một thời điểm (Web Locks), các tab báo nhau đăng nhập / đăng xuất (BroadcastChannel).
 - Đăng xuất / khóa tài khoản / gỡ quyền → **denylist** trong Redis (theo `jti` và theo thời điểm của người dùng): access token cũ bị từ chối ngay, không phải chờ hết 15 phút.
+- **Xác thực hai lớp** (Phase 15, TOTP theo RFC 6238, bắt buộc với admin):
+  - Sau mật khẩu, API chỉ trả một `mfaToken` 5 phút; nhập mã 6 số (hoặc mã khôi phục) mới có phiên.
+  - Secret được mã hóa AES-256-GCM; mỗi mã chỉ dùng một lần (`last_used_step`, compare-and-set).
+  - Refresh từ chối phiên không mở bằng 2FA của người cần 2FA (`MFA_REQUIRED`).
+  - Chi tiết: `docs/phase-15-two-factor-design.md`.
 - **RBAC**: vai trò → quyền; mỗi API kiểm tra quyền, dữ liệu "của mình" kiểm tra thêm quyền sở hữu (không phải của mình → 404, không xác nhận là có tồn tại).
 
 ## 6. Real-time

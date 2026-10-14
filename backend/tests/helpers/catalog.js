@@ -1,7 +1,7 @@
 const { randomUUID } = require('node:crypto');
 const request = require('supertest');
 const { seedAdmin } = require('../../src/scripts/seedAdmin');
-const { uniqueEmail, login, createLoggedInUser } = require('./auth');
+const { uniqueEmail, createLoggedInUser, loginWithTwoFactor, ADMIN_TOTP_SECRET } = require('./auth');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HOUR_MS = 60 * 60 * 1000;
@@ -17,11 +17,12 @@ function at(daysFromNow, hour = 12) {
   return new Date(midnight.getTime() + daysFromNow * DAY_MS + hour * HOUR_MS);
 }
 
+/** A new admin, signed in with two-factor (required for admins since Phase 15). */
 async function createAdmin(app) {
   const email = uniqueEmail();
-  await seedAdmin({ email, password: ADMIN_PASSWORD });
-  const res = await login(app, email, ADMIN_PASSWORD).expect(200);
-  return { email, token: res.body.data.accessToken };
+  await seedAdmin({ email, password: ADMIN_PASSWORD, totpSecret: ADMIN_TOTP_SECRET });
+  const res = await loginWithTwoFactor(app, email, ADMIN_PASSWORD);
+  return { email, password: ADMIN_PASSWORD, token: res.body.data.accessToken };
 }
 
 /**
