@@ -26,6 +26,8 @@ export default defineConfig({
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'] }, testIgnore: /\.mobile\.spec\.ts$/ },
     { name: 'mobile', use: { ...devices['Pixel 7'] }, testMatch: /\.mobile\.spec\.ts$/ },
+    // README images (npm run screenshots); never part of npm test / CI.
+    { name: 'screenshots', testDir: './screenshots', use: { ...devices['Desktop Chrome'] } },
   ],
   webServer: [
     {

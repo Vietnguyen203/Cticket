@@ -93,7 +93,7 @@ services:
     volumes:
       - uploads:/app/uploads
     ports:
-      - "${API_PORT:-3000}:3000"
+      - "${API_PORT:-3001}:3000"
     depends_on:
       postgres:
         condition: service_healthy
