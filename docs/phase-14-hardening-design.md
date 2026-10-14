@@ -1,4 +1,4 @@
-# Phase 14 — Hardening và tài liệu (đã duyệt, đang triển khai)
+# Phase 14 — Hardening và tài liệu (đã duyệt, đã triển khai)
 
 > Mục tiêu: dự án **an toàn khi chạy thật**, **nhanh ở những chỗ đã đo thấy chậm**, và **người khác mở repo là hiểu và chạy được trong vài phút** (README, kiến trúc, ảnh chụp) — đây cũng là thứ người phỏng vấn nhìn đầu tiên.
 
@@ -112,3 +112,11 @@ Mỗi bước bạn thử rồi commit, nhánh `feature/phase-14-hardening` (đ�
 - **Tìm đơn hàng của admin** (mã đơn hoặc email người mua) **quét toàn bộ bảng đơn**: `ILIKE 'mã%'` không dùng được index thường, và `mã OR email` làm PostgreSQL bỏ mọi index. Sửa: index `orders (order_code text_pattern_ops)` (migration `20261014200001000_order-code-prefix-index`), mã đơn so khớp bằng `LIKE upper(q) || '%'`, hai điều kiện thành hai truy vấn con `UNION ALL` mỗi cái một index. Kết quả: tìm theo email **10,7 → 1,1 ms**, theo đầu mã đơn **18,7 → 4,7 ms**. Trang đầu không tìm kiếm vẫn đọc hết để đếm tổng số đơn (10 ms với 23 nghìn đơn) — chấp nhận cho trang admin; nếu hàng triệu đơn thì chuyển sang số ước lượng hoặc phân trang theo con trỏ.
 - **Cỡ pool kết nối**: hướng dẫn trong `docs/production-checklist.md` mục 6.
 - Test: backend 254 pass (thêm 1), E2E 11/11.
+
+### Bước 14.3 (xong): tài liệu
+
+- **`README.md`** viết lại (trước đó chỉ có một dòng tiêu đề, lưu dạng UTF-16 nên GitHub coi là file nhị phân; giờ là UTF-8): đoạn tóm tắt tiếng Anh, tính năng theo vai trò, 8 ảnh chụp, sơ đồ Mermaid, công nghệ, chạy nhanh bằng Docker (từng lệnh, lưu ý PowerShell 5.1), phát triển, kiểm thử và kết quả load test, cấu trúc thư mục, danh sách tài liệu, badge CI, giới hạn và hướng phát triển. Không ghi mật khẩu mặc định: README hướng dẫn tạo admin bằng `seed:admin` với `ADMIN_EMAIL` / `ADMIN_PASSWORD` riêng (API trong Docker chạy `NODE_ENV=production`, script từ chối mật khẩu mặc định).
+- **`docs/architecture.md`**: tổng quan (Mermaid), 17 module và ranh giới, luồng đặt chỗ ba lớp (Redis lọc → PostgreSQL quyết định → ràng buộc DB), việc chỉ chạy sau COMMIT, thanh toán và vé, xác thực, real-time, cache và khi Redis hỏng, hàng đợi, web app.
+- **Ảnh chụp tự động**: `e2e/screenshots/readme.spec.ts`, project Playwright `screenshots`, lệnh `npm run screenshots` trong `e2e/` (cần `docker compose up -d postgres redis mailpit`). Dựng dữ liệu mẫu trên database `etp_e2e` (3 sự kiện có tên, địa điểm đọc được; vài đơn đã bán, 2 ghế đang bị giữ, vé đứng, mã giảm giá) rồi chụp 8 trang vào `docs/images/`. Để ảnh ổn định: đưa chuột ra góc và bỏ focus trước khi chụp, tắt animation CSS, chờ phần tải chậm (khóa / mở ghế), chụp cảnh soát vé **sau cùng** (mở cổng soát vé dời suất diễn về hôm nay, làm đổi các trang khác). `npm test` vẫn chỉ chạy project `desktop` và `mobile`.
+- **`.env.example`**: backend thêm `UPLOAD_DIR`, `JWT_ISSUER` / `JWT_AUDIENCE`, `REDIS_COMMAND_TIMEOUT_MS`, `RATE_LIMIT_ENABLED`, sửa chú thích tài khoản admin mặc định (chỉ cho dev); mọi biến trong `backend/src/config/env.js` đều có mặt. Gốc thêm `WEB_PORT`, `WEB_HTTPS_PORT`, cổng Mailpit, giải thích `TRUST_PROXY`.
+- **Cổng API trong Docker: 3000 → 3001** (`.env.example` gốc và giá trị mặc định trong `docker-compose.yml`). Vite và các tài liệu phase 7, 11 vốn chuyển tiếp / gọi tới `localhost:3001`, còn `.env.example` lại ghi 3000: người làm theo README sẽ có web dev không gọi được API. Cổng 3000 để cho API chạy ngoài Docker (`npm run dev` trong `backend`). Máy đã có `.env` với `API_PORT` thì không đổi gì.
