@@ -2,6 +2,7 @@ const request = require('supertest');
 const { createApp } = require('../../src/app');
 const { query, closePool } = require('../../src/database/pool');
 const { redis } = require('../../src/redis/client');
+const { invalidate, NAMESPACE } = require('../../src/redis/cache');
 const { useFakeMailbox } = require('../helpers/auth');
 const { bearer, createAdmin, createOrganizer, createCategory, changeStatus } = require('../helpers/catalog');
 const { createConfiguredEvent, publishEvent } = require('../helpers/inventory');
@@ -93,6 +94,30 @@ describe('cache-aside with versioned invalidation', () => {
     const [buyer] = await createCustomers(1);
     await book(app, buyer.token, schedule.id, { seatIds: [seats[0].id] }).expect(201);
     expect((await seatMap()).status).toBe('HELD'); // no waiting for any TTL
+  });
+
+  test('seat map layout is kept in process memory, and dropped as soon as the catalog changes', async () => {
+    const { schedule, seats } = await publishedEvent();
+    const priceOfA01 = async () =>
+      (await request(app).get(`/api/v1/schedules/${schedule.id}/seat-map`).expect(200)).body.data.zones
+        .find((z) => z.code === 'A')
+        .seats.find((s) => s.code === 'A01').price;
+    expect(await priceOfA01()).toBe(2_000_000); // first read: loaded and kept
+
+    const layoutReads = jest.spyOn(redis, 'get');
+    try {
+      expect(await priceOfA01()).toBe(2_000_000);
+      const keys = layoutReads.mock.calls.map(([key]) => key);
+      expect(keys.some((key) => key.includes(':seatmap:'))).toBe(false); // the 0.5 MB value did not come from Redis
+      expect(keys.some((key) => key.includes('cache:ver:catalog'))).toBe(true); // the version still did
+    } finally {
+      layoutReads.mockRestore();
+    }
+
+    // Any catalog write bumps the version: the kept layout is never read again.
+    await query(`UPDATE schedule_seats SET price = 2_500_000 WHERE schedule_id = $1 AND seat_id = $2`, [schedule.id, seats[0].id]);
+    await invalidate(NAMESPACE.CATALOG);
+    expect(await priceOfA01()).toBe(2_500_000);
   });
 
   test('venue layout: a new zone shows up immediately', async () => {

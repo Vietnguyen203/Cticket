@@ -115,7 +115,16 @@ async function list(db, { userId, scheduleId, status, q, limit, offset }) {
   if (scheduleId) add('o.schedule_id = ?', scheduleId);
   if (status) add('o.status = ?::order_status', status);
   // Admin search (ORD-05): the start of an order code, or the buyer's exact email.
-  if (q) add(`(o.order_code ILIKE ? || '%' OR o.user_id IN (SELECT id FROM users WHERE email = lower($${params.length + 1})))`, q);
+  // Two index lookups glued with UNION ALL (Phase 14.2): an OR across them made
+  // PostgreSQL read every order. Codes are upper case (idx_orders_order_code_prefix).
+  if (q) {
+    add(
+      `o.id IN (SELECT id FROM orders WHERE order_code LIKE upper(?) || '%'
+                UNION ALL
+                SELECT bo.id FROM orders bo JOIN users bu ON bu.id = bo.user_id WHERE bu.email = lower($${params.length + 1}))`,
+      q,
+    );
+  }
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
   const { rows } = await db.query(

@@ -102,3 +102,13 @@ Mỗi bước bạn thử rồi commit, nhánh `feature/phase-14-hardening` (đ�
 - **`docs/production-checklist.md`**: bí mật, tài khoản, HTTPS / HSTS / `TRUST_PROXY` / keep-alive, email, sao lưu (Redis không lưu đĩa: vé và đơn tự lành nhờ job bảo trì, email đang chờ có thể mất), sức chứa kết nối DB, quan sát, cập nhật dependency, cổng thanh toán thật.
 - Dọn chú thích lỗi thời trong `app.js`.
 - Test: backend 253 pass.
+
+### Bước 14.2 (xong): hiệu năng
+
+- **Sơ đồ ghế: bố cục giữ sẵn trong bộ nhớ của tiến trình** (`remember(..., { local: true })` trong `backend/src/redis/cache.js`, chỉ dùng cho bố cục sơ đồ ghế). Khóa có số phiên bản của cache (vẫn đọc từ Redis mỗi lần, nên mọi bản API thấy cùng lúc khi dữ liệu đổi): ghi vào catalog → phiên bản tăng → bản trong bộ nhớ không bao giờ được đọc lại; tối đa 50 mục, hết hạn theo TTL. Test: lần đọc thứ hai không lấy bố cục từ Redis; đổi giá rồi invalidate → thấy giá mới ngay.
+  - **Đo trực tiếp phần việc đã bỏ** (200 lần liên tiếp): mỗi lần mở sơ đồ 2.000 ghế bớt **≈ 5,2 ms** (đọc 396 KB từ Redis 4,2 ms + phân tích JSON 1 ms trên luồng chính của Node); ở 95 lượt mở / giây (load test) bớt **≈ 37 MB/giây** lưu lượng API ↔ Redis.
+  - **Đo bằng k6 (200 VU) không kết luận được**: máy đang có tải khác, hai lần đo *cùng code cũ* cho p95 104 ms và 600 ms. Không dùng các số này để so sánh (kết quả thô trong `loadtest/results/`, không commit).
+- **EXPLAIN ANALYZE 11 truy vấn nóng** trên `etp_load` (23.309 đơn, 2.000 ghế, 2.002 người dùng): trạng thái ghế, còn chỗ theo hạng vé, giỏ đang mở của khách, đơn giữ chỗ hết hạn, khóa ghế khi giữ chỗ, đơn của tôi, vé của tôi, dòng đơn / thanh toán / vé của một đơn — **đều dùng index, < 1,1 ms** (riêng trạng thái ghế / còn chỗ quét cả `schedule_seats` vì lấy hết 2.000 ghế của suất: đúng).
+- **Tìm đơn hàng của admin** (mã đơn hoặc email người mua) **quét toàn bộ bảng đơn**: `ILIKE 'mã%'` không dùng được index thường, và `mã OR email` làm PostgreSQL bỏ mọi index. Sửa: index `orders (order_code text_pattern_ops)` (migration `20261014200001000_order-code-prefix-index`), mã đơn so khớp bằng `LIKE upper(q) || '%'`, hai điều kiện thành hai truy vấn con `UNION ALL` mỗi cái một index. Kết quả: tìm theo email **10,7 → 1,1 ms**, theo đầu mã đơn **18,7 → 4,7 ms**. Trang đầu không tìm kiếm vẫn đọc hết để đếm tổng số đơn (10 ms với 23 nghìn đơn) — chấp nhận cho trang admin; nếu hàng triệu đơn thì chuyển sang số ước lượng hoặc phân trang theo con trỏ.
+- **Cỡ pool kết nối**: hướng dẫn trong `docs/production-checklist.md` mục 6.
+- Test: backend 254 pass (thêm 1), E2E 11/11.

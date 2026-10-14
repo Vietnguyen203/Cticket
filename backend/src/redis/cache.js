@@ -24,15 +24,42 @@ const versionKey = (namespace) => `cache:ver:${namespace}`;
 // for that result instead of all querying PostgreSQL at the same moment.
 const inFlight = new Map();
 
+// Process memory for a few large, read-mostly values (option `local`): the
+// layout of a 2.000-seat map is ~0.5 MB of JSON that every seat page would
+// otherwise fetch from Redis and parse again (Phase 14.2). The versioned key
+// keeps it right: an invalidation bumps the version (read from Redis on every
+// call, so all API instances see it), the key changes, the old entry is never
+// read again. Values are SHARED between requests: callers must not mutate them.
+const LOCAL_MAX_ENTRIES = 50;
+const local = new Map(); // fullKey -> { value, expiresAt }
+
+function readLocal(fullKey) {
+  const entry = local.get(fullKey);
+  if (!entry) return undefined;
+  if (entry.expiresAt <= Date.now()) {
+    local.delete(fullKey);
+    return undefined;
+  }
+  return entry.value;
+}
+
+function writeLocal(fullKey, value, ttlSeconds) {
+  if (value === null) return;
+  local.delete(fullKey); // re-insert: Map order = age, the oldest goes first
+  local.set(fullKey, { value, expiresAt: Date.now() + ttlSeconds * 1000 });
+  if (local.size > LOCAL_MAX_ENTRIES) local.delete(local.keys().next().value);
+}
+
 /**
  * @template T
  * @param {string} namespace
  * @param {string} key
  * @param {number} ttlSeconds
  * @param {() => Promise<T|null>} loader  null / undefined results are not cached
+ * @param {{ local?: boolean }} [options]  local: also keep the parsed value in this process
  * @returns {Promise<T|null>}  always JSON-shaped (dates as ISO strings), cached or not
  */
-async function remember(namespace, key, ttlSeconds, loader) {
+async function remember(namespace, key, ttlSeconds, loader, { local: keepLocal = false } = {}) {
   const toJson = (value) => (value === null || value === undefined ? null : JSON.parse(JSON.stringify(value)));
 
   const version = await tryRedis('cache version', () => redis.get(versionKey(namespace)), undefined);
@@ -40,15 +67,24 @@ async function remember(namespace, key, ttlSeconds, loader) {
     return toJson(await loader()); // Redis down: no cache, straight to PostgreSQL
   }
   const fullKey = `cache:${namespace}:v${version ?? 0}:${key}`;
+  if (keepLocal) {
+    const kept = readLocal(fullKey);
+    if (kept !== undefined) return kept;
+  }
 
   const hit = await tryRedis('cache read', () => redis.get(fullKey), null);
-  if (hit !== null) return JSON.parse(hit);
+  if (hit !== null) {
+    const value = JSON.parse(hit);
+    if (keepLocal) writeLocal(fullKey, value, ttlSeconds);
+    return value;
+  }
 
   if (!inFlight.has(fullKey)) {
     const load = (async () => {
       const value = toJson(await loader());
       if (value !== null) {
         await tryRedis('cache write', () => redis.set(fullKey, JSON.stringify(value), 'EX', ttlSeconds), null);
+        if (keepLocal) writeLocal(fullKey, value, ttlSeconds);
       }
       return value;
     })().finally(() => inFlight.delete(fullKey));
@@ -102,4 +138,9 @@ const TTL = Object.freeze({
   SEAT_MAP_LAYOUT: 3600,
 });
 
-module.exports = { remember, invalidate, invalidatesAfter, keyOf, NAMESPACE, TTL };
+/** For tests: forget what this process keeps in memory. */
+function clearLocalCache() {
+  local.clear();
+}
+
+module.exports = { clearLocalCache, remember, invalidate, invalidatesAfter, keyOf, NAMESPACE, TTL };
