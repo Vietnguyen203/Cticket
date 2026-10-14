@@ -1,13 +1,26 @@
 import { useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { listEventsByStatus, type EventStatus } from '../../api/admin'
 import { EmptyRow, PageHeader, Pagination, StatusBadge, TableCard, Tabs } from '../../admin/components'
 import { Alert, Button } from '../../components/ui'
 import { formatDateTime } from '../../utils/format'
 import { useAsync } from '../../utils/useAsync'
 
+type Tab = EventStatus | 'ALL'
+
+const TABS: Array<[Tab, string]> = [
+  ['ALL', 'Tất cả'],
+  ['PENDING_APPROVAL', 'Chờ duyệt'],
+  ['PUBLISHED', 'Đang bán'],
+  ['DRAFT', 'Nháp'],
+  ['CANCELLED', 'Đã hủy'],
+  ['FINISHED', 'Đã diễn'],
+]
+
+/** Every event of the platform, by status. The tab lives in the URL (?status=…), so "back" returns to it. */
 export function EventsReviewPage() {
-  const [status, setStatus] = useState<EventStatus>('PENDING_APPROVAL')
+  const [params, setParams] = useSearchParams()
+  const status: Tab = TABS.find(([key]) => key === params.get('status'))?.[0] ?? 'ALL'
   const [q, setQ] = useState('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -18,20 +31,14 @@ export function EventsReviewPage() {
 
   return (
     <>
-      <PageHeader title="Duyệt sự kiện" subtitle="Sự kiện ban tổ chức gửi lên; duyệt thì vé được mở bán theo lịch của từng suất." />
+      <PageHeader title="Sự kiện" subtitle="Mọi sự kiện trên nền tảng. Tab Chờ duyệt: sự kiện ban tổ chức gửi lên; duyệt thì vé được mở bán theo lịch của từng suất." />
       <Tabs
         value={status}
         onChange={(value) => {
-          setStatus(value)
+          setParams(value === 'ALL' ? {} : { status: value }, { replace: true })
           setPage(1)
         }}
-        options={[
-          ['PENDING_APPROVAL', 'Chờ duyệt'],
-          ['PUBLISHED', 'Đang bán'],
-          ['DRAFT', 'Nháp'],
-          ['CANCELLED', 'Đã hủy'],
-          ['FINISHED', 'Đã diễn'],
-        ]}
+        options={TABS}
       />
       <form
         onSubmit={(e) => {

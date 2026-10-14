@@ -323,6 +323,21 @@ describe('GET /events (list, search, filters)', () => {
     await list({ status: 'PENDING_APPROVAL' }, admin.token).expect(200);
   });
 
+  test('all=true: every status, newest first, for admins only', async () => {
+    const { listCategory, later, sooner, draft } = await publishedSet();
+
+    const all = await list({ all: 'true', categoryId: listCategory.id }, admin.token).expect(200);
+    expect(all.body.data.events.map((e) => [e.id, e.status])).toEqual([
+      [draft.id, 'DRAFT'],
+      [sooner.id, 'PUBLISHED'],
+      [later.id, 'PUBLISHED'],
+    ]);
+    expect(all.body.meta.total).toBe(3);
+
+    await list({ all: 'true' }, customer.session.accessToken).expect(403);
+    await list({ all: 'true' }).expect(403);
+  });
+
   test('sort must be one of the whitelisted keys', async () => {
     const res = await list({ sort: 'title; DROP TABLE events' });
     expect(res.status).toBe(400);

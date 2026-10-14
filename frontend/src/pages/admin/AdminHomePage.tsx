@@ -31,7 +31,7 @@ export function AdminHomePage() {
       {(canApprove || canOrganizers) && <h2 className="mb-3 mt-8 text-lg font-semibold">Chờ duyệt</h2>}
       <div className="grid gap-4 sm:grid-cols-2">
         {canApprove && (
-          <Todo to="/admin/events" label="Sự kiện chờ duyệt" count={pendingEvents.data?.meta.total} />
+          <Todo to="/admin/events?status=PENDING_APPROVAL" label="Sự kiện chờ duyệt" count={pendingEvents.data?.meta.total} />
         )}
         {canOrganizers && (
           <Todo to="/admin/organizers" label="Nhà tổ chức chờ duyệt" count={pendingOrganizers.data?.meta.total} />
