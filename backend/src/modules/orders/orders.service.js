@@ -25,7 +25,7 @@ const fastPath = require('./fast-path');
 const { markOrderPaid } = require('./order-payment');
 const { QUEUE, enqueueAfterCommit } = require('../../queue/queues');
 const { publishAfterCommit } = require('../../realtime/publisher');
-const { MESSAGE, scheduleRoom, seatUpdate, inventoryUpdate } = require('../../realtime/messages');
+const { MESSAGE, scheduleRoom, userRoom, seatUpdate, inventoryUpdate } = require('../../realtime/messages');
 
 const ACTIVE_CART_CONSTRAINT = 'uq_orders_active_cart';
 const ORDER_CODE_CONSTRAINT = 'orders_order_code_key';
@@ -166,24 +166,46 @@ function resolveGaItems(items, ticketTypes) {
   return resolved.sort((a, b) => (a.ticketType.id < b.ticketType.id ? -1 : 1));
 }
 
-/** Lock the requested seats (seat_id order) and check every one of them can be held. All or nothing. */
-async function lockRequestedSeats(client, scheduleId, seatIds) {
-  const locked = await events.lockSeatsForHold(client, scheduleId, [...seatIds].sort());
-  const bySeatId = new Map(locked.map((row) => [row.seat_id, row]));
+/** Every seat of `seatIds` can be held: AVAILABLE, of a ticket type on sale. All or nothing. */
+function assertHoldable(lockedRows, seatIds) {
+  const bySeatId = new Map(lockedRows.map((row) => [row.seat_id, row]));
 
   const unavailable = seatIds
     .filter((id) => bySeatId.get(id)?.status !== SEAT_STATUS.AVAILABLE)
     .map((id) => ({ seatId: id, status: bySeatId.get(id)?.status ?? 'NOT_IN_INVENTORY' }));
   if (unavailable.length > 0) throw new AppError('SEATS_UNAVAILABLE', undefined, { details: unavailable });
 
-  const paused = locked.filter((row) => row.ticket_type_status !== TICKET_TYPE_STATUS.ACTIVE);
+  const paused = seatIds.map((id) => bySeatId.get(id)).filter((row) => row.ticket_type_status !== TICKET_TYPE_STATUS.ACTIVE);
   if (paused.length > 0) {
     throw new AppError('TICKET_TYPE_UNAVAILABLE', 'Some of these seats are not on sale.', {
       details: paused.map((row) => ({ field: 'body.seatIds', message: `${row.seat_id} is not on sale` })),
     });
   }
+}
+
+/** Lock the requested seats (seat_id order) and check every one of them can be held. */
+async function lockRequestedSeats(client, scheduleId, seatIds) {
+  const locked = await events.lockSeatsForHold(client, scheduleId, [...seatIds].sort());
+  assertHoldable(locked, seatIds);
   return locked;
 }
+
+// Order lines. Prices are snapshots: a later change to the ticket type never changes the order.
+const seatLine = (seat) => ({
+  scheduleSeatId: seat.schedule_seat_id,
+  seatId: seat.seat_id,
+  seatLabel: `${seat.zone_name} - ${seat.seat_code}`,
+  ticketTypeId: seat.ticket_type_id,
+  ticketTypeName: seat.ticket_type_name,
+  unitPrice: seat.price,
+  quantity: 1,
+});
+const gaLine = (ticketType, quantity) => ({
+  ticketTypeId: ticketType.id,
+  ticketTypeName: ticketType.name,
+  unitPrice: ticketType.price,
+  quantity,
+});
 
 /** max_per_order of each ticket type (the overall cap is checked before any lock). */
 function assertPerTypeLimits(seats, gaItems) {
@@ -230,7 +252,7 @@ function placeOrder(actor, scheduleId, { seatIds = [], items = [] }) {
     assertPerTypeLimits(seats, gaItems);
 
     const heldSeats =
-      seats.length > 0 ? await events.holdSeats(client, { scheduleId, seatIds, orderId: order.id, expiresAt: order.expires_at }) : [];
+      seats.length > 0 ? await events.holdSeats(client, { scheduleId, seatIds, orderId: order.id }) : [];
     if (heldSeats.length !== seats.length) throw new Error('Locked seats changed status inside the booking transaction');
     const counters = [];
     for (const { ticketType, quantity } of gaItems) {
@@ -245,24 +267,7 @@ function placeOrder(actor, scheduleId, { seatIds = [], items = [] }) {
       counters.push(counter);
     }
 
-    // Prices are snapshots: a later change to the ticket type never changes this order.
-    const lines = [
-      ...seats.map((seat) => ({
-        scheduleSeatId: seat.schedule_seat_id,
-        seatId: seat.seat_id,
-        seatLabel: `${seat.zone_name} - ${seat.seat_code}`,
-        ticketTypeId: seat.ticket_type_id,
-        ticketTypeName: seat.ticket_type_name,
-        unitPrice: seat.price,
-        quantity: 1,
-      })),
-      ...gaItems.map(({ ticketType, quantity }) => ({
-        ticketTypeId: ticketType.id,
-        ticketTypeName: ticketType.name,
-        unitPrice: ticketType.price,
-        quantity,
-      })),
-    ];
+    const lines = [...seats.map(seatLine), ...gaItems.map(({ ticketType, quantity }) => gaLine(ticketType, quantity))];
     await ordersRepository.insertItems(client, { orderId: order.id, eventId: event.id, scheduleId }, lines);
     await ordersRepository.recalculateTotals(client, order.id);
     scheduleExpiry(client, order.id, order.expires_at);
@@ -328,6 +333,236 @@ async function createOrder(context, actor, scheduleId, body) {
   } finally {
     await releaseSeatLocks();
   }
+}
+
+// ---------------------------------------------------------------------------
+// Editing a held order (BKG-02)
+// ---------------------------------------------------------------------------
+
+/** What an order holds (or should hold): physical seat ids, and GA quantities per ticket type. */
+function contentOfLines(lines) {
+  return {
+    seatIds: lines.filter((line) => line.seat_id).map((line) => line.seat_id),
+    ga: new Map(lines.filter((line) => !line.seat_id).map((line) => [line.ticket_type_id, line.quantity])),
+  };
+}
+
+const contentOfBody = ({ seatIds = [], items = [] }) => ({
+  seatIds,
+  ga: new Map(items.map((item) => [item.ticketTypeId, item.quantity])),
+});
+
+/** The whole new content: at least one ticket (else cancel), at most MAX_TICKETS_PER_ORDER. */
+function assertTicketCount(content) {
+  const count = content.seatIds.length + [...content.ga.values()].reduce((sum, quantity) => sum + quantity, 0);
+  if (count === 0) throw new AppError('ORDER_CANNOT_BE_EMPTY');
+  if (count > ORDER_LIMITS.MAX_TICKETS_PER_ORDER) {
+    throw new AppError('ORDER_LIMIT_EXCEEDED', `At most ${ORDER_LIMITS.MAX_TICKETS_PER_ORDER} tickets per order.`);
+  }
+  return content;
+}
+
+/** From what the order holds to what is wanted. GA changes come in ticket_type_id order (their lock order). */
+function diffContent(current, wanted) {
+  const addSeatIds = wanted.seatIds.filter((id) => !current.seatIds.includes(id));
+  const removeSeatIds = current.seatIds.filter((id) => !wanted.seatIds.includes(id));
+  const gaChanges = [...new Set([...current.ga.keys(), ...wanted.ga.keys()])]
+    .sort()
+    .map((ticketTypeId) => ({ ticketTypeId, from: current.ga.get(ticketTypeId) ?? 0, to: wanted.ga.get(ticketTypeId) ?? 0 }))
+    .filter((change) => change.from !== change.to);
+  const gaAdded = gaChanges
+    .filter((change) => change.to > change.from)
+    .map((change) => ({ ticketTypeId: change.ticketTypeId, quantity: change.to - change.from }));
+  return {
+    addSeatIds,
+    removeSeatIds,
+    gaChanges,
+    gaAdded,
+    adds: addSeatIds.length > 0 || gaAdded.length > 0,
+    none: addSeatIds.length + removeSeatIds.length + gaChanges.length === 0,
+  };
+}
+
+function assertEditable(order) {
+  if (order.status === ORDER_STATUS.EXPIRED) throw new AppError('ORDER_EXPIRED');
+  if (order.status !== ORDER_STATUS.HELD) {
+    throw new AppError('INVALID_STATE_TRANSITION', `Only a HELD order can be changed; this one is ${order.status}.`);
+  }
+}
+
+/** GA tickets being added: a general admission type of this schedule, on sale. Taking tickets out is always allowed. */
+function assertGaAddable(gaAdded, ticketTypesById) {
+  const problems = gaAdded.flatMap(({ ticketTypeId }) => {
+    const ticketType = ticketTypesById.get(ticketTypeId);
+    let message = null;
+    if (!ticketType) message = 'is not a ticket type of this schedule';
+    else if (ticketType.inventory_mode !== INVENTORY_MODE.GENERAL_ADMISSION) message = 'is a reserved-seat type: send seatIds';
+    else if (ticketType.status !== TICKET_TYPE_STATUS.ACTIVE) message = 'is not on sale';
+    return message ? [{ field: 'body.items', message: `${ticketTypeId} ${message}` }] : [];
+  });
+  if (problems.length > 0) throw new AppError('TICKET_TYPE_UNAVAILABLE', undefined, { details: problems });
+}
+
+/**
+ * max_per_order of the ticket types this edit adds to. A type the edit only
+ * keeps or reduces is never refused, even if its limit was lowered since.
+ */
+function assertPerTypeLimitsAfterEdit(before, after, ticketTypesById) {
+  const over = [...after]
+    .filter(([id, quantity]) => quantity > (before.get(id) ?? 0) && quantity > ticketTypesById.get(id).max_per_order)
+    .map(([id]) => ticketTypesById.get(id));
+  if (over.length > 0) {
+    throw new AppError('ORDER_LIMIT_EXCEEDED', undefined, {
+      details: over.map((tt) => ({ field: 'body', message: `at most ${tt.max_per_order} tickets of "${tt.name}" per order` })),
+    });
+  }
+}
+
+function countPerType(seatTicketTypeIds, ga) {
+  const counts = new Map(ga);
+  seatTicketTypeIds.forEach((id) => counts.set(id, (counts.get(id) ?? 0) + 1));
+  return counts;
+}
+
+/**
+ * The transaction of an edit. Lock order as in booking: event, schedule (FOR
+ * SHARE) → the order row → the seats added AND removed, in one seat_id-ordered
+ * pass (two customers swapping seats queue up instead of deadlocking) → GA
+ * counters (ticket_type_id order). Everything is recomputed from the locked
+ * rows: the caller's preview only fed the Redis fast path.
+ * @returns {Promise<'EXPIRED'|'UNCHANGED'|'UPDATED'>}
+ */
+function applyEdit(actor, { id: orderId, schedule_id: scheduleId }, wantedOf) {
+  return withTransaction(async (client) => {
+    const sale = await events.lockScheduleForSale(client, scheduleId);
+    const order = await ordersRepository.findById(client, orderId, { forUpdate: true });
+    assertEditable(order);
+    if (order.hold_expired) {
+      await releaseHeldOrder(client, orderId, { to: ORDER_STATUS.EXPIRED });
+      return 'EXPIRED';
+    }
+
+    const lines = await ordersRepository.listItems(client, [orderId]);
+    const current = contentOfLines(lines);
+    const wanted = wantedOf(current);
+    const diff = diffContent(current, wanted);
+    if (diff.none) return 'UNCHANGED';
+    if (diff.adds) assertOnSale(sale);
+
+    const ticketTypesById = new Map((await events.listTicketTypes(client, scheduleId)).map((tt) => [tt.id, tt]));
+    const seats = await events.lockSeatsForHold(client, scheduleId, [...diff.addSeatIds, ...diff.removeSeatIds].sort());
+    const added = seats.filter((seat) => diff.addSeatIds.includes(seat.seat_id));
+    assertHoldable(seats, diff.addSeatIds);
+    assertGaAddable(diff.gaAdded, ticketTypesById);
+    assertPerTypeLimitsAfterEdit(
+      countPerType(lines.filter((line) => line.seat_id).map((line) => line.ticket_type_id), current.ga),
+      countPerType(
+        [
+          ...lines.filter((line) => wanted.seatIds.includes(line.seat_id)).map((line) => line.ticket_type_id),
+          ...added.map((seat) => seat.ticket_type_id),
+        ],
+        wanted.ga,
+      ),
+      ticketTypesById,
+    );
+
+    const room = scheduleRoom(scheduleId);
+    if (diff.removeSeatIds.length > 0) {
+      const released = await events.releaseSeats(client, { scheduleId, seatIds: diff.removeSeatIds, orderId });
+      if (released.length !== diff.removeSeatIds.length) throw new Error(`Seats of order ${orderId} are not held by it`);
+      await ordersRepository.deleteSeatLines(client, orderId, diff.removeSeatIds);
+      fastPath.forgetTakenSeatsAfterCommit(client, scheduleId, diff.removeSeatIds);
+      publishAfterCommit(client, room, seatUpdate(MESSAGE.SEAT_RELEASED, scheduleId, released));
+    }
+    if (added.length > 0) {
+      // Same deadline as the rest of the order: an edit never extends the hold.
+      const held = await events.holdSeats(client, { scheduleId, seatIds: diff.addSeatIds, orderId });
+      if (held.length !== added.length) throw new Error('Locked seats changed status inside the edit transaction');
+      await ordersRepository.insertItems(client, { orderId, eventId: sale.event.id, scheduleId }, added.map(seatLine));
+      publishAfterCommit(client, room, seatUpdate(MESSAGE.SEAT_HELD, scheduleId, held));
+    }
+
+    const counters = [];
+    for (const { ticketTypeId, from, to } of diff.gaChanges) {
+      const ticketType = ticketTypesById.get(ticketTypeId);
+      const counter =
+        to > from
+          ? await events.holdGa(client, { ticketTypeId, quantity: to - from })
+          : await events.releaseGa(client, { ticketTypeId, quantity: from - to });
+      if (!counter && to > from) {
+        const error = new AppError('INSUFFICIENT_INVENTORY', `Not enough "${ticketType.name}" tickets left.`, {
+          details: [{ field: 'body.items', message: `${ticketTypeId} has fewer than ${to - from} left` }],
+        });
+        error.gaLeft = { ticketTypeId, left: await events.gaAvailable(client, ticketTypeId) };
+        throw error;
+      }
+      if (!counter) throw new Error(`GA counter of ticket type ${ticketTypeId} is lower than the quantity being released`);
+      counters.push(counter);
+      if (from === 0) {
+        const line = gaLine(ticketType, to);
+        await ordersRepository.insertItems(client, { orderId, eventId: sale.event.id, scheduleId }, [line]);
+      } else {
+        await ordersRepository.setGaLineQuantity(client, { orderId, ticketTypeId, quantity: to });
+      }
+    }
+    if (counters.length > 0) publishAfterCommit(client, room, inventoryUpdate(scheduleId, counters));
+
+    await ordersRepository.recalculateTotals(client, orderId);
+    // Another tab showing this order reloads it.
+    publishAfterCommit(client, userRoom(actor.userId), { type: MESSAGE.ORDER_UPDATED, orderId });
+    return 'UPDATED';
+  });
+}
+
+/**
+ * Preview from an unlocked read, only to send what is being ADDED through the
+ * Redis fast path (as a booking does); then the transaction decides.
+ */
+async function editOrder(actor, orderId, wantedOf) {
+  const order = await ordersRepository.findById(pool, orderId);
+  if (!order || order.user_id !== actor.userId) throw orderNotFound();
+  assertEditable(order);
+  const checkedWantedOf = (current) => assertTicketCount(wantedOf(current));
+  const current = contentOfLines(await ordersRepository.listItems(pool, [orderId]));
+  const preview = diffContent(current, checkedWantedOf(current));
+
+  await fastPath.assertGaHint(preview.gaAdded);
+  await fastPath.assertSeatHints(order.schedule_id, preview.addSeatIds);
+  const releaseSeatLocks = await fastPath.lockSeats(order.schedule_id, preview.addSeatIds);
+  try {
+    // BKG-05: holds of this schedule already past their time stop blocking the seats being added.
+    if (preview.adds) await expireDueOrders({ scheduleId: order.schedule_id });
+    const outcome = await applyEdit(actor, order, checkedWantedOf);
+    if (outcome === 'EXPIRED') throw new AppError('ORDER_EXPIRED');
+    return await loadOrder(pool, orderId);
+  } catch (err) {
+    if (err.gaLeft) await fastPath.rememberGaLeft(err.gaLeft.ticketTypeId, err.gaLeft.left);
+    if (err.code === 'SEATS_UNAVAILABLE' && Array.isArray(err.details)) {
+      await fastPath.rememberTakenSeats(order.schedule_id, err.details);
+    }
+    throw err;
+  } finally {
+    await releaseSeatLocks();
+  }
+}
+
+/**
+ * BKG-02: change what one of my HELD orders holds. `body` is the WHOLE new
+ * content, as when booking, so sending the same request twice changes nothing
+ * the second time. Seats taken out are on sale again once this commits; the
+ * hold's deadline does not move.
+ */
+function updateOrderItems(context, actor, orderId, body) {
+  const wanted = contentOfBody(body);
+  return editOrder(actor, orderId, () => wanted);
+}
+
+/** BKG-02 as in the requirements sheet: take one seat out of my HELD order. */
+function removeSeat(context, actor, orderId, seatId) {
+  return editOrder(actor, orderId, (current) => {
+    if (!current.seatIds.includes(seatId)) throw new AppError('NOT_FOUND', 'This seat is not in the order.');
+    return { seatIds: current.seatIds.filter((id) => id !== seatId), ga: current.ga };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -450,4 +685,13 @@ async function previewPromotion(actor, { orderId, code }) {
   return { orderId, subtotal: order.subtotal, ...(await promotions.preview({ code, subtotal: order.subtotal, userId: actor.userId })) };
 }
 
-module.exports = { createOrder, getOrder, listOrders, cancelOrder, checkoutOrder, previewPromotion };
+module.exports = {
+  createOrder,
+  updateOrderItems,
+  removeSeat,
+  getOrder,
+  listOrders,
+  cancelOrder,
+  checkoutOrder,
+  previewPromotion,
+};

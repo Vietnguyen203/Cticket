@@ -70,6 +70,30 @@ async function recalculateTotals(db, orderId) {
   );
 }
 
+/** BKG-02: the lines of seats taken out of a held order. */
+async function deleteSeatLines(db, orderId, seatIds) {
+  await db.query(`DELETE FROM order_items WHERE order_id = $1 AND seat_id = ANY($2::uuid[])`, [orderId, seatIds]);
+}
+
+/**
+ * BKG-02: new quantity of a GA line (one line per ticket type: uq_order_items_ga_line),
+ * at the price snapshotted when it was first held. 0 removes the line.
+ */
+async function setGaLineQuantity(db, { orderId, ticketTypeId, quantity }) {
+  if (quantity === 0) {
+    await db.query(`DELETE FROM order_items WHERE order_id = $1 AND ticket_type_id = $2 AND schedule_seat_id IS NULL`, [
+      orderId,
+      ticketTypeId,
+    ]);
+    return;
+  }
+  await db.query(
+    `UPDATE order_items SET quantity = $3::int, total_amount = unit_price * $3::int
+     WHERE order_id = $1 AND ticket_type_id = $2 AND schedule_seat_id IS NULL`,
+    [orderId, ticketTypeId, quantity],
+  );
+}
+
 async function findById(db, id, { forUpdate = false } = {}) {
   const { rows } = await db.query(
     `SELECT ${ORDER_COLUMNS} FROM orders o WHERE o.id = $1 ${forUpdate ? 'FOR UPDATE' : ''}`,
@@ -358,6 +382,8 @@ module.exports = {
   insertHeldOrder,
   insertItems,
   recalculateTotals,
+  deleteSeatLines,
+  setGaLineQuantity,
   findById,
   findDetail,
   findActiveForUser,

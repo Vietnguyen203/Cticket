@@ -1,6 +1,15 @@
 import { describe, expect, test } from 'vitest'
 import type { SeatMap, SeatStatus } from '../api/types'
-import { initialSeatMapState, MAX_TICKETS_PER_ORDER, seatMapReducer, selectionSummary, type SeatMapAction, type SeatMapState } from './seatMapReducer'
+import {
+  editChanges,
+  initialSeatMapState,
+  MAX_TICKETS_PER_ORDER,
+  seatMapReducer,
+  selectionSummary,
+  type EditedOrder,
+  type SeatMapAction,
+  type SeatMapState,
+} from './seatMapReducer'
 
 const VIP = 'tt-vip'
 const GA = 'tt-ga'
@@ -125,5 +134,51 @@ describe('picking', () => {
       count: 3,
       total: 3_000_000,
     })
+  })
+})
+
+describe('changing a held order (BKG-02)', () => {
+  /** My order holds A01, A02 and 2 standing tickets: on everyone's map those seats are HELD. */
+  const order: EditedOrder = { id: 'o-1', orderCode: 'ETP-1', expiresAt: '2026-10-14T10:00:00Z', seatIds: ['A01', 'A02'], gaQuantities: { [GA]: 2 } }
+  const editing = (...actions: SeatMapAction[]) =>
+    run([{ type: 'loaded', map: seatMap({ A01: ['HELD', 2], A02: ['HELD', 2], A05: ['HELD', 2] }) }, { type: 'editOrder', order }, ...actions])
+
+  test('the picks start as what the order holds; its HELD seats can be unpicked and picked back', () => {
+    expect(editing()).toMatchObject({ selected: ['A01', 'A02'], gaQuantities: { [GA]: 2 }, taken: [] })
+    expect(editing({ type: 'toggleSeat', seatId: 'A01' }).selected).toEqual(['A02'])
+    expect(editing({ type: 'toggleSeat', seatId: 'A01' }, { type: 'toggleSeat', seatId: 'A01' }).selected).toEqual(['A02', 'A01'])
+    // Someone else's hold stays out of reach.
+    expect(editing({ type: 'toggleSeat', seatId: 'A05' }).selected).toEqual(['A01', 'A02'])
+  })
+
+  test('my seats changing on the live map (another tab of mine) are not reported as taken', () => {
+    const state = editing(held('A01', 3), held('A02', 3))
+    expect(state.selected).toEqual(['A01', 'A02'])
+    expect(state.taken).toEqual([])
+  })
+
+  test("the order's own standing tickets count as available to me", () => {
+    const soldOut = { type: 'live', message: { type: 'INVENTORY_UPDATED', scheduleId: 'sch-1', ticketTypes: [{ ticketTypeId: GA, available: 0 }] } } as SeatMapAction
+    const state = editing(soldOut)
+    expect(state.gaQuantities[GA]).toBe(2) // not cut down to 0
+    const more = seatMapReducer(state, { type: 'setGaQuantity', ticketTypeId: GA, quantity: 3 })
+    expect(more.gaQuantities[GA]).toBe(2)
+    expect(more.notice).toBe('Hạng Vé đứng chỉ còn 2 vé.')
+  })
+
+  test('editChanges: what "Cập nhật đơn" would change', () => {
+    expect(editChanges(editing()).none).toBe(true)
+    const state = editing(
+      { type: 'toggleSeat', seatId: 'A01' },
+      { type: 'toggleSeat', seatId: 'A03' },
+      { type: 'setGaQuantity', ticketTypeId: GA, quantity: 1 },
+    )
+    expect(editChanges(state)).toEqual({ added: ['A03'], removed: ['A01'], ga: [{ ticketTypeId: GA, from: 2, to: 1 }], none: false })
+  })
+
+  test('the order ending clears its picks; without an order, null changes nothing', () => {
+    expect(seatMapReducer(editing(), { type: 'editOrder', order: null })).toMatchObject({ editing: null, selected: [], gaQuantities: {} })
+    const picking = run([{ type: 'loaded', map: seatMap() }, { type: 'toggleSeat', seatId: 'A03' }])
+    expect(seatMapReducer(picking, { type: 'editOrder', order: null })).toBe(picking)
   })
 })

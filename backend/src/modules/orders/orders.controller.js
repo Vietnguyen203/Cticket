@@ -21,6 +21,22 @@ async function create(req, res) {
   return sendSuccess(res, { order }, { status: HTTP_CREATED });
 }
 
+async function updateItems(req, res) {
+  const order = await ordersService.updateOrderItems(
+    requestContext(req),
+    await resolveActor(req.user),
+    req.valid.params.id,
+    req.valid.body,
+  );
+  return sendSuccess(res, { order });
+}
+
+async function removeSeat(req, res) {
+  const { id, seatId } = req.valid.params;
+  const order = await ordersService.removeSeat(requestContext(req), await resolveActor(req.user), id, seatId);
+  return sendSuccess(res, { order });
+}
+
 async function list(req, res) {
   const { orders, meta } = await ordersService.listOrders(await resolveActor(req.user), req.valid.query);
   return sendSuccess(res, { orders }, { meta });
@@ -45,4 +61,4 @@ async function checkout(req, res) {
   return sendSuccess(res, { order });
 }
 
-module.exports = { create, list, get, cancel, checkout };
+module.exports = { create, updateItems, removeSeat, list, get, cancel, checkout };

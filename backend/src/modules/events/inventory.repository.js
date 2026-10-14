@@ -265,13 +265,18 @@ async function lockSeatsForHold(db, scheduleId, seatIds) {
   return rows;
 }
 
-/** @returns {Promise<Array<{ seat_id, status, version }>>} seats actually moved AVAILABLE → HELD */
-async function holdSeats(db, { scheduleId, seatIds, orderId, expiresAt }) {
+/**
+ * The seats expire with their order: the deadline is copied from the order row
+ * in SQL (a JS Date would cut its microseconds off).
+ * @returns {Promise<Array<{ seat_id, status, version }>>} seats actually moved AVAILABLE → HELD
+ */
+async function holdSeats(db, { scheduleId, seatIds, orderId }) {
   const { rows } = await db.query(
-    `UPDATE schedule_seats SET status = 'HELD', held_by_order_id = $3, hold_expires_at = $4
+    `UPDATE schedule_seats
+     SET status = 'HELD', held_by_order_id = $3, hold_expires_at = (SELECT expires_at FROM orders WHERE id = $3)
      WHERE schedule_id = $1 AND seat_id = ANY($2::uuid[]) AND status = 'AVAILABLE'
      RETURNING ${CHANGED_SEAT}`,
-    [scheduleId, seatIds, orderId, expiresAt],
+    [scheduleId, seatIds, orderId],
   );
   return rows;
 }
@@ -287,6 +292,20 @@ async function releaseSeatsOfOrder(db, orderId) {
      WHERE held_by_order_id = $1 AND status = 'HELD'
      RETURNING ${CHANGED_SEAT}`,
     [orderId],
+  );
+  return rows;
+}
+
+/**
+ * BKG-02: put SOME of an order's held seats back on sale. The caller has
+ * already locked them (with the seats being added, in seat_id order).
+ */
+async function releaseSeats(db, { scheduleId, seatIds, orderId }) {
+  const { rows } = await db.query(
+    `UPDATE schedule_seats SET status = 'AVAILABLE', held_by_order_id = NULL, hold_expires_at = NULL
+     WHERE schedule_id = $1 AND seat_id = ANY($2::uuid[]) AND held_by_order_id = $3 AND status = 'HELD'
+     RETURNING ${CHANGED_SEAT}`,
+    [scheduleId, seatIds, orderId],
   );
   return rows;
 }
@@ -419,6 +438,7 @@ module.exports = {
   lockSeatsForHold,
   holdSeats,
   releaseSeatsOfOrder,
+  releaseSeats,
   holdGa,
   releaseGa,
   gaAvailable,

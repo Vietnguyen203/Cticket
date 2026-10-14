@@ -63,6 +63,7 @@ const ERROR_CODES = Object.freeze({
   SALES_CLOSED: { status: 422, message: 'Ticket sales for this schedule are closed.' },
   TICKET_TYPE_UNAVAILABLE: { status: 422, message: 'One or more ticket types cannot be bought.' },
   ORDER_LIMIT_EXCEEDED: { status: 422, message: 'Too many tickets in one order.' },
+  ORDER_CANNOT_BE_EMPTY: { status: 422, message: 'An order needs at least one ticket; cancel it instead.' },
   IDEMPOTENCY_KEY_REUSED: { status: 422, message: 'This Idempotency-Key was already used for a different request.' },
   PROMOTION_INVALID: { status: 422, message: 'This promotion code cannot be used for this order.' },
   IMAGE_INVALID: { status: 422, message: 'The file must be a JPEG, PNG or WebP image.' },

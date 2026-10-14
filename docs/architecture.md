@@ -43,7 +43,7 @@ flowchart LR
 | `organizers` | Đăng ký làm nhà tổ chức, duyệt |
 | `categories`, `venues` | Danh mục; địa điểm, khu, ghế (sinh hàng loạt), địa điểm do nhà tổ chức đề xuất |
 | `events` | Sự kiện, suất diễn, hạng vé, sơ đồ ghế, tồn kho, máy trạng thái sự kiện, nhân viên soát vé |
-| `orders` | Giữ chỗ, đơn hàng, checkout, hết hạn, hủy, xóa dữ liệu bán của sự kiện |
+| `orders` | Giữ chỗ, đổi / bỏ ghế trong đơn đang giữ, đơn hàng, checkout, hết hạn, hủy, xóa dữ liệu bán của sự kiện |
 | `promotions` | Mã giảm giá (giới hạn tổng / mỗi người, thời hạn) |
 | `payments` | Thanh toán giả lập có idempotency, hoàn tiền |
 | `tickets` | Phát vé, mã QR ký HMAC có phiên bản, cấp lại QR |
@@ -87,6 +87,8 @@ sequenceDiagram
 3. **Ràng buộc DB (lưới cuối)**: `UNIQUE`, `CHECK` trên trạng thái ghế, mỗi khách một giỏ đang mở mỗi suất, mỗi vé chỉ một lượt soát vé (`check_ins.ticket_id UNIQUE`).
 
 Kiểm chứng: test 100 người cùng giữ 1 ghế (kể cả tắt Redis) → đúng 1 người được; load test 500 người tranh 50 ghế → không ghế nào thuộc 2 đơn, tồn kho khớp (`docs/testing.md`).
+
+**Đổi ghế trong đơn đang giữ** (BKG-02, `PUT /orders/:id/items`): khách gửi nội dung cuối cùng của đơn; phần **thêm vào** đi qua đúng ba lớp trên, ghế thêm và ghế bỏ được khóa **trong cùng một lượt theo `seat_id`** (hai khách đổi chéo ghế không deadlock), hạn giữ chỗ giữ nguyên. Chi tiết: `docs/bkg-02-edit-held-order-design.md`.
 
 **Việc ngoài DB chỉ chạy sau COMMIT** (`client.afterCommit`): gửi WebSocket, đưa job vào hàng đợi, xóa gợi ý Redis. Rollback thì không có gì lọt ra ngoài.
 

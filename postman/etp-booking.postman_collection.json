@@ -1268,6 +1268,251 @@
       ]
     },
     {
+      "name": "3b. Đổi ghế trong đơn đang giữ (BKG-02)",
+      "description": "Gửi NỘI DUNG CUỐI CÙNG của đơn (giống lúc đặt): server tự giữ ghế mới, nhả ghế bỏ ra, đổi số vé đứng, trong một transaction. Đồng hồ giữ chỗ không đổi. Xem docs/bkg-02-edit-held-order-design.md.",
+      "item": [
+        {
+          "name": "Đổi: bỏ A02, thêm B01, vé đứng 2 → 1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  pm.test('A01 + B01 + 1 vé đứng = 3.300.000đ', () => {",
+                  "    pm.expect(data.order.status).to.eql('HELD');",
+                  "    pm.expect(data.order.items.map((i) => i.seatLabel).filter(Boolean)).to.have.length(2);",
+                  "    pm.expect(data.order.totalAmount).to.eql(2000000 + 800000 + 500000);",
+                  "  });",
+                  "  pm.test('Đồng hồ không chạy lại từ đầu', () => pm.expect(data.order.remainingSeconds).to.be.below(600));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/orders/{{orderId}}/items",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"seatIds\": [\n    \"{{seatA01}}\",\n    \"{{seatB01}}\"\n  ],\n  \"items\": [\n    {\n      \"ticketTypeId\": \"{{gaId}}\",\n      \"quantity\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Gửi lại đúng request đó: không đổi gì",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  pm.test('Vẫn 3.300.000đ', () => pm.expect(data.order.totalAmount).to.eql(3300000));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/orders/{{orderId}}/items",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"seatIds\": [\n    \"{{seatA01}}\",\n    \"{{seatB01}}\"\n  ],\n  \"items\": [\n    {\n      \"ticketTypeId\": \"{{gaId}}\",\n      \"quantity\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Tồn kho sau khi đổi (VIP 9, STD 9, GA 49)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  const byCode = Object.fromEntries(data.ticketTypes.map((t) => [t.code, t.available]));",
+                  "  pm.test('Còn lại VIP 9, STD 9, GA 49', () => pm.expect(byCode).to.include({\"VIP\":9,\"STD\":9,\"GA\":49}));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/schedules/{{scheduleId}}/availability",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Bỏ ghế B01 (BKG-02 đúng như bảng yêu cầu)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  pm.test('Còn A01 + 1 vé đứng = 2.500.000đ', () => pm.expect(data.order.totalAmount).to.eql(2500000));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{host}}/api/v1/orders/{{orderId}}/seats/{{seatB01}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Bỏ B01 lần nữa: không còn trong đơn (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 404', () => pm.expect(pm.response.code).to.be.oneOf([404]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{host}}/api/v1/orders/{{orderId}}/seats/{{seatB01}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Admin thử sửa đơn của bạn (404: chỉ người mua được sửa)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 404', () => pm.expect(pm.response.code).to.be.oneOf([404]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/orders/{{orderId}}/items",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"seatIds\": [\n    \"{{seatA01}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "4. Hủy đơn & đặt lại",
       "item": [
         {

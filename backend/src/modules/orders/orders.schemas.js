@@ -5,6 +5,7 @@ const { paginationQuery } = require('../../utils/pagination');
 const MAX = ORDER_LIMITS.MAX_TICKETS_PER_ORDER;
 
 const idParams = z.object({ id: z.uuid() });
+const seatParams = z.object({ id: z.uuid(), seatId: z.uuid() });
 
 const createOrder = z
   .object({
@@ -26,6 +27,9 @@ const createOrder = z
     path: ['items'],
   });
 
+// BKG-02: the WHOLE new content of a held order, in the same shape as when booking.
+const updateItems = createOrder;
+
 const listQuery = z.object({
   ...paginationQuery,
   all: z.enum(['true', 'false']).transform((value) => value === 'true').default(false),
@@ -39,4 +43,4 @@ const checkout = z.object({
   promotionCode: z.string().trim().min(3).max(50).optional(),
 });
 
-module.exports = { idParams, createOrder, listQuery, checkout };
+module.exports = { idParams, seatParams, createOrder, updateItems, listQuery, checkout };
