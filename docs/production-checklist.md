@@ -1,5 +1,7 @@
 # Danh sách kiểm tra khi lên production
 
+> **Phase 16** đã tự động hóa phần lớn danh sách này cho một VPS (`deploy/`, sổ tay `docs/deployment.md`). Các mục đánh dấu **[tự động]** đã có sẵn trong cấu hình và script; các mục còn lại vẫn cần bạn làm hoặc kiểm tra.
+
 Bản Docker trong repo là **môi trường phát triển / demo**: chứng chỉ tự ký, Mailpit, mật khẩu mẫu, thanh toán giả lập. Trước khi chạy với người dùng thật, đi hết danh sách này.
 
 ## 1. Bí mật
@@ -19,11 +21,11 @@ Bản Docker trong repo là **môi trường phát triển / demo**: chứng ch�
 
 ## 3. Mạng và HTTPS
 
-- [ ] Chứng chỉ thật (ví dụ Let's Encrypt) thay cho chứng chỉ tự ký của container `web`; chuyển hướng HTTP → HTTPS.
-- [ ] Bật **HSTS** trong `frontend/docker/security-headers.conf`: `add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;` (chỉ khi HTTPS đã chạy ổn định: trình duyệt sẽ nhớ và từ chối HTTP).
+- [x] **[tự động]** Chứng chỉ Let's Encrypt (Caddy lấy và gia hạn), chuyển hướng HTTP → HTTPS (`deploy/Caddyfile`).
+- [x] **[tự động]** **HSTS** 1 năm, đặt ở Caddy (không có `includeSubDomains`: các tên miền con khác của bạn không bị ép HTTPS).
 - [ ] `NODE_ENV=production` → cookie refresh có cờ `Secure` (đã mặc định; không đặt `REFRESH_COOKIE_SECURE=false`).
 - [ ] `CORS_ORIGINS` = đúng các tên miền của web (dùng cho cả kiểm tra `Origin` của WebSocket).
-- [ ] `TRUST_PROXY` = **số proxy** đứng trước API: chỉ nginx `web` → `1`; thêm load balancer của cloud phía trước → `2`. Sai số này thì rate limit đếm sai người (quá ít: mọi người chung một IP; quá nhiều: khách giả được IP).
+- [x] **[tự động]** `TRUST_PROXY=2` trong `deploy/docker-compose.prod.yml` (Caddy + nginx). Đặt thêm load balancer / Cloudflare proxy phía trước thì tăng lên. Quy tắc chung: `TRUST_PROXY` = **số proxy** đứng trước API. Sai số này thì rate limit đếm sai người (quá ít: mọi người chung một IP; quá nhiều: khách giả được IP).
 - [ ] Proxy / load balancer giữ kết nối rảnh **dưới 65 giây** (API giữ 65 s; xem `backend/src/server.js`), nếu không sẽ gặp lỗi 502 ngẫu nhiên.
 - [ ] Camera của trang soát vé chỉ chạy trên HTTPS.
 
@@ -34,9 +36,9 @@ Bản Docker trong repo là **môi trường phát triển / demo**: chứng ch�
 
 ## 5. Dữ liệu và sao lưu
 
-- [ ] Sao lưu PostgreSQL định kỳ (pg_dump hằng ngày hoặc sao lưu liên tục / PITR) và **thử khôi phục**.
-- [ ] Sao lưu thư mục ảnh tải lên (volume `uploads`). Chạy **nhiều máy chủ API** thì chuyển ảnh sang kho chung (S3 hoặc tương đương): mỗi máy có ổ đĩa riêng.
-- [ ] Redis đang chạy không lưu xuống đĩa (dữ liệu có hạn sống; PostgreSQL là nguồn gốc). Khi Redis khởi động lại: **vé thiếu và đơn quá hạn tự được xử lý lại** (job `reconcile-tickets` mỗi phút, `sweep-holds`), nhưng **email / thông báo đang chờ gửi có thể mất**. Cần chắc chắn không mất email → bật AOF (`--appendonly yes`).
+- [x] **[tự động]** Sao lưu PostgreSQL + ảnh hằng đêm và trước mỗi lần deploy (container `backup`); `restore.sh check` để thử khôi phục (CI chạy mỗi lần push). **Bạn làm**: chạy thử khôi phục mỗi tháng, bật bản sao ngoài máy chủ (`docs/deployment.md` mục 7).
+- [x] **[tự động]** Sao lưu thư mục ảnh tải lên (volume `uploads`). Chạy **nhiều máy chủ API** thì chuyển ảnh sang kho chung (S3 hoặc tương đương): mỗi máy có ổ đĩa riêng.
+- [ ] Redis đang chạy không lưu xuống đĩa (dữ liệu có hạn sống; PostgreSQL là nguồn gốc). Khi Redis khởi động lại: **vé thiếu và đơn quá hạn tự được xử lý lại** (job `reconcile-tickets` mỗi phút, `sweep-holds`), nhưng **email / thông báo đang chờ gửi có thể mất**. Cần chắc chắn không mất email → bật AOF (`--appendonly yes`): **[tự động]** đã bật trong `deploy/docker-compose.prod.yml`.
 
 ## 6. Sức chứa
 
@@ -46,7 +48,7 @@ Bản Docker trong repo là **môi trường phát triển / demo**: chứng ch�
 
 ## 7. Quan sát
 
-- [ ] Orchestrator dùng `/health/live` (tiến trình còn sống) và `/health/ready` (đủ PostgreSQL; Redis hỏng → `degraded` nhưng vẫn phục vụ).
+- [x] **[tự động]** Healthcheck Docker và `deploy.sh` dùng `/health/ready` (đủ PostgreSQL; Redis hỏng → `degraded` nhưng vẫn phục vụ); nginx mở `/health/live`, `/health/ready` ra ngoài cho dịch vụ theo dõi (`docs/deployment.md` mục 10).
 - [ ] Gom log JSON (pino) về một chỗ; log không chứa token / mật khẩu (query string bị bỏ khỏi log, dữ liệu job không được log).
 - [ ] Cảnh báo: tỷ lệ 5xx, p95 thời gian phản hồi, Redis `degraded`, hàng đợi job tồn đọng, dung lượng đĩa PostgreSQL.
 

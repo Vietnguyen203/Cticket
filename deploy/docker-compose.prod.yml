@@ -1,0 +1,229 @@
+# Production (Phase 16): one VPS, everything in Docker. See docs/deployment.md.
+#
+#   docker compose -f deploy/docker-compose.prod.yml ...   (scripts/deploy.sh does it)
+#
+# Settings and secrets come from deploy/.env (on the server only, never in git;
+# scripts/init-env.sh creates it). Images are built on the server and tagged
+# with the commit (IMAGE_TAG), so the previous version is still there for a
+# rollback.
+#
+# Only Caddy publishes ports (80, 443). Docker-published ports bypass the ufw
+# firewall, so no other service may have a `ports:` entry.
+name: etp-prod
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
+x-backend: &backend
+  image: etp-prod-backend:${IMAGE_TAG:?Run through scripts/deploy.sh, which sets IMAGE_TAG}
+  build: ../backend
+  logging: *logging
+  restart: unless-stopped
+
+x-app-env: &app-env
+  NODE_ENV: production
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  DATABASE_URL: postgres://${POSTGRES_USER:-etp}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-etp}
+  PG_POOL_MAX: ${PG_POOL_MAX:-15}
+  REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+  JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?Set JWT_ACCESS_SECRET in deploy/.env}
+  OTP_SECRET: ${OTP_SECRET:?Set OTP_SECRET in deploy/.env}
+  QR_SECRET: ${QR_SECRET:?Set QR_SECRET in deploy/.env}
+  TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:?Set TOTP_ENCRYPTION_KEY in deploy/.env}
+  TWO_FACTOR_REQUIRED_ROLES: ${TWO_FACTOR_REQUIRED_ROLES:-ADMIN}
+  SMTP_HOST: ${SMTP_HOST:?Set SMTP_HOST in deploy/.env}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_SECURE: ${SMTP_SECURE:-false}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASS: ${SMTP_PASS:-}
+  MAIL_FROM: ${MAIL_FROM:?Set MAIL_FROM in deploy/.env}
+  # The web origin: the WebSocket only accepts pages of this site.
+  CORS_ORIGINS: https://${DOMAIN:?Set DOMAIN in deploy/.env}
+  # Two proxies in front of the API: Caddy, then nginx (web).
+  TRUST_PROXY: "2"
+
+services:
+  # The only door to the Internet: HTTPS with Let's Encrypt certificates
+  # (obtained and renewed by itself), HTTP → HTTPS, HSTS. See Caddyfile.
+  caddy:
+    image: caddy:2.10-alpine
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp" # HTTP/3
+    environment:
+      DOMAIN: ${DOMAIN}
+      # An email for Let's Encrypt (expiry notices), or "internal" for a local
+      # certificate when rehearsing on a computer (DOMAIN=etp.localhost).
+      CADDY_TLS: ${CADDY_TLS:?Set CADDY_TLS in deploy/.env (an email for Lets Encrypt, or internal)}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data # certificates: keep them (Let's Encrypt has rate limits)
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_started
+    logging: *logging
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+
+  # nginx: the built web app, security headers, /api /ws /health → api.
+  web:
+    image: etp-prod-web:${IMAGE_TAG}
+    build: ../frontend
+    volumes:
+      - webcerts:/etc/nginx/certs # its self-signed certificate (port 8443, not published here)
+    depends_on:
+      api:
+        condition: service_started
+    logging: *logging
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+
+  # One-shot: applies migrations (forward only), then exits. scripts/deploy.sh
+  # runs it (`run --rm migrate`) before replacing the API; the profile keeps
+  # `up` from starting it next to the API.
+  migrate:
+    <<: *backend
+    profiles: ["tools"]
+    command: ["npm", "run", "migrate:up"]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-etp}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-etp}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    <<: *backend
+    environment:
+      <<: *app-env
+      PORT: 3000
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  worker:
+    <<: *backend
+    command: ["node", "src/worker.js"]
+    environment:
+      <<: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # SIGTERM lets running jobs finish; give them time before SIGKILL.
+    stop_grace_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 384m
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-etp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}
+      POSTGRES_DB: ${POSTGRES_DB:-etp}
+      TZ: UTC
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging: *logging
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 768m
+
+  # Unlike on a computer, Redis keeps an append-only file: jobs waiting in the
+  # queues (emails, hold expiries) survive a restart. Cache and locks still
+  # only speed things up; PostgreSQL stays the source of truth.
+  redis:
+    image: redis:7.4-alpine
+    command:
+      - sh
+      - -c
+      - exec redis-server --requirepass "$$REDIS_PASSWORD" --maxmemory 256mb --maxmemory-policy noeviction --appendonly yes --appendfsync everysec --save ""
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in deploy/.env}
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=$$REDIS_PASSWORD redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging: *logging
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 320m
+
+  # Nightly backup (20:15 UTC = 03:15 in Vietnam): pg_dump + the uploaded
+  # images, kept 7 days + 4 weeks in ./backups (scripts/backup.sh). The same
+  # script runs before every deploy. Uses the postgres image for pg_dump and
+  # its busybox crond.
+  backup:
+    image: postgres:17-alpine
+    entrypoint: ["sh", "-c"]
+    command:
+      - echo "15 20 * * * sh /scripts/backup.sh daily > /proc/1/fd/1 2>&1" | crontab - && exec crond -f -l 8
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-etp}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-etp}
+      BACKUP_KEEP_DAILY: ${BACKUP_KEEP_DAILY:-7}
+      BACKUP_KEEP_WEEKLY: ${BACKUP_KEEP_WEEKLY:-4}
+      TZ: UTC
+    volumes:
+      - ./scripts/backup.sh:/scripts/backup.sh:ro
+      - ${BACKUP_DIR:-./backups}:/backups
+      - uploads:/uploads:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging: *logging
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+volumes:
+  pgdata:
+  redisdata:
+  uploads:
+  webcerts:
+  caddy_data:
+  caddy_config:

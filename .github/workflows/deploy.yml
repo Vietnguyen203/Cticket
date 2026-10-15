@@ -1,0 +1,65 @@
+# Deploy (Phase 16): when CI succeeds on main, the commit goes to the server.
+# See docs/deployment.md, section 9.
+#
+# OFF until the server exists: it runs only when the repository variable
+# DEPLOY_ENABLED is "true" (Settings → Secrets and variables → Actions →
+# Variables), with:
+#   variables  DEPLOY_HOST (server IP or name), DEPLOY_DOMAIN (the site)
+#   secrets    DEPLOY_SSH_KEY (private key of the CI key pair),
+#              DEPLOY_KNOWN_HOSTS (the server's host key: ssh-keyscan output)
+# The CI key can only run deploy/scripts/ci-deploy.sh on the server (forced
+# command in authorized_keys): it deploys a commit, nothing else.
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Commit or branch to deploy (default main)
+        required: false
+        default: main
+
+permissions:
+  contents: read
+
+# One deploy at a time; a newer one waits instead of cancelling a running one.
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      vars.DEPLOY_ENABLED == 'true' &&
+      (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+    name: Deploy to the server
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: production
+      url: https://${{ vars.DEPLOY_DOMAIN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || inputs.ref }}
+      - name: The exact commit
+        id: commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Deploy over SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          HOST: ${{ vars.DEPLOY_HOST }}
+          SHA: ${{ steps.commit.outputs.sha }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes "deploy@$HOST" "deploy $SHA"
+      - name: Smoke test from outside
+        run: bash deploy/scripts/smoke.sh "https://${{ vars.DEPLOY_DOMAIN }}"
