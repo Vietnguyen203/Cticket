@@ -20,6 +20,7 @@ import { OrderPage } from './pages/customer/OrderPage'
 import { SeatSelectPage } from './pages/customer/SeatSelectPage'
 import { TicketPage } from './pages/customer/TicketPage'
 import { VnpayReturnPage } from './pages/customer/VnpayReturnPage'
+import { WaitlistPage } from './pages/customer/WaitlistPage'
 import { AdminHomePage } from './pages/admin/AdminHomePage'
 import { CategoriesPage } from './pages/admin/CategoriesPage'
 import { EventReviewPage } from './pages/admin/EventReviewPage'
@@ -60,6 +61,7 @@ export const router = createBrowserRouter([
       // Phase 17: VNPay's vnp_ReturnUrl (VNPAY_RETURN_URL on the API).
       { path: 'payments/vnpay/return', element: signedIn(<VnpayReturnPage />) },
       { path: 'tickets', element: signedIn(<MyTicketsPage />) },
+      { path: 'waitlist', element: signedIn(<WaitlistPage />) }, // Phase 18.4
       { path: 'tickets/:id', element: signedIn(<TicketPage />) },
       { path: 'login', element: <LoginPage /> },
       { path: 'register', element: <RegisterPage /> },

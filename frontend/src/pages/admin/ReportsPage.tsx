@@ -94,7 +94,12 @@ function PlatformReport({ report: r }: { report: PlatformSales }) {
         <Stat label="Doanh thu" value={formatVnd(t.revenue)} note={t.discount > 0 ? `Gộp ${formatVnd(t.gross)} − giảm ${formatVnd(t.discount)}` : undefined} />
         <Stat label="Đơn / vé" value={`${t.orders} / ${t.tickets}`} note={`${t.buyers} người mua`} />
         <Stat label="Giá trị đơn trung bình" value={t.orders > 0 ? formatVnd(Math.round(t.revenue / t.orders)) : '—'} />
-        <Stat label="Hoàn tiền" value={formatVnd(t.refunds.amount)} note={`${t.refunds.orders} đơn`} tone={t.refunds.orders > 0 ? 'red' : undefined} />
+        <Stat
+          label="Hoàn tiền"
+          value={formatVnd(t.refunds.amount)}
+          note={`${t.refunds.orders} đơn${t.cancellationFees > 0 ? ` · phí hủy giữ lại ${formatVnd(t.cancellationFees)}` : ''}`}
+          tone={t.refunds.orders > 0 ? 'red' : undefined}
+        />
       </div>
 
       <ReportSection
@@ -168,8 +173,8 @@ function PlatformReport({ report: r }: { report: PlatformSales }) {
 
 function dailyRows(r: PlatformSales): Cell[][] {
   return [
-    ['Ngày', 'Số đơn', 'Số vé', 'Doanh thu (VND)', 'Đơn hoàn', 'Tiền hoàn (VND)'],
-    ...r.daily.map((d) => [d.date, d.orders, d.tickets, d.revenue, d.refunds.orders, d.refunds.amount]),
+    ['Ngày', 'Số đơn', 'Số vé', 'Doanh thu (VND)', 'Trong đó phí hủy (VND)', 'Đơn hoàn', 'Tiền hoàn (VND)'],
+    ...r.daily.map((d) => [d.date, d.orders, d.tickets, d.revenue, d.cancellationFees, d.refunds.orders, d.refunds.amount]),
   ]
 }
 

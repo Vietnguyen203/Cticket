@@ -11,14 +11,15 @@ const paymentsRepository = require('./payments.repository');
  *   once this commits; never an outside call while row locks are held.
  * @returns {Promise<string>} the refund id
  */
-async function startRefund(client, { payment, orderId, reason, requestedBy }) {
+async function startRefund(client, { payment, orderId, reason, requestedBy, amount = payment.amount }) {
+  // Phase 18.3: `amount` may be part of the payment (a customer's cancellation).
   if (payment.provider !== PAYMENT_PROVIDER.VNPAY) {
-    return paymentsRepository.insertRefund(client, { paymentId: payment.id, orderId, amount: payment.amount, reason });
+    return paymentsRepository.insertRefund(client, { paymentId: payment.id, orderId, amount, reason });
   }
   const refundId = await paymentsRepository.insertPendingRefund(client, {
     paymentId: payment.id,
     orderId,
-    amount: payment.amount,
+    amount,
     reason,
     requestedBy,
   });

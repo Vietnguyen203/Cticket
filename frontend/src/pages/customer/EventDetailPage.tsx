@@ -5,6 +5,7 @@ import { EventImage } from '../../components/EventImage'
 import { Alert, Card, FullPageSpinner } from '../../components/ui'
 import { formatDateTime, formatVnd } from '../../utils/format'
 import { useAsync } from '../../utils/useAsync'
+import { refundPolicyOf } from '../../payments/refundPolicy'
 
 type SaleState = 'on-sale' | 'not-yet' | 'closed' | 'over' | 'cancelled' | 'not-ready'
 
@@ -70,6 +71,11 @@ export function EventDetailPage() {
             <ScheduleBox key={schedule.id} schedule={schedule} slug={e.slug} />
           ))}
           {schedules.length === 0 && <p className="text-sm text-slate-500">Chưa có suất diễn.</p>}
+          {/* Phase 18.3 */}
+          <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
+            <p className="font-semibold">Chính sách hủy: {refundPolicyOf(e.refundPolicy).label}</p>
+            <p className="mt-1 text-slate-600">{refundPolicyOf(e.refundPolicy).summary}</p>
+          </div>
         </aside>
       </div>
     </div>

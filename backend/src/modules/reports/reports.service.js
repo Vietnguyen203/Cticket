@@ -21,11 +21,13 @@ function fillRate(sold, capacity, blocked) {
   return sellable > 0 ? Math.round((sold / sellable) * 1000) / 1000 : null;
 }
 
+// Phase 18.3: revenue = sold orders + cancellation fees kept (repository header).
 const toDay = (row) => ({
   date: row.date,
   orders: row.orders,
   tickets: row.tickets,
-  revenue: row.revenue,
+  revenue: row.revenue + row.cancellation_fees,
+  cancellationFees: row.cancellation_fees,
   refunds: { orders: row.refunded_orders, amount: row.refunded_amount },
 });
 
@@ -43,12 +45,13 @@ function sumPlaces(rows) {
 
 /** Money figures added up (schedule → event). */
 function sumMoney(rows) {
-  const total = { orders: 0, gross: 0, discount: 0, revenue: 0, refunds: { orders: 0, amount: 0 } };
+  const total = { orders: 0, gross: 0, discount: 0, revenue: 0, cancellationFees: 0, refunds: { orders: 0, amount: 0 } };
   for (const row of rows) {
     total.orders += row.orders;
     total.gross += row.gross;
     total.discount += row.discount;
     total.revenue += row.revenue;
+    total.cancellationFees += row.cancellationFees;
     total.refunds.orders += row.refunds.orders;
     total.refunds.amount += row.refunds.amount;
   }
@@ -100,7 +103,8 @@ async function eventSales(user, eventId) {
       orders: m?.orders ?? 0,
       gross: m?.gross ?? 0,
       discount: m?.discount ?? 0,
-      revenue: m?.revenue ?? 0,
+      revenue: (m?.revenue ?? 0) + (m?.cancellation_fees ?? 0),
+      cancellationFees: m?.cancellation_fees ?? 0,
       refunds: { orders: m?.refunded_orders ?? 0, amount: m?.refunded_amount ?? 0 },
       ...sumPlaces(types),
     };
@@ -135,7 +139,7 @@ async function eventSales(user, eventId) {
 async function myEvents(user) {
   const organizer = await organizers.findOrganizerByUserId(user.id);
   if (organizer?.status !== ORGANIZER_STATUS.ACTIVE) {
-    return { events: [], totals: { orders: 0, tickets: 0, revenue: 0, refunds: { orders: 0, amount: 0 } }, truncated: false };
+    return { events: [], totals: { orders: 0, tickets: 0, revenue: 0, cancellationFees: 0, refunds: { orders: 0, amount: 0 } }, truncated: false };
   }
   const rows = await reportsRepository.eventsOfOrganizer(pool, organizer.id, MAX_MY_EVENTS + 1);
   const events = rows.slice(0, MAX_MY_EVENTS).map((row) => ({
@@ -149,14 +153,16 @@ async function myEvents(user) {
     orders: row.orders,
     tickets: row.sold,
     fillRate: fillRate(row.sold, row.capacity, row.blocked),
-    revenue: row.revenue,
+    revenue: row.revenue + row.cancellation_fees,
+    cancellationFees: row.cancellation_fees,
     refunds: { orders: row.refunded_orders, amount: row.refunded_amount },
   }));
-  const totals = { orders: 0, tickets: 0, revenue: 0, refunds: { orders: 0, amount: 0 } };
+  const totals = { orders: 0, tickets: 0, revenue: 0, cancellationFees: 0, refunds: { orders: 0, amount: 0 } };
   for (const e of events) {
     totals.orders += e.orders;
     totals.tickets += e.tickets;
     totals.revenue += e.revenue;
+    totals.cancellationFees += e.cancellationFees;
     totals.refunds.orders += e.refunds.orders;
     totals.refunds.amount += e.refunds.amount;
   }
@@ -189,7 +195,12 @@ async function platformSales({ from, to }) {
   const organizerRows = await reportsRepository.byOrganizer(pool, { from, to, limit: MAX_ORGANIZERS });
   return {
     range: { from, to },
-    totals: { ...sold, refunds: refunded },
+    totals: {
+      ...sold,
+      revenue: sold.revenue + refunded.fees,
+      cancellationFees: refunded.fees,
+      refunds: { orders: refunded.orders, amount: refunded.amount },
+    },
     daily: daily.map(toDay),
     topEvents: top.map(toTopEvent),
     byOrganizer: organizerRows.map((row) => ({
@@ -203,11 +214,12 @@ async function platformSales({ from, to }) {
 }
 
 function sumDays(days) {
-  const total = { orders: 0, tickets: 0, revenue: 0, refunds: { orders: 0, amount: 0 } };
+  const total = { orders: 0, tickets: 0, revenue: 0, cancellationFees: 0, refunds: { orders: 0, amount: 0 } };
   for (const day of days) {
     total.orders += day.orders;
     total.tickets += day.tickets;
     total.revenue += day.revenue;
+    total.cancellationFees += day.cancellationFees;
     total.refunds.orders += day.refunds.orders;
     total.refunds.amount += day.refunds.amount;
   }

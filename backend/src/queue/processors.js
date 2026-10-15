@@ -1,4 +1,5 @@
 const { withTransaction } = require('../database/transaction');
+const { pool } = require('../database/pool');
 const { ORDER_STATUS } = require('../config/constants');
 const mailer = require('../mail/mailer');
 const { orderConfirmedEmail, orderRefundedEmail } = require('../mail/templates');
@@ -9,6 +10,8 @@ const orders = require('../modules/orders');
 const tickets = require('../modules/tickets');
 const notifications = require('../modules/notifications');
 const payments = require('../modules/payments');
+const reminders = require('../modules/reminders');
+const waitlist = require('../modules/waitlist');
 const { QUEUE } = require('./queues');
 
 /**
@@ -53,18 +56,29 @@ const HANDLERS = {
     'order-confirmed': sendOrderConfirmation,
     'order-refunded': sendRefundConfirmation,
     'payment-returned': (data) => payments.sendPaymentReturnedEmail(data), // Phase 17: late VNPay money
+    'login-locked': (data) => auth.sendLoginLockedEmail(data), // Phase 18.1
+    'event-reminder': (data) => reminders.sendReminderEmail(data), // Phase 18.2
+    'waitlist-offer': (data) => waitlist.sendOfferEmail(data), // Phase 18.4
   },
   [QUEUE.HOLDS]: {
     expire: ({ orderId }) => orders.expireOrder(orderId),
   },
   [QUEUE.NOTIFICATIONS]: {
     notify: (data) => notifications.createNotification(data),
+    // Phase 18.4: built when it runs (the offer may have ended meanwhile).
+    'notify-waitlist': async (data) => {
+      const notification = await waitlist.offerNotification(data);
+      return notification ? notifications.createNotification(notification) : 'skipped';
+    },
   },
   [QUEUE.MAINTENANCE]: {
     'reconcile-tickets': () => tickets.reconcileTickets(),
     'sweep-holds': () => orders.expireDueOrders(),
     'finish-shows': finishShows,
     'reconcile-payments': () => payments.reconcileGatewayPayments(), // Phase 17
+    'purge-login-attempts': () => auth.purgeLoginAttempts(pool), // Phase 18.1
+    'send-reminders': () => reminders.sendDueReminders(), // Phase 18.2
+    'offer-waitlist': () => waitlist.offerSpacesToWaitlist(), // Phase 18.4
   },
   [QUEUE.PAYMENTS]: {
     'vnpay-refund': (data, job) => payments.processVnpayRefund(data, job),

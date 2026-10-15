@@ -8,6 +8,9 @@ const { isRevoked, revokeAllTokensOfUser } = require('./denylist');
 const { sendOtpEmail } = require('./otp.service');
 const { revokeAllRefreshTokensOfUser } = require('./auth.repository');
 const twoFactor = require('./two-factor.service');
+const loginGuard = require('./login-guard');
+const mailer = require('../../mail/mailer');
+const { loginLockedEmail } = require('../../mail/templates');
 
 module.exports = {
   verifyAccessToken,
@@ -23,4 +26,10 @@ module.exports = {
   enableKnownTotpSecret: twoFactor.enableKnownSecret,
   /** Queue the "two-factor was reset" email for a user row (email, first_name). */
   alertTwoFactorReset: (user) => twoFactor.queueAlert(user, twoFactor.ALERT.RESET),
+  // Phase 18.1
+  clearLoginLock: loginGuard.clear,
+  loginLockedUntilOf: loginGuard.lockedUntilOf,
+  purgeLoginAttempts: loginGuard.purgeOld,
+  /** Emails queue: "your account was locked after wrong passwords". */
+  sendLoginLockedEmail: ({ to, firstName, minutes }) => mailer.sendMail({ to, ...loginLockedEmail({ firstName, minutes }) }),
 };

@@ -57,4 +57,17 @@ async function reissueQr(req, res) {
   return sendSuccess(res, { ticket: await tickets.reissueQr(requestContext(req), req.valid.params.id) });
 }
 
-module.exports = { listUsers, changeUserStatus, setUserRoles, resetUserTwoFactor, listAuditLogs, listAuditActions, reissueQr };
+async function unlockUserLogin(req, res) {
+  return sendSuccess(res, { user: await adminUsersService.unlockLogin(requestContext(req), req.valid.params.id) });
+}
+
+module.exports = {
+  listUsers,
+  changeUserStatus,
+  setUserRoles,
+  resetUserTwoFactor,
+  unlockUserLogin,
+  listAuditLogs,
+  listAuditActions,
+  reissueQr,
+};

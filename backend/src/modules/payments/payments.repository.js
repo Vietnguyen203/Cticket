@@ -185,7 +185,7 @@ async function insertPendingRefund(db, { paymentId, orderId, amount, reason, req
 async function lockRefund(db, id) {
   const { rows } = await db.query(
     `SELECT r.id, r.status, r.amount, r.order_id, r.requested_by, r.attempts,
-            p.id AS payment_id, p.provider, p.provider_ref, p.provider_create_date, p.provider_transaction_id
+            p.id AS payment_id, p.amount AS payment_amount, p.provider, p.provider_ref, p.provider_create_date, p.provider_transaction_id
      FROM refunds r JOIN payments p ON p.id = r.payment_id
      WHERE r.id = $1
      FOR UPDATE OF r`,

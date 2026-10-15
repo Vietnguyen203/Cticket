@@ -21,7 +21,8 @@ const SLUG_CONSTRAINT = 'events_slug_key';
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Fields an organizer may still change after the event is PUBLISHED. */
-const EDITABLE_WHEN_PUBLISHED = ['description', 'bannerUrl', 'thumbnailUrl'];
+// Phase 18.3: the refund policy too (an order cancelled later follows the policy of that moment).
+const EDITABLE_WHEN_PUBLISHED = ['description', 'bannerUrl', 'thumbnailUrl', 'refundPolicy'];
 
 function toEventSummary(row) {
   return {
@@ -47,6 +48,7 @@ function toEventDetail(row, schedules) {
     bannerUrl: row.banner_url,
     thumbnailUrl: row.thumbnail_url,
     ageRestriction: row.age_restriction,
+    refundPolicy: row.refund_policy, // Phase 18.3
     status: row.status,
     publishedAt: row.published_at,
     createdAt: row.created_at,

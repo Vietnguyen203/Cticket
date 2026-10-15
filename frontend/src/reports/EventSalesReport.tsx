@@ -38,7 +38,7 @@ export function EventSalesReport({ eventId, header }: { eventId: string; header?
         <Stat
           label="Hoàn tiền"
           value={formatVnd(t.refunds.amount)}
-          note={`${t.refunds.orders} đơn (không tính vào doanh thu)`}
+          note={`${t.refunds.orders} đơn (không tính vào doanh thu)${t.cancellationFees > 0 ? ` · phí hủy giữ lại ${formatVnd(t.cancellationFees)} (đã tính vào doanh thu)` : ''}`}
           tone={t.refunds.orders > 0 ? 'red' : undefined}
         />
       </div>
@@ -131,8 +131,8 @@ export function EventSalesReport({ eventId, header }: { eventId: string; header?
 
 function dailyRows(r: EventSales): Cell[][] {
   return [
-    ['Ngày', 'Số đơn', 'Số vé', 'Doanh thu (VND)', 'Đơn hoàn', 'Tiền hoàn (VND)'],
-    ...r.daily.map((d) => [d.date, d.orders, d.tickets, d.revenue, d.refunds.orders, d.refunds.amount]),
+    ['Ngày', 'Số đơn', 'Số vé', 'Doanh thu (VND)', 'Trong đó phí hủy (VND)', 'Đơn hoàn', 'Tiền hoàn (VND)'],
+    ...r.daily.map((d) => [d.date, d.orders, d.tickets, d.revenue, d.cancellationFees, d.refunds.orders, d.refunds.amount]),
   ]
 }
 

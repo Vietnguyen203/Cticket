@@ -35,6 +35,8 @@ export interface EventInput {
   bannerUrl?: string | null
   thumbnailUrl?: string | null
   ageRestriction?: number | null
+  /** Phase 18.3 */
+  refundPolicy?: 'NONE' | 'STANDARD' | 'FLEXIBLE'
   categoryIds: string[]
 }
 

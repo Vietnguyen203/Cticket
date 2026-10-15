@@ -16,6 +16,12 @@ const MAINTENANCE_SCHEDULE = [
   { name: 'finish-shows', every: 10 * MINUTE_MS },
   // Phase 17: VNPay attempts at their order's deadline are asked about before the seats are released.
   { name: 'reconcile-payments', every: MINUTE_MS },
+  // Phase 18.1: login lock streaks older than a day.
+  { name: 'purge-login-attempts', every: 60 * MINUTE_MS },
+  // Phase 18.2: reminders 24 hours / 2 hours before the show.
+  { name: 'send-reminders', every: 5 * MINUTE_MS },
+  // Phase 18.4: freed places go to the waiting list.
+  { name: 'offer-waitlist', every: MINUTE_MS },
 ];
 
 /**

@@ -8,6 +8,7 @@ const updateProfile = nonEmptyPatch(
     firstName: personName.optional(),
     lastName: personName.optional(),
     phone: phoneNumber.nullable().optional(),
+    eventReminders: z.boolean().optional(), // Phase 18.2
   }),
 );
 

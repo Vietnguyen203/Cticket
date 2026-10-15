@@ -88,7 +88,13 @@ const ERROR_CODES = Object.freeze({
   LAST_ADMIN: { status: 409, message: 'The platform must keep at least one active administrator.' },
   TICKET_NOT_REISSUABLE: { status: 409, message: 'Only a valid (not used, not refunded) ticket can get a new QR code.' },
   STAFF_USER_NOT_FOUND: { status: 422, message: 'No active account uses this email.' },
+  WAITLIST_NOT_NEEDED: { status: 409, message: 'There are tickets left: book them now instead of waiting.' },
+  WAITLIST_ALREADY_JOINED: { status: 409, message: 'You are already on the waiting list for this ticket type.' },
+  WAITLIST_RESERVED: { status: 409, message: 'These tickets are kept for people on the waiting list. Try again later.' },
+  ORDER_NOT_CANCELLABLE: { status: 409, message: 'This order cannot be cancelled by its buyer.' },
+  REFUND_TERMS_CHANGED: { status: 409, message: 'The refund for this order has changed. Check the new amount.' },
   RATE_LIMITED: { status: 429, message: 'Too many requests. Please slow down.' },
+  LOGIN_LOCKED: { status: 429, message: 'Too many failed sign-ins for this email. Try again later or reset the password.' },
   INTERNAL_ERROR: { status: 500, message: 'An unexpected error occurred.' },
   SERVICE_UNAVAILABLE: { status: 503, message: 'The service is temporarily unavailable.' },
 });

@@ -19,6 +19,7 @@ const authRepository = require('./auth.repository');
 const tokens = require('./auth.tokens');
 const sessions = require('./sessions');
 const denylist = require('./denylist');
+const loginGuard = require('./login-guard');
 
 /**
  * Two-factor authentication with an authenticator app (Phase 15).
@@ -135,7 +136,10 @@ async function assertUsable(claims) {
   if (used !== null || Number(attempts ?? 0) >= TWO_FACTOR.MAX_ATTEMPTS) throw new AppError('MFA_TOKEN_INVALID');
 }
 
-async function failWrongCode(claims) {
+/** Phase 18.1: a wrong code counts like a wrong password for the account's email. */
+async function failWrongCode(claims, user) {
+  const { locked, lockSeconds } = await loginGuard.failAndMaybeAlert(pool, user.email, user);
+  if (locked) throw new AppError('LOGIN_LOCKED', undefined, { details: { retryAfterSeconds: lockSeconds } });
   const [[, count]] = await withRedis(() =>
     redis.multi().incr(attemptsKey(claims.jti)).expire(attemptsKey(claims.jti), secondsLeft(claims)).exec(),
   );
@@ -175,13 +179,15 @@ async function needsTwoFactor(db, userId, roles) {
 async function verifyLogin({ mfaToken, code, recoveryCode }, meta) {
   const claims = tokens.verifyMfaToken(mfaToken, 'verify');
   const user = await activeUser(claims.userId);
+  await loginGuard.assertNotLocked(pool, user.email);
   await assertUsable(claims);
 
   const ok = code
     ? await useTotpCode(pool, user.id, code)
     : await repository.useRecoveryCode(pool, user.id, hashRecoveryCode(user.id, recoveryCode));
-  if (!ok) await failWrongCode(claims);
+  if (!ok) await failWrongCode(claims, user);
   await markUsed(claims);
+  await loginGuard.clear(pool, user.email);
 
   const roles = await users.findRoleCodes(pool, user.id);
   const session = await sessions.openSession(pool, { user, roles, meta, mfa: true });
@@ -203,6 +209,7 @@ async function startLoginSetup({ mfaToken }) {
 async function confirmLoginSetup({ mfaToken, code }, meta) {
   const claims = tokens.verifyMfaToken(mfaToken, 'setup');
   const user = await activeUser(claims.userId);
+  await loginGuard.assertNotLocked(pool, user.email);
   await assertUsable(claims);
 
   const result = await withTransaction(async (client) => {
@@ -212,7 +219,8 @@ async function confirmLoginSetup({ mfaToken, code }, meta) {
     const roles = await users.findRoleCodes(client, user.id);
     return { recoveryCodes, session: await sessions.openSession(client, { user, roles, meta, mfa: true }) };
   });
-  if (!result) await failWrongCode(claims);
+  if (!result) await failWrongCode(claims, user);
+  await loginGuard.clear(pool, user.email);
   await queueAlert(user, ALERT.ENABLED);
   return { ...result, remember: claims.remember };
 }

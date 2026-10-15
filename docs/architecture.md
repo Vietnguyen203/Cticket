@@ -39,14 +39,16 @@ flowchart LR
 
 | Module | Việc |
 |---|---|
-| `auth` | Đăng ký, OTP email, đăng nhập, xác thực hai lớp (TOTP), refresh token xoay vòng, đăng xuất, denylist |
+| `auth` | Đăng ký, OTP email, đăng nhập, xác thực hai lớp (TOTP), khóa đăng nhập theo email khi sai nhiều lần, refresh token xoay vòng, đăng xuất, denylist |
 | `users` | Hồ sơ, vai trò và quyền (RBAC, bảng quyền cache trong bộ nhớ) |
 | `organizers` | Đăng ký làm nhà tổ chức, duyệt |
 | `categories`, `venues` | Danh mục; địa điểm, khu, ghế (sinh hàng loạt), địa điểm do nhà tổ chức đề xuất |
 | `events` | Sự kiện, suất diễn, hạng vé, sơ đồ ghế, tồn kho, máy trạng thái sự kiện, nhân viên soát vé |
 | `orders` | Giữ chỗ, đổi / bỏ ghế trong đơn đang giữ, đơn hàng, checkout, hết hạn, hủy, xóa dữ liệu bán của sự kiện |
 | `promotions` | Mã giảm giá (giới hạn tổng / mỗi người, thời hạn) |
-| `payments` | Thanh toán qua VNPay (URL có chữ ký, IPN, Return URL, đối soát, hoàn tiền qua hàng đợi) và giả lập có idempotency; hoàn tiền |
+| `payments` | Thanh toán qua VNPay (URL có chữ ký, IPN, Return URL, đối soát, hoàn tiền qua hàng đợi) và giả lập có idempotency; hoàn tiền (cả hoàn một phần); khách tự hủy đơn theo chính sách hoàn của sự kiện |
+| `reminders` | Nhắc lịch 24 giờ / 2 giờ trước giờ diễn (email + thông báo), mỗi lần nhắc gửi đúng một lần |
+| `waitlist` | Danh sách chờ khi hạng vé hết: job mời người chờ sớm nhất, giữ chỗ cho họ 30 phút (kiểm tra ngay trong giao dịch giữ chỗ) |
 | `tickets` | Phát vé, mã QR ký HMAC có phiên bản, cấp lại QR |
 | `checkins` | Soát vé, lịch sử, thống kê |
 | `notifications` | Thông báo trong app + đẩy qua WebSocket |
@@ -145,7 +147,7 @@ sequenceDiagram
 
 ## 8. Hàng đợi và worker
 
-BullMQ trên Redis: `tickets`, `emails`, `holds` (hết hạn giữ chỗ đúng giờ), `notifications`, `payments` (hoàn tiền qua VNPay), `maintenance` (mỗi phút: phát bù vé, quét đơn quá hạn, đối soát lượt VNPay; mỗi 10 phút: kết thúc suất đã diễn). Job thử lại có back-off; thao tác trong job **idempotent** (chạy lại không sinh vé trùng). Worker tắt an toàn: chờ job đang chạy xong.
+BullMQ trên Redis: `tickets`, `emails`, `holds` (hết hạn giữ chỗ đúng giờ), `notifications`, `payments` (hoàn tiền qua VNPay), `maintenance` (mỗi phút: phát bù vé, quét đơn quá hạn, đối soát lượt VNPay, mời người trong danh sách chờ; mỗi 5 phút: nhắc lịch; mỗi 10 phút: kết thúc suất đã diễn; mỗi giờ: dọn bộ đếm đăng nhập sai). Job thử lại có back-off; thao tác trong job **idempotent** (chạy lại không sinh vé trùng). Worker tắt an toàn: chờ job đang chạy xong.
 
 ## 9. Web app
 

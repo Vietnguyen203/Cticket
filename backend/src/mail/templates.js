@@ -74,7 +74,11 @@ function orderConfirmedEmail({ order, tickets }) {
 /** Sent after a refund (Q-02). */
 function orderRefundedEmail({ order }) {
   const greeting = order.first_name ? `Xin chào ${order.first_name},` : 'Xin chào,';
-  const body = `Đơn ${order.order_code} (${order.event_title}) đã được hoàn ${formatVnd(order.total_amount)}. Các vé của đơn không còn hiệu lực.`;
+  // Phase 18.3: a customer's cancellation refunds part of it; the rest is the fee of the event's policy.
+  const refunded = order.refunded_amount ?? order.total_amount;
+  const fee = order.total_amount - refunded;
+  const feeNote = fee > 0 ? ` Phí hủy theo chính sách của sự kiện: ${formatVnd(fee)}.` : '';
+  const body = `Đơn ${order.order_code} (${order.event_title}) đã được hoàn ${formatVnd(refunded)}.${feeNote} Các vé của đơn không còn hiệu lực.`;
   return {
     subject: `Đã hoàn tiền đơn ${order.order_code}`,
     text: `${greeting}\n\n${body}`,
@@ -134,4 +138,76 @@ function paymentReturnedEmail({ firstName, orderCode, amount }) {
   };
 }
 
-module.exports = { otpEmail, orderConfirmedEmail, orderRefundedEmail, twoFactorEmail, paymentReturnedEmail, escapeHtml };
+/** Phase 18.1: the first lock of a streak of wrong passwords / codes. */
+function loginLockedEmail({ firstName, minutes }) {
+  const greeting = firstName ? `Xin chào ${firstName},` : 'Xin chào,';
+  const body = `Có người vừa nhập sai mật khẩu hoặc mã xác thực của tài khoản này nhiều lần liên tiếp, nên việc đăng nhập bằng email này tạm khóa ${minutes} phút. Bạn vẫn có thể đặt lại mật khẩu ngay để vào lại.`;
+  const warning = 'Nếu không phải bạn, hãy đổi mật khẩu: có thể ai đó đang thử đoán mật khẩu của bạn.';
+  return {
+    subject: 'Đăng nhập tạm khóa sau nhiều lần sai mật khẩu',
+    text: `${greeting}\n\n${body}\n\n${warning}`,
+    html: `<p>${escapeHtml(greeting)}</p>\n<p>${escapeHtml(body)}</p>\n<p><strong>${warning}</strong></p>`,
+  };
+}
+
+const REMINDER_WHEN = { '24H': 'ngày mai', '2H': 'khoảng 2 giờ nữa' };
+const timeOfDay = (date) =>
+  new Date(date).toLocaleTimeString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit' });
+
+/**
+ * Phase 18.2: 24 hours / 2 hours before the show.
+ * @param {{ order: object, tickets: Array<{ code: string, seatLabel: string|null, ticketTypeName: string }>,
+ *   kind: '24H'|'2H', gatesOpenAt: Date }} params
+ */
+function eventReminderEmail({ order, tickets, kind, gatesOpenAt }) {
+  const greeting = order.first_name ? `Xin chào ${order.first_name},` : 'Xin chào,';
+  const when = `${formatTime(order.start_at)}`;
+  const where = `${order.venue_name}, ${order.venue_address}, ${order.venue_city}`;
+  const intro = `${order.event_title} sẽ diễn ra ${REMINDER_WHEN[kind]}: ${when}.`;
+  const gates = `Cổng soát vé mở từ ${timeOfDay(gatesOpenAt)}. Mở mục Vé của tôi trong ứng dụng để lấy mã QR khi vào cổng.`;
+  const lines = tickets.map((t) => `${t.code} — ${t.ticketTypeName}${t.seatLabel ? `, ghế ${t.seatLabel}` : ''}`);
+  return {
+    subject: `Nhắc lịch: ${order.event_title} — ${REMINDER_WHEN[kind]}`,
+    text: [greeting, '', intro, `Địa điểm: ${where}.`, '', `Vé của bạn (${tickets.length}):`, ...lines, '', gates].join('\n'),
+    html: `<p>${escapeHtml(greeting)}</p>
+<p>${escapeHtml(intro)}</p>
+<p>Địa điểm: ${escapeHtml(where)}</p>
+<p>Vé của bạn (${tickets.length}):</p>
+<ul>${lines.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}</ul>
+<p>${escapeHtml(gates)}</p>
+<p style="color:#64748b;font-size:12px">Không muốn nhận email nhắc lịch? Tắt trong trang Tài khoản.</p>`,
+  };
+}
+
+/**
+ * Phase 18.4: places freed up for someone on the waiting list; kept for them
+ * until the offer ends.
+ * @param {{ first_name: string|null, event_title: string, start_at: Date, venue_name: string,
+ *   ticket_type_name: string, quantity: number, offer_expires_at: Date }} entry
+ */
+function waitlistOfferEmail(entry) {
+  const greeting = entry.first_name ? `Xin chào ${entry.first_name},` : 'Xin chào,';
+  const body = `Đã có ${entry.quantity} vé hạng ${entry.ticket_type_name} cho ${entry.event_title} (${formatTime(entry.start_at)}, ${entry.venue_name}).`;
+  const deadline = `Số vé này được giữ riêng cho bạn tới ${timeOfDay(entry.offer_expires_at)}. Sau đó vé được mời cho người tiếp theo trong danh sách chờ.`;
+  const action = 'Mở mục Danh sách chờ trong ứng dụng và bấm "Đặt ngay".';
+  return {
+    subject: `Đã có vé: ${entry.event_title}`,
+    text: [greeting, '', body, deadline, '', action].join('\n'),
+    html: `<p>${escapeHtml(greeting)}</p>
+<p>${escapeHtml(body)}</p>
+<p><strong>${escapeHtml(deadline)}</strong></p>
+<p>${escapeHtml(action)}</p>`,
+  };
+}
+
+module.exports = {
+  waitlistOfferEmail,
+  eventReminderEmail,
+  otpEmail,
+  orderConfirmedEmail,
+  orderRefundedEmail,
+  twoFactorEmail,
+  paymentReturnedEmail,
+  loginLockedEmail,
+  escapeHtml,
+};

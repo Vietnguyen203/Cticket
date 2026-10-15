@@ -200,6 +200,8 @@ export interface AdminUser {
   emailVerifiedAt: string | null
   roles: Role[]
   twoFactorEnabled: boolean
+  /** Phase 18.1: sign-in paused after wrong passwords until then (null = not locked) */
+  loginLockedUntil: string | null
   createdAt: string
 }
 
@@ -211,6 +213,11 @@ export async function listUsers(params: { q?: string; role?: Role; status?: stri
 /** Phase 15: someone lost their phone: two-factor off, logged out everywhere (reason required). */
 export async function resetUserTwoFactor(id: string, reason: string): Promise<AdminUser> {
   return (await api.post(`/admin/users/${id}/2fa/reset`, { reason })).data.data.user
+}
+
+/** Phase 18.1: end a sign-in lock (after wrong passwords) early. */
+export async function unlockUserLogin(id: string): Promise<AdminUser> {
+  return (await api.post(`/admin/users/${id}/login-unlock`)).data.data.user
 }
 
 /** Suspending logs the user out everywhere at once (reason required). */

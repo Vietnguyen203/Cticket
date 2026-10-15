@@ -130,10 +130,22 @@ export function LoginPage() {
   }
 
   const attemptsLeft = (error?.details as { attemptsLeft?: number } | undefined)?.attemptsLeft
+  // Phase 18.1: how long the email stays locked.
+  const lockedSeconds = (error?.details as { retryAfterSeconds?: number } | undefined)?.retryAfterSeconds
   const errorAlert = error && (
     <Alert>
       {error.message}
       {attemptsLeft !== undefined && ` Còn ${attemptsLeft} lần thử.`}
+      {error.code === 'LOGIN_LOCKED' && (
+        <>
+          {' '}
+          Thử lại sau {Math.max(1, Math.ceil((lockedSeconds ?? 60) / 60))} phút, hoặc{' '}
+          <Link to="/forgot-password" className="font-semibold underline">
+            đặt lại mật khẩu
+          </Link>{' '}
+          để vào ngay.
+        </>
+      )}
       {error.code === 'EMAIL_NOT_VERIFIED' && (
         <button type="button" onClick={verifyNow} className="ml-1 font-semibold underline">
           Gửi mã xác minh

@@ -79,7 +79,10 @@ async function findPaidOrdersWithoutTickets(db, { olderThanSeconds, limit }) {
 async function confirmationOf(db, orderId) {
   const { rows } = await db.query(
     `SELECT o.id, o.order_code, o.status, o.total_amount, o.discount_amount, o.currency,
-            u.email, u.first_name, e.title AS event_title, es.start_at, v.name AS venue_name
+            u.email, u.first_name, u.event_reminders, e.title AS event_title, es.start_at, es.status AS schedule_status,
+            v.name AS venue_name, v.address_line AS venue_address, v.city AS venue_city,
+            -- Phase 18.3: a customer's cancellation gives back part of it.
+            least(o.total_amount, (SELECT coalesce(sum(r.amount), 0) FROM refunds r WHERE r.order_id = o.id))::bigint AS refunded_amount
      FROM orders o
      JOIN users u ON u.id = o.user_id
      JOIN event_schedules es ON es.id = o.schedule_id

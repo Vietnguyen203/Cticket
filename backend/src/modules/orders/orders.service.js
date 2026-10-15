@@ -17,6 +17,7 @@ const AppError = require('../../utils/AppError');
 const { toLimitOffset, toPageMeta } = require('../../utils/pagination');
 const { recordAudit } = require('../audit');
 const events = require('../events');
+const waitlist = require('../waitlist');
 const promotions = require('../promotions');
 const ordersRepository = require('./orders.repository');
 const { releaseHeldOrder, expireOrder, expireDueOrders } = require('./order-release');
@@ -227,6 +228,16 @@ const gaLine = (ticketType, quantity) => ({
   quantity,
 });
 
+/** Phase 18.4: places a booking / an edit adds per ticket type (removed places count back). */
+function placesPerType(seatTypeIds, gaChanges = [], removedSeatTypeIds = []) {
+  const places = new Map();
+  const add = (id, n) => places.set(id, (places.get(id) ?? 0) + n);
+  seatTypeIds.forEach((id) => add(id, 1));
+  removedSeatTypeIds.forEach((id) => add(id, -1));
+  gaChanges.forEach(({ ticketTypeId, quantity }) => add(ticketTypeId, quantity));
+  return places;
+}
+
 /** max_per_order of each ticket type (the overall cap is checked before any lock). */
 function assertPerTypeLimits(seats, gaItems) {
   const perType = new Map();
@@ -270,6 +281,14 @@ function placeOrder(actor, scheduleId, { seatIds = [], items = [] }) {
 
     const seats = seatIds.length > 0 ? await lockRequestedSeats(client, scheduleId, seatIds) : [];
     assertPerTypeLimits(seats, gaItems);
+    // Phase 18.4: not the places kept for someone on the waiting list.
+    await waitlist.assertCanTake(client, {
+      userId: actor.userId,
+      wanted: placesPerType(
+        seats.map((seat) => seat.ticket_type_id),
+        gaItems.map(({ ticketType, quantity }) => ({ ticketTypeId: ticketType.id, quantity })),
+      ),
+    });
 
     const heldSeats =
       seats.length > 0 ? await events.holdSeats(client, { scheduleId, seatIds, orderId: order.id }) : [];
@@ -485,6 +504,17 @@ function applyEdit(actor, { id: orderId, schedule_id: scheduleId }, wantedOf) {
       ),
       ticketTypesById,
     );
+    // Phase 18.4: what the edit adds must not be places kept for the waiting list.
+    if (diff.adds) {
+      await waitlist.assertCanTake(client, {
+        userId: actor.userId,
+        wanted: placesPerType(
+          added.map((seat) => seat.ticket_type_id),
+          diff.gaChanges.map(({ ticketTypeId, from, to }) => ({ ticketTypeId, quantity: to - from })),
+          lines.filter((line) => diff.removeSeatIds.includes(line.seat_id)).map((line) => line.ticket_type_id),
+        ),
+      });
+    }
 
     const room = scheduleRoom(scheduleId);
     if (diff.removeSeatIds.length > 0) {

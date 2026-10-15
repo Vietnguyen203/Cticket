@@ -41,7 +41,9 @@ export function MyEventsPage() {
           <Stat
             label="Hoàn tiền"
             value={formatVnd(sales.data.totals.refunds.amount)}
-            note={`${sales.data.totals.refunds.orders} đơn`}
+            note={`${sales.data.totals.refunds.orders} đơn${
+              sales.data.totals.cancellationFees > 0 ? ` · phí hủy giữ lại ${formatVnd(sales.data.totals.cancellationFees)}` : ''
+            }`}
             tone={sales.data.totals.refunds.orders > 0 ? 'red' : undefined}
           />
         </div>

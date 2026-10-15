@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { listUsers, resetUserTwoFactor, setUserRoles, setUserStatus, type AdminUser } from '../../api/admin'
+import { listUsers, resetUserTwoFactor, setUserRoles, setUserStatus, unlockUserLogin, type AdminUser } from '../../api/admin'
 import { toApiError } from '../../api/errors'
 import type { Role } from '../../api/types'
 import { ConfirmDialog, EmptyRow, PageHeader, Pagination, StatusBadge, TableCard } from '../../admin/components'
@@ -43,6 +43,17 @@ export function UsersPage() {
       }),
     JSON.stringify(filters),
   )
+
+  /** Phase 18.1 */
+  async function unlockLogin(user: AdminUser) {
+    try {
+      await unlockUserLogin(user.id)
+      setMessage({ tone: 'success', text: `${user.email} đăng nhập lại được ngay.` })
+      list.reload()
+    } catch (err) {
+      setMessage({ tone: 'error', text: toApiError(err).message })
+    }
+  }
 
   async function reactivate(user: AdminUser) {
     try {
@@ -127,6 +138,11 @@ export function UsersPage() {
                   ) : (
                     <StatusBadge status={user.status} />
                   )}
+                  {user.loginLockedUntil && (
+                    <p className="mt-1 text-xs text-amber-700" title="Nhập sai mật khẩu nhiều lần">
+                      Tạm khóa đăng nhập tới {formatDateTime(user.loginLockedUntil)}
+                    </p>
+                  )}
                 </td>
                 <td className="text-xs">
                   {user.twoFactorEnabled ? <span className="font-semibold text-emerald-700">Bật</span> : <span className="text-slate-400">—</span>}
@@ -140,6 +156,11 @@ export function UsersPage() {
                       <Button variant="ghost" onClick={() => setEditingRoles(user)}>
                         Phân quyền
                       </Button>
+                      {user.loginLockedUntil && (
+                        <Button variant="ghost" onClick={() => void unlockLogin(user)}>
+                          Mở khóa đăng nhập
+                        </Button>
+                      )}
                       {user.twoFactorEnabled && (
                         <Button variant="ghost" onClick={() => setResetting(user)}>
                           Đặt lại 2FA

@@ -15,6 +15,7 @@ import {
 import { OrderStatusBadge } from '../../admin/OrderStatusBadge'
 import { Alert, Button, Card, FullPageSpinner } from '../../components/ui'
 import { VNPAY_MIN_SECONDS, vnpayReason } from '../../payments/vnpayReasons'
+import { CancelOrderCard } from './CancelOrderCard'
 import { realtime } from '../../realtime'
 import { formatDateTime, formatVnd } from '../../utils/format'
 import { mmss, useCountdown } from '../../utils/useCountdown'
@@ -282,6 +283,9 @@ export function OrderPage() {
           </Button>
         </Card>
       )}
+
+      {/* Phase 18.3: cancel under the event's refund policy (keyed so a new status reloads the terms). */}
+      {o.status === 'PAID' && <CancelOrderCard key={o.status} orderId={o.id} onCancelled={reload} />}
 
       {(o.refunds ?? []).length > 0 && (
         <Card className="space-y-2 text-sm">

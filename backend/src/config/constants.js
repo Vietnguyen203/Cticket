@@ -43,6 +43,43 @@ const TWO_FACTOR = Object.freeze({
   RECOVERY_CODES: 10,
 });
 
+// Phase 18.1: wrong passwords (and two-factor codes) per email before a pause.
+const LOGIN_LOCK = Object.freeze({
+  FAILURES: 5,
+  FIRST_LOCK_SECONDS: 15 * 60, // doubled at each further lock of a streak
+  MAX_LOCK_SECONDS: 24 * 60 * 60,
+  STREAK_RESET_SECONDS: 24 * 60 * 60, // a day without a failure starts over
+});
+
+// Phase 18.3: what a customer gets back when cancelling a paid order. Tiers
+// from the earliest: cancelling at least `hoursBefore` the show refunds `percent`.
+const REFUND_POLICY = Object.freeze({ NONE: 'NONE', STANDARD: 'STANDARD', FLEXIBLE: 'FLEXIBLE' });
+const REFUND_POLICY_TIERS = Object.freeze({
+  [REFUND_POLICY.NONE]: [],
+  [REFUND_POLICY.STANDARD]: [
+    { hoursBefore: 7 * 24, percent: 80 },
+    { hoursBefore: 3 * 24, percent: 50 },
+  ],
+  [REFUND_POLICY.FLEXIBLE]: [
+    { hoursBefore: 48, percent: 100 },
+    { hoursBefore: 24, percent: 50 },
+  ],
+});
+
+// Phase 18.4: the waiting list of a sold-out ticket type.
+const WAITLIST_STATUS = Object.freeze({
+  WAITING: 'WAITING',
+  OFFERED: 'OFFERED',
+  BOOKED: 'BOOKED',
+  EXPIRED: 'EXPIRED',
+  CANCELLED: 'CANCELLED',
+  CLOSED: 'CLOSED',
+});
+const WAITLIST = Object.freeze({
+  OFFER_MINUTES: 30, // places kept for the person offered them
+  TYPES_PER_RUN: 200, // ticket types the offer job looks at per run
+});
+
 const PASSWORD = Object.freeze({
   MIN_LENGTH: 8,
   // bcrypt ignores everything after 72 BYTES. Vietnamese letters take 2-3
@@ -196,6 +233,11 @@ module.exports = {
   OTP_PURPOSE,
   OTP,
   TWO_FACTOR,
+  LOGIN_LOCK,
+  REFUND_POLICY,
+  REFUND_POLICY_TIERS,
+  WAITLIST_STATUS,
+  WAITLIST,
   PASSWORD,
   ORGANIZER_STATUS,
   EVENT_STATUS,

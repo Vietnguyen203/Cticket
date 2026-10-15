@@ -5,6 +5,7 @@ import { getEvent } from '../../api/events'
 import { createOrder, listMyOrders, updateOrderItems } from '../../api/orders'
 import type { Order, Seat, SeatMap, TicketTypeAvailability } from '../../api/types'
 import { useAuth } from '../../auth/AuthContext'
+import { WaitlistOffer } from './WaitlistOffer'
 import { Alert, Button, Card, FullPageSpinner } from '../../components/ui'
 import { realtime } from '../../realtime'
 import {
@@ -196,6 +197,8 @@ export function SeatSelectPage() {
             state={state}
             dispatch={dispatch}
           />
+          {/* Phase 18.4 */}
+          {!editing && <WaitlistOffer scheduleId={scheduleId} ticketTypes={map.ticketTypes} />}
         </div>
 
         <aside className="lg:sticky lg:top-20 lg:self-start">

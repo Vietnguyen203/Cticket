@@ -111,3 +111,8 @@ const { seedAdmin } = require('./src/scripts/seedAdmin')
 await seedAdmin()
 
 require('./src/server')
+
+// Phase 18.4: the E2E stack has no worker; run its "offer-waitlist" job here, often,
+// so a freed place reaches the waiting list within seconds.
+const { offerSpacesToWaitlist } = require('./src/modules/waitlist')
+setInterval(() => offerSpacesToWaitlist().catch(() => {}), 2000)

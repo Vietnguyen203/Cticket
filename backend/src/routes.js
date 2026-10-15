@@ -15,6 +15,7 @@ const uploadsRoutes = require('./modules/uploads/uploads.routes');
 const adminRoutes = require('./modules/admin/admin.routes');
 const reportsRoutes = require('./modules/reports/reports.routes');
 const { checkInsRouter, scheduleCheckInsRouter } = require('./modules/checkins/checkins.routes');
+const { waitlistRouter, scheduleWaitlistRouter } = require('./modules/waitlist/waitlist.routes');
 
 /** Everything under /api/v1. Each module mounts its own router here. */
 const apiRouter = Router();
@@ -32,6 +33,7 @@ apiRouter.use('/schedules', schedulesRouter);
 apiRouter.use('/schedules', scheduleOrdersRouter); // POST /schedules/:id/orders
 apiRouter.use('/ticket-types', ticketTypesRouter);
 apiRouter.use('/orders', ordersRouter);
+apiRouter.use('/orders', paymentsRoutes.cancellationRouter); // Phase 18.3: /orders/:id/cancellation
 apiRouter.use('/payments', paymentsRoutes);
 apiRouter.use('/promotions', promotionsRoutes);
 apiRouter.use('/notifications', notificationsRoutes);
@@ -39,6 +41,8 @@ apiRouter.use('/tickets', ticketsRoutes);
 apiRouter.use('/check-ins', checkInsRouter);
 apiRouter.use('/schedules', scheduleCheckInsRouter); // GET /schedules/:id/check-ins, /check-in-stats
 apiRouter.use('/staff', staffRouter);
+apiRouter.use('/waitlist', waitlistRouter); // Phase 18.4
+apiRouter.use('/schedules', scheduleWaitlistRouter); // POST /schedules/:id/waitlist
 apiRouter.use('/uploads', uploadsRoutes);
 apiRouter.use('/admin', adminRoutes);
 apiRouter.use('/reports', reportsRoutes);

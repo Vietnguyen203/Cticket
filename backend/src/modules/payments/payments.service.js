@@ -124,19 +124,26 @@ async function getPayment(actor, paymentId) {
  * money goes back through the payments queue (refunds.js): the order and its
  * tickets are refunded now, the refund row says when VNPay has accepted it.
  */
-async function refundLockedOrder(client, { orderId, payment, reason, context }) {
+async function refundLockedOrder(client, { orderId, payment, reason, context, amount = payment?.amount ?? 0, action = 'PAYMENT_REFUNDED' }) {
+  // Phase 18.3: `amount` below the payment = a customer's cancellation; the rest is the fee kept.
   if (payment) {
-    await startRefund(client, { payment, orderId, reason, requestedBy: context?.userId ?? 'system' });
+    if (amount > 0) await startRefund(client, { payment, orderId, reason, amount, requestedBy: context?.userId ?? 'system' });
     await paymentsRepository.markRefunded(client, payment.id);
   }
-  await orders.refundPaidOrder(client, orderId);
+  await orders.refundPaidOrder(client, orderId, { refundAmount: amount });
   await recordAudit(client, {
     context,
-    action: 'PAYMENT_REFUNDED',
+    action,
     entityType: 'order',
     entityId: orderId,
     oldValue: { status: ORDER_STATUS.PAID },
-    newValue: { status: ORDER_STATUS.REFUNDED, paymentId: payment?.id ?? null, amount: payment?.amount ?? 0, reason },
+    newValue: {
+      status: ORDER_STATUS.REFUNDED,
+      paymentId: payment?.id ?? null,
+      amount,
+      fee: (payment?.amount ?? 0) - amount,
+      reason,
+    },
   });
 }
 
@@ -199,4 +206,4 @@ function paymentMethods() {
   return [...(env.VNPAY_ENABLED ? [PAYMENT_PROVIDER.VNPAY] : []), ...(env.PAYMENT_SIMULATOR ? [PAYMENT_PROVIDER.SIMULATOR] : [])];
 }
 
-module.exports = { pay, getPayment, refundPayment, refundPaidOrders, retryRefund, paymentMethods };
+module.exports = { pay, getPayment, refundPayment, refundPaidOrders, refundLockedOrder, retryRefund, paymentMethods };

@@ -54,7 +54,7 @@ function markPaymentFailed(client, orderId) {
  * tickets refunded. The payment row is handled by the payments module.
  * @returns {Promise<object|null>} null if the order was not PAID
  */
-async function refundPaidOrder(client, orderId) {
+async function refundPaidOrder(client, orderId, { refundAmount } = {}) {
   const changed = await ordersRepository.transition(client, {
     orderId,
     from: [ORDER_STATUS.PAID],
@@ -80,7 +80,7 @@ async function refundPaidOrder(client, orderId) {
   enqueueAfterCommit(client, QUEUE.NOTIFICATIONS, 'notify', {
     userId: changed.user_id,
     type: MESSAGE.ORDER_REFUNDED,
-    data: { orderId, orderCode: changed.order_code, amount: changed.total_amount },
+    data: { orderId, orderCode: changed.order_code, amount: refundAmount ?? changed.total_amount },
   });
   return changed;
 }

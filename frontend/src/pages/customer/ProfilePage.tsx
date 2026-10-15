@@ -15,6 +15,40 @@ const ROLE_LABELS: Record<Role, string> = {
 }
 
 /** APP-C06: view / edit the profile, log out. */
+/** Phase 18.2: reminders 24 hours / 2 hours before the show (saved at once). */
+function ReminderSetting() {
+  const { user, setUser } = useAuth()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  if (!user) return null
+  const on = user.eventReminders !== false
+
+  async function toggle() {
+    setBusy(true)
+    setError(null)
+    try {
+      setUser(await updateMe({ eventReminders: !on }))
+    } catch (err) {
+      setError(toApiError(err).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Card className="space-y-3">
+      <label className="flex cursor-pointer items-start gap-3">
+        <input type="checkbox" className="mt-1 h-4 w-4" checked={on} disabled={busy} onChange={() => void toggle()} />
+        <span>
+          <span className="font-semibold">Nhắc lịch trước giờ diễn</span>
+          <span className="block text-sm text-slate-600">Email và thông báo 24 giờ và 2 giờ trước mỗi buổi diễn bạn đã mua vé.</span>
+        </span>
+      </label>
+      {error && <Alert>{error}</Alert>}
+    </Card>
+  )
+}
+
 export function ProfilePage() {
   const { user, setUser, logout } = useAuth()
   const navigate = useNavigate()
@@ -112,6 +146,8 @@ export function ProfilePage() {
       </Card>
 
       <TwoFactorSection email={user.email} />
+
+      <ReminderSetting />
 
       <Card className="flex items-center justify-between gap-4">
         <p className="text-sm text-slate-600">

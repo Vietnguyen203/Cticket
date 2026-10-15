@@ -131,6 +131,7 @@ describe('event report (REP-01)', () => {
       gross: 5_500_000,
       discount: 550_000,
       revenue: 4_950_000,
+      cancellationFees: 0, // an admin refund gives everything back (Phase 18.3)
       refunds: { orders: 1, amount: 1_000_000 },
       capacity: 120,
       blocked: 1,
@@ -150,7 +151,7 @@ describe('event report (REP-01)', () => {
 
     // Today in Vietnam: the sale and the refund; the days add up to the totals.
     const today = report.daily.at(-1);
-    expect(today).toEqual({ date: vnToday(), orders: 1, tickets: 5, revenue: 4_950_000, refunds: { orders: 1, amount: 1_000_000 } });
+    expect(today).toEqual({ date: vnToday(), orders: 1, tickets: 5, revenue: 4_950_000, cancellationFees: 0, refunds: { orders: 1, amount: 1_000_000 } });
     expect(report.daily.reduce((n, d) => n + d.revenue, 0)).toBe(report.totals.revenue);
     expect(report.daily).toHaveLength(14); // sold today only: the chart still shows two weeks
   });
