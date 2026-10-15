@@ -64,7 +64,7 @@ describe('verifyTotp', () => {
 
   test('the otpauth:// URI that the QR code carries', () => {
     const uri = otpauthUri({ issuer: 'ETP Tickets', account: 'a@b.vn', secret: 'ABC' });
-    expect(uri).toBe('otpauth://totp/ETP%20Tickets:a%40b.vn?secret=ABC&issuer=ETP+Tickets&algorithm=SHA1&digits=6&period=30');
+    expect(uri).toBe('otpauth://totp/ETP%20Tickets:a%40b.vn?secret=ABC&issuer=ETP%20Tickets&algorithm=SHA1&digits=6&period=30');
   });
 });
 
