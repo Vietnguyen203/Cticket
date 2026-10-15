@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Vietnguyen203/Cticket/actions/workflows/ci.yml/badge.svg)](https://github.com/Vietnguyen203/Cticket/actions/workflows/ci.yml)
 
-> **English summary.** A ticketing platform for concerts and events, built as a learning project with production habits: a Node.js modular monolith (Express, PostgreSQL, Redis, BullMQ, WebSocket) and a React web app. Buyers pick seats on a **live seat map**, hold them for 10 minutes (and can swap seats in the held order without losing the others), pay (simulated, idempotent) and get **QR tickets**; gate staff scan them with a **phone camera**; organizers build events and seat plans and follow their sales; admins approve, refund and see platform reports. **Two-factor authentication** with an authenticator app (TOTP, written from RFC 6238), required for admins. **No seat is ever sold twice**: Redis filters the rush, PostgreSQL row locks and constraints decide (proven by 100-buyers-one-seat tests and a 500-user k6 load test). 302 backend tests, 66 web tests, 14 Playwright end-to-end tests, CI on GitHub Actions. Documentation is in Vietnamese.
+> **English summary.** A ticketing platform for concerts and events, built as a learning project with production habits: a Node.js modular monolith (Express, PostgreSQL, Redis, BullMQ, WebSocket) and a React web app. Buyers pick seats on a **live seat map**, hold them for 10 minutes (and can swap seats in the held order without losing the others), pay (simulated, idempotent) and get **QR tickets**; gate staff scan them with a **phone camera**; organizers build events and seat plans and follow their sales; admins approve, refund and see platform reports. **Two-factor authentication** with an authenticator app (TOTP, written from RFC 6238), required for admins. **No seat is ever sold twice**: Redis filters the rush, PostgreSQL row locks and constraints decide (proven by 100-buyers-one-seat tests and a 500-user k6 load test). 302 backend tests, 66 web tests, 14 Playwright end-to-end tests, CI on GitHub Actions. Ready to deploy on one VPS with Docker Compose: Caddy (automatic HTTPS), deploy on green CI with automatic fallback, nightly backups with tested restores. Documentation is in Vietnamese.
 
 Nền tảng bán vé sự kiện (concert, sân khấu…), làm như một dự án học tập nhưng theo thói quen của sản phẩm thật: thiết kế trước rồi mới code, test ở nhiều tầng, đo tải, tài liệu cho từng phase.
 
@@ -110,6 +110,16 @@ docker compose exec -e ADMIN_EMAIL=admin@example.com -e ADMIN_PASSWORD=MatKhauMa
 
 Lần đầu đăng nhập admin, trang sẽ yêu cầu **thiết lập xác thực hai lớp**: quét mã QR bằng ứng dụng xác thực trên điện thoại, nhập mã 6 số, cất 10 mã khôi phục. Đăng ký một tài khoản khách (lấy mã OTP trong Mailpit), đăng nhập admin để duyệt nhà tổ chức / sự kiện. Muốn gửi email thật thì đặt `SMTP_*` trong `.env`.
 
+## Triển khai lên VPS
+
+Một VPS Ubuntu 24.04, mọi thứ trong Docker Compose (`deploy/`):
+- **Caddy** tự lấy và gia hạn chứng chỉ HTTPS.
+- Mỗi lần CI xanh trên `main` thì **tự deploy**: build ngay trên máy chủ, sao lưu, migration, kiểm tra sức khỏe; bản mới không khỏe thì **tự quay về bản trước**.
+- **Sao lưu hằng đêm**, có script khôi phục.
+- Máy chủ chỉ mở 22 / 80 / 443, đăng nhập SSH bằng khóa.
+
+Toàn bộ quy trình đã chạy thử trên máy tính, và CI dựng lại stack production mỗi lần push. Hướng dẫn từng bước: [docs/deployment.md](docs/deployment.md).
+
 ## Phát triển
 
 **Web app** (tự tải lại khi sửa code), dùng API đang chạy trong Docker:
@@ -147,7 +157,7 @@ Test đồng thời đáng chú ý: **100 người cùng giữ 1 ghế → đún
 
 **Load test** (laptop, 1 bản API): duyệt sự kiện 300 người dùng ảo p95 5,7 ms; hỗn hợp duyệt / xem sơ đồ / mua 200 người dùng ảo trong 5 phút: giữ chỗ p95 71 ms, thanh toán p95 52 ms, 0% lỗi, 2.819 lượt mua; tranh ghế 500 người / 50 ghế: không ghế nào bán trùng. Load test dẫn tới 4 cải tiến (keep-alive sau proxy, gợi ý ghế trong Redis, gzip, nhiều bản API).
 
-Chi tiết: [docs/testing.md](docs/testing.md). CI (GitHub Actions) chạy backend, web và E2E mỗi lần push.
+Chi tiết: [docs/testing.md](docs/testing.md). CI (GitHub Actions) chạy backend, web, E2E và dựng thử stack production (deploy, smoke test, sao lưu → khôi phục) mỗi lần push.
 
 ## Cấu trúc thư mục
 
@@ -162,14 +172,14 @@ docs/        Thiết kế từng phase, kiến trúc, kiểm thử, checklist pr
 
 ## Tài liệu
 
-- [Kiến trúc](docs/architecture.md) · [Kiểm thử](docs/testing.md) · [Checklist production](docs/production-checklist.md)
-- Thiết kế và ghi chú theo phase: [4 sơ đồ ghế, tồn kho](docs/phase-4-inventory-design.md) · [5 đặt chỗ](docs/phase-5-booking-design.md) · [6 Redis](docs/phase-6-redis-design.md) · [7 WebSocket](docs/phase-7-websocket-design.md) · [8 thanh toán](docs/phase-8-payments-design.md) · [9 hàng đợi](docs/phase-9-queue-design.md) · [10 soát vé](docs/phase-10-checkin-design.md) · [11 web](docs/phase-11-web-design.md) · [12 quản trị](docs/phase-12-admin-web-design.md) · [12.4 báo cáo](docs/phase-12.4-reports-design.md) · [13 kiểm thử](docs/phase-13-testing-design.md) · [14 hardening](docs/phase-14-hardening-design.md) · [BKG-02 đổi ghế trong đơn đang giữ](docs/bkg-02-edit-held-order-design.md) · [15 xác thực hai lớp](docs/phase-15-two-factor-design.md)
+- [Kiến trúc](docs/architecture.md) · [Kiểm thử](docs/testing.md) · [Triển khai lên VPS](docs/deployment.md) · [Checklist production](docs/production-checklist.md)
+- Thiết kế và ghi chú theo phase: [4 sơ đồ ghế, tồn kho](docs/phase-4-inventory-design.md) · [5 đặt chỗ](docs/phase-5-booking-design.md) · [6 Redis](docs/phase-6-redis-design.md) · [7 WebSocket](docs/phase-7-websocket-design.md) · [8 thanh toán](docs/phase-8-payments-design.md) · [9 hàng đợi](docs/phase-9-queue-design.md) · [10 soát vé](docs/phase-10-checkin-design.md) · [11 web](docs/phase-11-web-design.md) · [12 quản trị](docs/phase-12-admin-web-design.md) · [12.4 báo cáo](docs/phase-12.4-reports-design.md) · [13 kiểm thử](docs/phase-13-testing-design.md) · [14 hardening](docs/phase-14-hardening-design.md) · [BKG-02 đổi ghế trong đơn đang giữ](docs/bkg-02-edit-held-order-design.md) · [15 xác thực hai lớp](docs/phase-15-two-factor-design.md) · [16 triển khai](docs/phase-16-deployment-design.md)
 
 Ảnh chụp màn hình được tạo tự động (`cd e2e` → `npm run screenshots`, dữ liệu mẫu).
 
 ## Giới hạn và hướng phát triển
 
 - **Thanh toán là giả lập**: thay bằng cổng thật (webhook có chữ ký, đối soát) — xem checklist production.
-- Chưa có: khóa tài khoản sau nhiều lần sai mật khẩu (đã có rate limit theo IP), triển khai lên cloud.
+- Chưa có: khóa tài khoản sau nhiều lần sai mật khẩu (đã có rate limit theo IP). Phần triển khai đã sẵn sàng nhưng chưa chạy trên máy chủ thật (cần VPS và tên miền).
 - Ảnh tải lên lưu trên ổ đĩa của API: nhiều máy chủ thì chuyển sang kho chung (S3…).
 - Một tiến trình Node.js dùng một nhân CPU: tải lớn thì chạy nhiều bản API sau load balancer (đã thử trong load test).

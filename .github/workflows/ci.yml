@@ -153,3 +153,34 @@ jobs:
             e2e/playwright-report/
             e2e/test-results/
           retention-days: 7
+
+  # Phase 16: the production stack (deploy/), as on the server: built by
+  # deploy.sh, behind Caddy with a local certificate (etp.localhost), then
+  # the same smoke test as after a real deploy, a backup and a restore check.
+  # Its secrets are random, made by init-env.sh on this machine.
+  production:
+    name: Production stack (Caddy, deploy, backup)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scripts pass shellcheck
+        run: shellcheck -x deploy/scripts/*.sh
+      - name: deploy/.env with random secrets (no mail server in CI)
+        run: |
+          bash deploy/scripts/init-env.sh etp.localhost internal
+          sed -i 's/^SMTP_HOST=.*/SMTP_HOST=localhost/' deploy/.env
+      - name: Deploy this commit
+        run: bash deploy/scripts/deploy.sh --checked-out
+      - name: Smoke test through Caddy
+        run: bash deploy/scripts/smoke.sh https://etp.localhost -k --resolve etp.localhost:443:127.0.0.1 --resolve etp.localhost:80:127.0.0.1
+      - name: Backup, then restore it into a scratch database
+        run: |
+          IMAGE_TAG="$(tail -n 1 deploy/.state/history)"
+          export IMAGE_TAG
+          docker compose -f deploy/docker-compose.prod.yml exec -T backup sh /scripts/backup.sh manual
+          dump="$(find deploy/backups -name 'db-manual-*.dump' | sort | tail -n 1)"
+          bash deploy/scripts/restore.sh check "$dump"
+      - name: Logs of the stack
+        if: failure()
+        run: IMAGE_TAG="$(tail -n 1 deploy/.state/history 2>/dev/null || echo none)" docker compose -f deploy/docker-compose.prod.yml logs --tail 100

@@ -1,1 +1,4 @@
 frontend/docker/*.sh text eol=lf
+# Phase 16: run on Linux servers and in containers (a CR breaks sh / bash).
+deploy/scripts/*.sh text eol=lf
+deploy/Caddyfile text eol=lf

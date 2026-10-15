@@ -164,5 +164,6 @@ docker compose --env-file .env -f loadtest/docker-compose.yml down
 | **Backend (Jest)** | PostgreSQL 17 + Redis 7.4 (service container) → `npm ci` → toàn bộ Jest có độ phủ (fail nếu dưới ngưỡng); tóm tắt độ phủ hiện trên trang kết quả; tải lên báo cáo HTML |
 | **Web** | `npm ci` → typecheck → lint → Vitest → build |
 | **End-to-end** | PostgreSQL + Redis + Mailpit → cài Chromium → typecheck test → Playwright; lỗi thì tải lên ảnh / video / trace |
+| **Production stack** (Phase 16) | `shellcheck` các script → `init-env.sh` (secret ngẫu nhiên) → `deploy.sh` dựng đúng stack của VPS sau Caddy, tên miền `etp.localhost` → `smoke.sh` (health, CSP / HSTS, API, HTTP → HTTPS, WebSocket) → sao lưu → `restore.sh check` |
 
 Mật khẩu / bí mật trong workflow là giá trị dùng một lần cho database của máy CI, không phải secret thật; không job nào gửi mail ra ngoài. Lần chạy mới trên cùng nhánh hủy lần chạy cũ (`concurrency`).

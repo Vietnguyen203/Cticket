@@ -6,6 +6,11 @@ node_modules/
 .env.*
 !.env.example
 
+# Phase 16, on the server only: deployed commits, backups, rclone credentials
+deploy/.state/
+deploy/backups/
+deploy/rclone/
+
 # Logs & coverage
 *.log
 coverage/

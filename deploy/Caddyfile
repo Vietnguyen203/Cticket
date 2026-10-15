@@ -1,0 +1,19 @@
+# Phase 16: Caddy terminates HTTPS and passes everything to nginx (web).
+# DOMAIN and CADDY_TLS come from deploy/.env through docker-compose.prod.yml.
+#
+# - Certificates: Let's Encrypt, obtained and renewed automatically
+#   (CADDY_TLS = an email for expiry notices). "internal" instead: a local
+#   certificate authority, for a rehearsal on a computer (etp.localhost).
+# - http:// is redirected to https:// automatically.
+# - WebSocket (/ws) needs nothing special: reverse_proxy upgrades it.
+# - X-Forwarded-For / -Proto are set by reverse_proxy; the API trusts two
+#   proxies (Caddy, nginx) to find the visitor's address (TRUST_PROXY=2).
+
+{$DOMAIN} {
+	tls {$CADDY_TLS}
+
+	# Browsers stay on HTTPS for a year once they have seen it.
+	header Strict-Transport-Security "max-age=31536000"
+
+	reverse_proxy web:8080
+}

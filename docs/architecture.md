@@ -33,6 +33,7 @@ flowchart LR
 - **nginx `web`** phục vụ bản build của React, nén gzip, gắn header bảo mật (CSP…), và chuyển `/api`, `/ws` về API: trình duyệt chỉ thấy **một origin**, nên cookie đơn giản và không cần CORS.
 - **API** không giữ trạng thái trong bộ nhớ ngoài cache phụ: chạy nhiều bản sau load balancer được (WebSocket đồng bộ qua Redis pub/sub).
 - **Worker** chạy các việc không cần trả lời ngay: phát vé, gửi email, hết hạn giữ chỗ, thông báo, bảo trì định kỳ.
+- **Production** (Phase 16): **Caddy** đứng trước nginx, lo HTTPS (Let's Encrypt). Chỉ Caddy mở cổng ra ngoài. Thêm container `backup` sao lưu hằng đêm; Redis bật AOF. Xem `docs/deployment.md`.
 
 ## 2. Các module của backend
 
