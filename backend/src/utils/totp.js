@@ -98,7 +98,10 @@ function verifyTotp(secret, code, { timeMs = Date.now(), window = 1, afterStep =
 /** What the QR code holds: authenticator apps read the issuer, account and secret from it. */
 function otpauthUri({ issuer, account, secret }) {
   const label = `${encodeURIComponent(issuer)}:${encodeURIComponent(account)}`;
-  const params = new URLSearchParams({ secret, issuer, algorithm: 'SHA1', digits: String(DIGITS), period: String(STEP_SECONDS) });
+  // %20, not "+" (URLSearchParams): apps such as Google Authenticator show a "+" literally.
+  const params = Object.entries({ secret, issuer, algorithm: 'SHA1', digits: DIGITS, period: STEP_SECONDS })
+    .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+    .join('&');
   return `otpauth://totp/${label}?${params}`;
 }
 
