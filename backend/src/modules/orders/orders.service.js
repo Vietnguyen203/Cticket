@@ -59,8 +59,26 @@ function toPayment(row) {
     currency: row.currency,
     provider: row.provider,
     failureCode: row.failure_code,
+    providerTransactionId: row.provider_transaction_id,
+    providerResponseCode: row.provider_response_code,
+    bankCode: row.bank_code,
     paidAt: row.paid_at,
     createdAt: row.created_at,
+  };
+}
+
+function toRefund(row) {
+  return {
+    id: row.id,
+    paymentId: row.payment_id,
+    amount: row.amount,
+    status: row.status,
+    reason: row.reason,
+    failureMessage: row.failure_message,
+    attempts: row.attempts,
+    providerRefundId: row.provider_refund_id,
+    createdAt: row.created_at,
+    completedAt: row.completed_at,
   };
 }
 
@@ -76,7 +94,7 @@ function toTicket(row) {
   };
 }
 
-function toOrder(row, items, payments, tickets) {
+function toOrder(row, items, payments, tickets, refunds) {
   return {
     id: row.id,
     orderCode: row.order_code,
@@ -98,6 +116,7 @@ function toOrder(row, items, payments, tickets) {
     createdAt: row.created_at,
     ...(payments ? { payments: payments.map(toPayment) } : {}),
     ...(tickets ? { tickets: tickets.map(toTicket) } : {}),
+    ...(refunds ? { refunds: refunds.map(toRefund) } : {}),
   };
 }
 
@@ -108,7 +127,8 @@ async function loadOrder(db, orderId) {
   const items = await ordersRepository.listItems(db, [orderId]);
   const payments = await ordersRepository.listPayments(db, orderId);
   const tickets = await ordersRepository.listTickets(db, orderId);
-  return toOrder(row, items, payments, tickets);
+  const refunds = await ordersRepository.listRefunds(db, orderId);
+  return toOrder(row, items, payments, tickets, refunds);
 }
 
 const canSee = (actor, order) => order.user_id === actor.userId || actor.canManageAll;

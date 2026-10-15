@@ -20,6 +20,34 @@ function requireIdempotencyKey(req, res, next) {
 /** Mounted at /api/v1/payments */
 const router = Router();
 
+// --- Phase 17 (before "/:id") ------------------------------------------------------
+// Which methods the order page may offer (VNPay when configured, the simulator when on).
+router.get('/methods', controller.methods);
+router.post(
+  '/vnpay',
+  authenticate,
+  authorize('payment:create'),
+  validate({ body: schemas.startVnpay }),
+  controller.startVnpay,
+);
+// Called by VNPay's server, not by a browser: no login; the signature is the proof.
+router.get('/vnpay/ipn', controller.vnpayIpn);
+// The customer is back from VNPay (the web's return page forwards VNPay's query string).
+router.get(
+  '/vnpay/return',
+  authenticate,
+  authorize('payment:create'),
+  validate({ query: schemas.vnpayCallback }),
+  controller.vnpayReturn,
+);
+router.post(
+  '/refunds/:id/retry',
+  authenticate,
+  authorize('refund:create'),
+  validate({ params: schemas.idParams }),
+  controller.retryRefund,
+);
+
 router.post(
   '/',
   authenticate,

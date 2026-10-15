@@ -60,4 +60,10 @@ Bản Docker trong repo là **môi trường phát triển / demo**: chứng ch�
 
 ## 9. Thanh toán
 
-- [ ] Cổng thanh toán hiện là **giả lập**. Thay bằng cổng thật: tạo giao dịch phía server, nhận kết quả qua **webhook có kiểm tra chữ ký**, giữ `Idempotency-Key` như hiện tại, đối soát định kỳ.
+- [x] **[tự động]** Cổng thật: **VNPay** (Phase 17). Giao dịch tạo phía server, kết quả qua IPN có kiểm chữ ký, hỏi lại VNPay ở Return URL, đối soát mỗi phút, tiền đến muộn được hoàn tự động. Xem `docs/phase-17-vnpay-design.md`.
+- [ ] `PAYMENT_SIMULATOR` **tắt** (mặc định tắt khi `NODE_ENV=production`; chỉ bật cho bản demo không bán vé thật): bật thì ai cũng "trả tiền" được mà không mất tiền.
+- [ ] `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET` chỉ nằm trong `deploy/.env` trên máy chủ (chmod 600), không bao giờ trong git, log hay chat. Lộ `VNPAY_HASH_SECRET` = người khác ký được IPN giả → đổi ngay trong trang merchant của VNPay.
+- [ ] Bán tiền thật: hợp đồng với VNPay, đổi `VNPAY_PAY_URL` / `VNPAY_API_URL` sang địa chỉ production VNPay cấp, dùng bộ mã production (khác sandbox).
+- [ ] IPN URL khai báo với VNPay: `https://<tên miền>/api/v1/payments/vnpay/ipn` (HTTPS, mở công khai, không đăng nhập). `VNPAY_SERVER_IP` = IP công khai của máy chủ.
+- [ ] Theo dõi hoàn tiền **FAILED** (trang chi tiết đơn của admin, audit `REFUND_FAILED`): tiền chưa về khách cho tới khi admin "Hoàn tiền lại" hoặc xử lý với VNPay.
+- [ ] Đối chiếu định kỳ với báo cáo giao dịch trong trang merchant của VNPay (số lượt SUCCESS / REFUNDED khớp).

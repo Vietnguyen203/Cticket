@@ -10,7 +10,19 @@ import { execFileSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import os from 'node:os'
 import path from 'node:path'
-import { API_PORT, BACKEND_DIR, E2E_ADMIN, E2E_TOTP_SECRET, MAILPIT_SMTP_PORT, WEB_URL, stackUrls } from './stack.mjs'
+import { startFakeVnpay } from './support/fake-vnpay.mjs'
+import {
+  API_PORT,
+  API_URL,
+  BACKEND_DIR,
+  E2E_ADMIN,
+  E2E_TOTP_SECRET,
+  FAKE_VNPAY_PORT,
+  FAKE_VNPAY_URL,
+  MAILPIT_SMTP_PORT,
+  WEB_URL,
+  stackUrls,
+} from './stack.mjs'
 
 const require = createRequire(path.join(BACKEND_DIR, 'package.json'))
 const { Client } = require('pg')
@@ -40,6 +52,10 @@ execFileSync(
   ],
   { env: { ...process.env, DATABASE_URL: database }, stdio: 'pipe' },
 )
+
+// The fake VNPay (support/fake-vnpay.mjs): its IPN calls this API.
+const VNPAY = { tmnCode: 'E2ETMN01', secret: 'e2e-only-vnpay-hash-secret' }
+await startFakeVnpay({ port: FAKE_VNPAY_PORT, ...VNPAY, ipnUrl: `${API_URL}/api/v1/payments/vnpay/ipn` })
 
 // 2. Empty Redis db
 const redisClient = new Redis(redis, { lazyConnect: true, maxRetriesPerRequest: 1 })
@@ -81,6 +97,13 @@ Object.assign(process.env, {
   ADMIN_EMAIL: E2E_ADMIN.email,
   ADMIN_PASSWORD: E2E_ADMIN.password,
   ADMIN_TOTP_SECRET: E2E_TOTP_SECRET,
+  // Phase 17: VNPay is the fake one below (test-only values); the simulator stays on.
+  VNPAY_TMN_CODE: VNPAY.tmnCode,
+  VNPAY_HASH_SECRET: VNPAY.secret,
+  VNPAY_PAY_URL: `${FAKE_VNPAY_URL}/paymentv2/vpcpay.html`,
+  VNPAY_API_URL: `${FAKE_VNPAY_URL}/merchant_webapi/api/transaction`,
+  VNPAY_RETURN_URL: `${WEB_URL}/payments/vnpay/return`,
+  PAYMENT_SIMULATOR: 'true',
 })
 
 // 3. Admin

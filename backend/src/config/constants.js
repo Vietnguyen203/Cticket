@@ -133,8 +133,25 @@ const PAYMENT_STATUS = Object.freeze({
   REFUNDED: 'REFUNDED',
 });
 
-/** The only payment provider for now: decides SUCCESS / FAILED as the client asks (for testing). */
-const PAYMENT_PROVIDER = Object.freeze({ SIMULATOR: 'SIMULATOR' });
+/**
+ * SIMULATOR: decides SUCCESS / FAILED as the client asks (dev, tests, demos).
+ * VNPAY (Phase 17): redirect to VNPay, result by IPN / querydr.
+ */
+const PAYMENT_PROVIDER = Object.freeze({ SIMULATOR: 'SIMULATOR', VNPAY: 'VNPAY' });
+
+/** Phase 17: VNPay payments. */
+const VNPAY = Object.freeze({
+  // VNPay stops taking money this long before the order's hold ends, so its
+  // IPN has time to arrive before the seats would be released.
+  EXPIRE_MARGIN_SECONDS: 120,
+  // Starting a payment needs at least this much time left on the order.
+  MIN_SECONDS_TO_PAY: 180,
+  // A pending attempt VNPay cannot be asked about is given this long after the
+  // order's deadline before the order expires anyway (late money is refunded).
+  UNKNOWN_GRACE_SECONDS: 600,
+  RECONCILE_BATCH_SIZE: 50,
+  REFUND_ATTEMPTS: 5,
+});
 
 const DISCOUNT_TYPE = Object.freeze({ PERCENTAGE: 'PERCENTAGE', FIXED_AMOUNT: 'FIXED_AMOUNT' });
 
@@ -193,6 +210,7 @@ module.exports = {
   ACTIVE_ORDER_STATUSES,
   PAYMENT_STATUS,
   PAYMENT_PROVIDER,
+  VNPAY,
   DISCOUNT_TYPE,
   PROMOTION_STATUS,
   CANCEL_REASON,

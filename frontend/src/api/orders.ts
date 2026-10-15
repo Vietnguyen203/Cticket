@@ -80,3 +80,32 @@ export async function payOrder(orderId: string, idempotencyKey: string, simulate
     return (await send()).data.data.payment // the answer to the first try may have been lost
   }
 }
+
+// --- Phase 17: VNPay -----------------------------------------------------------
+
+/** What this server offers: 'VNPAY' when configured, 'SIMULATOR' when on (off in production). */
+export async function getPaymentMethods(): Promise<string[]> {
+  return (await api.get('/payments/methods')).data.data.methods
+}
+
+/** A new VNPay attempt: the browser then goes to paymentUrl (VNPay's page). */
+export async function startVnpayPayment(orderId: string): Promise<{ paymentId: string; paymentUrl: string }> {
+  return (await api.post('/payments/vnpay', { orderId })).data.data
+}
+
+export interface VnpayResult {
+  paymentId: string
+  orderId: string
+  /** What the API knows after asking VNPay: PENDING = VNPay has not confirmed yet */
+  status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'CANCELLED' | 'REFUNDED'
+  responseCode: string | null
+}
+
+/**
+ * Back from VNPay: forward VNPay's query string as it came. The API checks
+ * its signature and asks VNPay what happened (the URL alone proves nothing).
+ */
+export async function confirmVnpayReturn(search: string): Promise<VnpayResult> {
+  const params = Object.fromEntries(new URLSearchParams(search))
+  return (await api.get('/payments/vnpay/return', { params })).data.data.payment
+}

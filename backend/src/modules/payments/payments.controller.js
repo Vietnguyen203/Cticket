@@ -2,6 +2,7 @@ const { sendSuccess } = require('../../utils/response');
 const { requestContext } = require('../../utils/requestContext');
 const users = require('../users');
 const paymentsService = require('./payments.service');
+const vnpayService = require('./vnpay.service');
 
 const HTTP_CREATED = 201;
 
@@ -31,4 +32,29 @@ async function refund(req, res) {
   return sendSuccess(res, { payment });
 }
 
-module.exports = { pay, get, refund };
+// --- Phase 17 ------------------------------------------------------------------
+
+function methods(req, res) {
+  return sendSuccess(res, { methods: paymentsService.paymentMethods() });
+}
+
+/** A new VNPay attempt: the web sends the customer to paymentUrl. */
+async function startVnpay(req, res) {
+  const result = await vnpayService.startPayment(await resolveActor(req.user), req.valid.body, { ip: req.ip });
+  return sendSuccess(res, result, { status: HTTP_CREATED });
+}
+
+/** VNPay's server-to-server call: answered in VNPay's format, not the API envelope. */
+async function vnpayIpn(req, res) {
+  return res.status(200).json(await vnpayService.handleIpn(req.query));
+}
+
+async function vnpayReturn(req, res) {
+  return sendSuccess(res, { payment: await vnpayService.confirmReturn(await resolveActor(req.user), req.valid.query) });
+}
+
+async function retryRefund(req, res) {
+  return sendSuccess(res, { refund: await paymentsService.retryRefund(requestContext(req), req.valid.params.id) });
+}
+
+module.exports = { pay, get, refund, methods, startVnpay, vnpayIpn, vnpayReturn, retryRefund };

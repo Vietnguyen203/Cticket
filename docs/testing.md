@@ -4,9 +4,9 @@ Dự án có 4 tầng kiểm thử, từ nhanh / hẹp tới chậm / rộng:
 
 | Tầng | Công cụ | Số lượng | Chạy ở đâu | Thời gian |
 |---|---|---|---|---|
-| Unit + integration (backend) | Jest + Supertest, PostgreSQL và Redis thật | **302 test**, 27 file | máy dev, CI | ≈ 1–2 phút |
-| Unit (web) | Vitest | **66 test**, 14 file | máy dev, CI | ≈ 2 giây |
-| End-to-end (trình duyệt) | Playwright (Chromium, desktop + điện thoại) | **14 kịch bản** | máy dev, CI | ≈ 1 phút |
+| Unit + integration (backend) | Jest + Supertest, PostgreSQL và Redis thật | **330 test**, 30 file | máy dev, CI | ≈ 1–2 phút |
+| Unit (web) | Vitest | **68 test**, 15 file | máy dev, CI | ≈ 2 giây |
+| End-to-end (trình duyệt) | Playwright (Chromium, desktop + điện thoại) | **15 kịch bản** | máy dev, CI | ≈ 1 phút |
 | Tải (load) | k6 | **4 kịch bản** | chạy tay | 1–5 phút / kịch bản |
 
 Mỗi lần push hoặc mở pull request, **GitHub Actions** chạy 3 tầng đầu (`.github/workflows/ci.yml`). Load test chạy tay vì lâu và số đo phụ thuộc máy.
@@ -31,7 +31,8 @@ Test chạy trên **PostgreSQL và Redis thật** (không giả lập database),
 | Sơ đồ ghế, tồn kho, khóa / mở ghế | `inventory` | 16 |
 | Giữ chỗ, đơn hàng, khóa Redis, gợi ý ghế | `orders`, `booking-redis` | 25 |
 | Đổi / bỏ ghế trong đơn đang giữ (BKG-02) | `order-edit` | 15 |
-| Thanh toán (idempotency), mã giảm giá, hoàn tiền | `payments` | 16 |
+| Thanh toán (idempotency), mã giảm giá, hoàn tiền | `payments`, `payments-simulator-off` | 17 |
+| **VNPay** (Phase 17, với một VNPay giả trong test): ký / kiểm chữ ký, URL thanh toán, IPN (mọi mã trả lời), Return URL hỏi lại VNPay, lượt thứ hai, tiền đến muộn và trả trùng → hoàn tự động, đối soát khi đơn hết giờ, hoàn tiền qua hàng đợi (thành công / thử lại / bị từ chối / admin gửi lại), hủy sự kiện | `payments-vnpay`, `vnpay` | 27 |
 | Vé, QR, soát vé | `checkins` | 16 |
 | WebSocket real-time | `websocket` | 12 |
 | Hàng đợi BullMQ, email, hết hạn giữ chỗ | `queue` | 11 |
@@ -57,6 +58,7 @@ Các tình huống "nhiều người cùng làm một việc tại cùng một t
 | **2 cổng quét cùng 1 vé cùng lúc** | đúng 1 lần vào |
 | Cùng một `Idempotency-Key` gửi 5 lần cùng lúc | 1 lần thanh toán, 5 câu trả lời giống hệt |
 | 2 lần thanh toán 1 đơn với 2 key khác nhau | 1 thành công, 1 `ORDER_ALREADY_PAID` |
+| **IPN của VNPay và Return URL đến cùng lúc** | ghi nhận đúng 1 lần: 1 vé, 1 email |
 | 2 người cùng dùng lượt cuối của 1 mã giảm giá | đúng 1 người được |
 | 2 admin cùng duyệt 1 sự kiện / 1 nhà tổ chức | 1 thành công, 1 xung đột |
 | 2 admin cùng gỡ quyền admin của nhau | nền tảng vẫn còn ít nhất 1 admin |
@@ -68,7 +70,7 @@ Các tình huống "nhiều người cùng làm một việc tại cùng một t
 
 | Statements | Branches | Functions | Lines |
 |---|---|---|---|
-| **93,5%** | **83,7%** | **94,2%** | **95,2%** |
+| **93,5%** | **83,1%** | **94,5%** | **95,4%** |
 
 CI **fail** nếu tụt dưới 90% / 80% / 90% / 90%. Phần thấp: `server.js` và `worker.js` (file khởi động tiến trình, Jest không chạy; E2E và load test chạy chúng).
 
@@ -86,7 +88,7 @@ Cần Docker đang chạy `postgres` và `redis`; `TEST_DATABASE_URL`, `TEST_RED
 
 ## 2. Web: Vitest
 
-Phần logic không cần trình duyệt: gộp cập nhật sơ đồ ghế real-time (phiên bản, ghế bị người khác lấy, chế độ sửa đơn đang giữ), client WebSocket (kết nối lại, đăng nhập lại khi token hết hạn), refresh token chỉ chạy một lần cho nhiều request và nhiều tab, giờ server, giờ Việt Nam, kết quả quét vé, kiểm tra trước khi gửi duyệt, quyền menu, CSV (BOM, chống CSV injection), số trên biểu đồ.
+Phần logic không cần trình duyệt: lý do VNPay từ chối (theo mã), gộp cập nhật sơ đồ ghế real-time (phiên bản, ghế bị người khác lấy, chế độ sửa đơn đang giữ), client WebSocket (kết nối lại, đăng nhập lại khi token hết hạn), refresh token chỉ chạy một lần cho nhiều request và nhiều tab, giờ server, giờ Việt Nam, kết quả quét vé, kiểm tra trước khi gửi duyệt, quyền menu, CSV (BOM, chống CSV injection), số trên biểu đồ.
 
 ```
 cd frontend
@@ -108,6 +110,7 @@ Admin bắt buộc xác thực hai lớp (Phase 15): admin của môi trường 
 | Đăng ký → mã trong Mailpit → đăng nhập → tải lại → đăng xuất → đăng nhập lại | cookie refresh httpOnly + SameSite=Strict, không token trong localStorage |
 | Sai mật khẩu | báo lỗi, không có phiên |
 | Mua 2 ghế + 1 vé đứng | mã giảm giá sai rồi đúng, thẻ bị từ chối rồi trả lại, 3 vé có QR |
+| **Trả qua VNPay** (Phase 17) | trình duyệt sang trang của một VNPay giả (`e2e/support/fake-vnpay.mjs`, kiểm chữ ký của URL), hủy → về trang kết quả với lý do; trả lại → IPN tới API, về thẳng trang đơn, có vé |
 | **2 trình duyệt cùng xem sơ đồ** | A giữ ghế → B thấy đổi màu ngay, ghế B đang chọn bị bỏ kèm thông báo |
 | Giữ chỗ hết hạn | đơn báo hết hạn, ghế trở lại trống |
 | **Đổi ghế trong đơn đang giữ** (BKG-02) | quay lại sơ đồ từ trang đơn, đổi 1 ghế, bỏ 1 ghế ở trang đơn; trình duyệt thứ hai thấy từng thay đổi |

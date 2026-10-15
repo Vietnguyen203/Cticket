@@ -39,6 +39,8 @@ x-load-env: &load-env
   SMTP_PASS: ""
   MAIL_FROM: Event Tickets Load <no-reply@load.test>
   RATE_LIMIT_ENABLED: "false"
+  # Phase 17: the buyers pay with the simulator (off by default with NODE_ENV=production).
+  PAYMENT_SIMULATOR: "true"
 
 services:
   # One-shot: create the database if it does not exist yet.

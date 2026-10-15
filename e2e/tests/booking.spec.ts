@@ -37,7 +37,8 @@ test('buy 2 seats + 1 standing: hold, wrong then right code, declined card, paid
   await page.getByRole('button', { name: 'Tiếp tục thanh toán' }).click()
   await page.getByRole('button', { name: 'Giả lập thẻ bị từ chối' }).click()
   await expect(page.getByText('Thanh toán bị từ chối. Ghế vẫn được giữ')).toBeVisible()
-  await page.getByRole('button', { name: /^Thanh toán 4\.050\.000/ }).click()
+  // VNPay is offered too (fake VNPay, tests/vnpay.spec.ts); this one pays with the simulator.
+  await page.getByRole('button', { name: 'Giả lập thanh toán thành công' }).click()
   await expect(page.getByText('Thanh toán thành công!')).toBeVisible()
 
   // 3 tickets, each with its QR code.

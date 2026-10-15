@@ -199,7 +199,10 @@ describe('platform report (REP-02)', () => {
     expect(report.byOrganizer[0]).toMatchObject({ id: organizer.organizerId, revenue: 4_000_000 });
 
     await refund(early.payment.id);
-    await query(`UPDATE refunds SET completed_at = '2020-03-03T01:00:00Z' WHERE order_id = $1`, [early.order.id]);
+    // Phase 17: a refund counts on the day it was made (a VNPay refund may complete later, or fail and be sent again).
+    await query(`UPDATE refunds SET created_at = '2020-03-03T01:00:00Z', completed_at = '2020-03-03T01:00:00Z' WHERE order_id = $1`, [
+      early.order.id,
+    ]);
     report = (await platformSales(admin.token, 'from=2020-03-01&to=2020-03-03').expect(200)).body.data;
     expect(report.daily.map((d) => [d.date, d.revenue, d.refunds.amount])).toEqual([
       ['2020-03-01', 2_000_000, 0],

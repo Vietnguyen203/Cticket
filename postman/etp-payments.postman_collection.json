@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "ETP — Payments (Phase 8)",
-    "description": "Checkout, mã giảm giá, thanh toán giả lập (Idempotency-Key), hoàn tiền. Điền email/password ở tab Variables rồi Run từ trên xuống. Tài khoản của bạn phải là organizer ACTIVE.",
+    "description": "Checkout, mã giảm giá, thanh toán giả lập (Idempotency-Key), hoàn tiền. Điền email/password ở tab Variables rồi Run từ trên xuống. Tài khoản của bạn phải là organizer ACTIVE. Phase 17: thư mục 8 thử VNPay sandbox (cần cấu hình VNPay trên API).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -202,6 +202,18 @@
     },
     {
       "key": "adminTotpCode",
+      "value": ""
+    },
+    {
+      "key": "vnpayOrderId",
+      "value": ""
+    },
+    {
+      "key": "vnpayPaymentId",
+      "value": ""
+    },
+    {
+      "key": "vnpayUrl",
       "value": ""
     }
   ],
@@ -2196,6 +2208,323 @@
                 }
               }
             },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. VNPay sandbox (Phase 17)",
+      "description": "Cần VNPAY_TMN_CODE / VNPAY_HASH_SECRET trong .env của API (đăng ký sandbox: http://sandbox.vnpayment.vn/devreg/). Chưa cấu hình thì \"Bắt đầu thanh toán VNPay\" trả 403 và các bước sau tự bỏ qua. Để trả thật bằng thẻ test: mở biến vnpayUrl trong trình duyệt; VNPay đưa bạn về trang /payments/vnpay/return của web. Không có tunnel thì IPN không tới được máy bạn: trang Return URL vẫn hỏi lại VNPay (querydr), hoặc dùng npm run vnpay:ipn.",
+      "item": [
+        {
+          "name": "Các cách thanh toán đang bật",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  const methods = (pm.response.json().data || {}).methods || [];",
+                  "  pm.test('Danh sách VNPAY / SIMULATOR', () => methods.forEach((m) => pm.expect(['VNPAY', 'SIMULATOR']).to.include(m)));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/payments/methods",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Giữ ghế STD B01",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                  "  const data = pm.response.json().data || {};",
+                  "  if (data.order) pm.collectionVariables.set('vnpayOrderId', data.order.id);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/schedules/{{scheduleId}}/orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"seatIds\": [\n    \"{{seatB01}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Checkout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/orders/{{vnpayOrderId}}/checkout",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Bắt đầu thanh toán VNPay → URL có chữ ký",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.collectionVariables.unset('vnpayPaymentId');",
+                  "  pm.test('201, hoặc 403 khi VNPay chưa cấu hình', () => pm.expect(pm.response.code).to.be.oneOf([201, 403]));",
+                  "  if (pm.response.code !== 201) return;",
+                  "  const data = pm.response.json().data;",
+                  "  pm.collectionVariables.set('vnpayPaymentId', data.paymentId);",
+                  "  pm.collectionVariables.set('vnpayUrl', data.paymentUrl);",
+                  "  pm.test('URL tới VNPay, số tiền × 100, có chữ ký', () => {",
+                  "    pm.expect(data.paymentUrl).to.include('vnp_Amount=80000000');",
+                  "    pm.expect(data.paymentUrl).to.match(/vnp_SecureHash=[0-9a-f]{128}$/);",
+                  "  });",
+                  "  console.log('Mở URL này trong trình duyệt để trả bằng thẻ test:', data.paymentUrl);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/payments/vnpay",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{vnpayOrderId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "IPN giả mạo (sai chữ ký) → 97, không đổi gì",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200 (VNPay đọc RspCode)', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  pm.test('RspCode 97 hoặc 99 (VNPay tắt)', () => pm.expect(pm.response.json().RspCode).to.be.oneOf(['97', '99']));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/payments/vnpay/ipn?vnp_TxnRef=khongco&vnp_Amount=80000000&vnp_ResponseCode=00&vnp_TransactionStatus=00&vnp_SecureHash=abc",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Đơn: lượt VNPay đang chờ",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  if (!pm.collectionVariables.get('vnpayPaymentId')) return; // VNPay is not configured on this API",
+                  "  const order = pm.response.json().data.order;",
+                  "  pm.test('Lượt mới nhất là VNPay', () => pm.expect(order.payments[0]).to.include({ provider: 'VNPAY', id: pm.collectionVariables.get('vnpayPaymentId') }));",
+                  "  pm.test('PENDING (hoặc SUCCESS nếu bạn đã trả)', () => pm.expect(['PENDING', 'SUCCESS']).to.include(order.payments[0].status));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/orders/{{vnpayOrderId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Bắt đầu lại: lượt cũ được hỏi VNPay rồi hủy",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  if (!pm.collectionVariables.get('vnpayPaymentId')) return; // VNPay is not configured on this API",
+                  "  // 409 ORDER_ALREADY_PAID if you paid the first one; 503 if VNPay did not answer.",
+                  "  pm.test('201 / 409 / 503', () => pm.expect(pm.response.code).to.be.oneOf([201, 409, 503]));",
+                  "  if (pm.response.code === 201) pm.collectionVariables.set('vnpayUrl', pm.response.json().data.paymentUrl);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/payments/vnpay",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{vnpayOrderId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Hủy đơn (dọn dẹp; lượt VNPay đang chờ bị hủy theo)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('200, hoặc 409 nếu đơn đã thanh toán', () => pm.expect(pm.response.code).to.be.oneOf([200, 409]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{host}}/api/v1/orders/{{vnpayOrderId}}/cancel",
             "auth": {
               "type": "bearer",
               "bearer": [

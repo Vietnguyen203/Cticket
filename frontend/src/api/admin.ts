@@ -272,6 +272,11 @@ export async function refundPayment(paymentId: string, reason: string) {
   return (await api.post(`/payments/${paymentId}/refund`, { reason })).data.data.payment
 }
 
+/** Phase 17: send a VNPay refund again after VNPay refused it or did not answer. */
+export async function retryRefund(refundId: string) {
+  return (await api.post(`/payments/refunds/${refundId}/retry`)).data.data.refund
+}
+
 /** TKT-03: a new QR for a valid ticket; the old one stops opening the gate. */
 export async function reissueTicketQr(ticketId: string) {
   return (await api.post(`/admin/tickets/${ticketId}/reissue-qr`)).data.data.ticket

@@ -1,16 +1,29 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { getOrderDetail, refundPayment, reissueTicketQr } from '../../api/admin'
+import { getOrderDetail, refundPayment, reissueTicketQr, retryRefund } from '../../api/admin'
 import { toApiError } from '../../api/errors'
 import { ConfirmDialog, PageHeader } from '../../admin/components'
 import { OrderStatusBadge } from '../../admin/OrderStatusBadge'
 import { Alert, Button, Card, FullPageSpinner } from '../../components/ui'
+import { vnpayReason } from '../../payments/vnpayReasons'
 import { formatDateTime, formatVnd } from '../../utils/format'
 import { useAsync } from '../../utils/useAsync'
 
-type Action = { kind: 'refund'; paymentId: string } | { kind: 'reissue'; ticketId: string; code: string }
+type Action =
+  | { kind: 'refund'; paymentId: string; provider: string }
+  | { kind: 'retry-refund'; refundId: string }
+  | { kind: 'reissue'; ticketId: string; code: string }
 
-/** One order for an admin: lines, payments (refund), tickets (new QR). */
+/** A payment's status: PENDING is a VNPay attempt waiting for VNPay (badge "Chờ thanh toán"). */
+const paymentBadge = (status: string) => (status === 'PENDING' ? 'PAYMENT_PENDING' : status)
+
+const REFUND_STATUS: Record<string, [string, string]> = {
+  PENDING: ['Đang hoàn', 'text-amber-700'],
+  SUCCESS: ['Đã hoàn', 'text-emerald-700'],
+  FAILED: ['Hoàn lỗi', 'text-red-700'],
+}
+
+/** One order for an admin: lines, payments (refund), refunds (send again), tickets (new QR). */
 export function OrderDetailPage() {
   const { id = '' } = useParams()
   const order = useAsync(() => getOrderDetail(id), `order:${id}`)
@@ -79,19 +92,50 @@ export function OrderDetailPage() {
             <div key={payment.id} className="rounded-lg border border-slate-200 p-3">
               <div className="flex items-center justify-between gap-2">
                 <span>{formatVnd(payment.amount)}</span>
-                <OrderStatusBadge status={payment.status} />
+                <OrderStatusBadge status={paymentBadge(payment.status)} />
               </div>
               <p className="mt-1 text-xs text-slate-500">
                 {payment.provider} · {formatDateTime(payment.paidAt ?? payment.createdAt)}
-                {payment.failureCode ? ` · ${payment.failureCode}` : ''}
+                {payment.provider !== 'VNPAY' && payment.failureCode ? ` · ${payment.failureCode}` : ''}
               </p>
+              {payment.provider === 'VNPAY' && (payment.providerTransactionId || payment.status === 'FAILED') && (
+                <p className="mt-1 text-xs text-slate-500">
+                  {payment.providerTransactionId && `Mã GD VNPay ${payment.providerTransactionId}`}
+                  {payment.bankCode && ` · ${payment.bankCode}`}
+                  {payment.status === 'FAILED' && ` · ${vnpayReason(payment.failureCode)}`}
+                </p>
+              )}
               {payment.status === 'SUCCESS' && o.status === 'PAID' && (
-                <Button variant="danger" className="mt-2 w-full" onClick={() => setAction({ kind: 'refund', paymentId: payment.id })}>
+                <Button variant="danger" className="mt-2 w-full" onClick={() => setAction({ kind: 'refund', paymentId: payment.id, provider: payment.provider })}>
                   Hoàn tiền
                 </Button>
               )}
             </div>
           ))}
+          {(o.refunds ?? []).length > 0 && <h2 className="pt-2 font-semibold">Hoàn tiền</h2>}
+          {o.refunds?.map((refund) => {
+            const [label, color] = REFUND_STATUS[refund.status] ?? [refund.status, 'text-slate-600']
+            return (
+              <div key={refund.id} className="rounded-lg border border-slate-200 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span>{formatVnd(refund.amount)}</span>
+                  <span className={`text-xs font-semibold ${color}`}>{label}</span>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  {formatDateTime(refund.completedAt ?? refund.createdAt)}
+                  {refund.attempts > 0 && ` · gửi VNPay ${refund.attempts} lần`}
+                  {refund.providerRefundId && ` · mã GD ${refund.providerRefundId}`}
+                </p>
+                {refund.reason && <p className="mt-1 text-xs text-slate-500">Lý do: {refund.reason}</p>}
+                {refund.failureMessage && <p className="mt-1 text-xs text-red-700">{refund.failureMessage}</p>}
+                {refund.status === 'FAILED' && (
+                  <Button variant="secondary" className="mt-2 w-full" onClick={() => setAction({ kind: 'retry-refund', refundId: refund.id })}>
+                    Hoàn tiền lại
+                  </Button>
+                )}
+              </div>
+            )
+          })}
         </Card>
       </div>
 
@@ -128,7 +172,9 @@ export function OrderDetailPage() {
         <ConfirmDialog
           open
           title="Hoàn tiền toàn bộ đơn?"
-          message="Vé của đơn hết hiệu lực, ghế được mở bán lại, khách nhận email báo hoàn tiền. Đơn đã có vé vào cổng thì không hoàn được."
+          message={`Vé của đơn hết hiệu lực, ghế được mở bán lại, khách nhận email báo hoàn tiền. Đơn đã có vé vào cổng thì không hoàn được.${
+            action.provider === 'VNPAY' ? ' Tiền được gửi trả qua VNPay ngay sau đó; theo dõi ở mục Hoàn tiền.' : ''
+          }`}
           confirmLabel="Hoàn tiền"
           danger
           askReason
@@ -139,7 +185,25 @@ export function OrderDetailPage() {
             } catch (err) {
               throw toApiError(err)
             }
-            setDone('Đã hoàn tiền.')
+            setDone(action.provider === 'VNPAY' ? 'Đã hoàn đơn; yêu cầu hoàn tiền đã gửi tới VNPay.' : 'Đã hoàn tiền.')
+            order.reload()
+          }}
+        />
+      )}
+      {action?.kind === 'retry-refund' && (
+        <ConfirmDialog
+          open
+          title="Gửi lại yêu cầu hoàn tiền tới VNPay?"
+          message="Chỉ làm khi lý do lỗi đã được xử lý (VNPay hoạt động lại, hoặc đã liên hệ VNPay)."
+          confirmLabel="Hoàn tiền lại"
+          onClose={() => setAction(null)}
+          onConfirm={async () => {
+            try {
+              await retryRefund(action.refundId)
+            } catch (err) {
+              throw toApiError(err)
+            }
+            setDone('Đã gửi lại yêu cầu hoàn tiền.')
             order.reload()
           }}
         />

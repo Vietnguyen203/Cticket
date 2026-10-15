@@ -22,6 +22,9 @@ export const API_PORT = 3100
 export const WEB_PORT = 5180
 export const API_URL = `http://localhost:${API_PORT}`
 export const WEB_URL = `http://localhost:${WEB_PORT}`
+/** Phase 17: the fake VNPay (support/fake-vnpay.mjs), started with the API. */
+export const FAKE_VNPAY_PORT = 3190
+export const FAKE_VNPAY_URL = `http://localhost:${FAKE_VNPAY_PORT}`
 export const MAILPIT_URL = process.env.MAILPIT_URL ?? 'http://localhost:8025'
 export const MAILPIT_SMTP_PORT = process.env.MAILPIT_SMTP_PORT ?? '1025'
 

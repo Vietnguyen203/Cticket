@@ -78,6 +78,14 @@ services:
       # Phase 15: encrypts two-factor secrets; roles that must use two-factor.
       TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:?Set TOTP_ENCRYPTION_KEY in .env}
       TWO_FACTOR_REQUIRED_ROLES: ${TWO_FACTOR_REQUIRED_ROLES:-ADMIN}
+      # Phase 17: VNPay sandbox. Empty TMN code / hash secret = VNPay off.
+      VNPAY_TMN_CODE: ${VNPAY_TMN_CODE:-}
+      VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET:-}
+      VNPAY_PAY_URL: ${VNPAY_PAY_URL:-https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+      VNPAY_API_URL: ${VNPAY_API_URL:-https://sandbox.vnpayment.vn/merchant_webapi/api/transaction}
+      VNPAY_RETURN_URL: ${VNPAY_RETURN_URL:-http://localhost:8080/payments/vnpay/return}
+      # The free simulated payment stays on for this local stack (off by default in production).
+      PAYMENT_SIMULATOR: ${PAYMENT_SIMULATOR:-true}
       # Defaults to the local Mailpit inbox; set SMTP_* in .env to send real email.
       SMTP_HOST: ${SMTP_HOST:-mailpit}
       SMTP_PORT: ${SMTP_PORT:-1025}
@@ -130,6 +138,14 @@ services:
       # Phase 15: encrypts two-factor secrets; roles that must use two-factor.
       TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:?Set TOTP_ENCRYPTION_KEY in .env}
       TWO_FACTOR_REQUIRED_ROLES: ${TWO_FACTOR_REQUIRED_ROLES:-ADMIN}
+      # Phase 17: VNPay sandbox. Empty TMN code / hash secret = VNPay off.
+      VNPAY_TMN_CODE: ${VNPAY_TMN_CODE:-}
+      VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET:-}
+      VNPAY_PAY_URL: ${VNPAY_PAY_URL:-https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+      VNPAY_API_URL: ${VNPAY_API_URL:-https://sandbox.vnpayment.vn/merchant_webapi/api/transaction}
+      VNPAY_RETURN_URL: ${VNPAY_RETURN_URL:-http://localhost:8080/payments/vnpay/return}
+      # The free simulated payment stays on for this local stack (off by default in production).
+      PAYMENT_SIMULATOR: ${PAYMENT_SIMULATOR:-true}
       # Defaults to the local Mailpit inbox; set SMTP_* in .env to send real email.
       SMTP_HOST: ${SMTP_HOST:-mailpit}
       SMTP_PORT: ${SMTP_PORT:-1025}
@@ -165,6 +181,23 @@ services:
       api:
         condition: service_started
     restart: unless-stopped
+
+  # Phase 17: a public HTTPS address for VNPay's IPN while testing on this
+  # computer (Cloudflare quick tunnel: no account, a new random address each
+  # start). Only on demand:
+  #   docker compose --profile tunnel up -d tunnel
+  #   docker compose logs tunnel        → https://<random>.trycloudflare.com
+  # IPN URL for VNPay's merchant portal: <that address>/api/v1/payments/vnpay/ipn
+  # The whole API answers at that address while it runs: stop it after testing
+  # (docker compose --profile tunnel stop tunnel).
+  tunnel:
+    image: cloudflare/cloudflared:2026.9.3
+    command: ["tunnel", "--no-autoupdate", "--url", "http://api:3000"]
+    profiles: ["tunnel"]
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: "no"
 
 volumes:
   pgdata:

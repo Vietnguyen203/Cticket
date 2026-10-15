@@ -19,6 +19,7 @@
     "2fa:reset": "node src/scripts/resetTwoFactor.js",
     "mail:test": "node src/scripts/sendTestEmail.js",
     "inventory:check": "node src/scripts/checkInventory.js",
+    "vnpay:ipn": "node src/scripts/sendVnpayIpn.js",
     "test": "jest --runInBand",
     "test:coverage": "jest --runInBand --coverage"
   },
