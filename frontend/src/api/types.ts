@@ -86,6 +86,8 @@ export interface EventSummary {
   cities: string[]
   organizer: Organizer
   categories: Category[]
+  /** Phase 19: published reviews (average null when none) */
+  rating?: { average: number | null; count: number }
 }
 
 export interface Venue {
@@ -120,6 +122,8 @@ export interface EventDetail {
   ageRestriction: number | null
   /** Phase 18.3: NONE / STANDARD / FLEXIBLE (payments/refundPolicy.ts) */
   refundPolicy?: string
+  /** Phase 19 */
+  rating?: { average: number | null; count: number }
   status: string
   organizer: Organizer
   categories: Category[]

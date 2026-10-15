@@ -53,20 +53,28 @@ function Section({ title, tickets }: { title: string; tickets: MyTicket[] }) {
     <section className="space-y-2">
       <h2 className="font-semibold text-slate-700">{title}</h2>
       {tickets.map((ticket) => (
-        <Link key={ticket.id} to={`/tickets/${ticket.id}`} className="block">
-          <Card className="flex items-center justify-between gap-3 !p-4 transition hover:border-brand-600">
-            <div>
-              <p className="font-semibold">{ticket.event.title}</p>
-              <p className="text-sm text-slate-600">
-                {formatDateTime(ticket.schedule.startAt)} · {ticket.venue.name}
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                <span className="font-mono">{ticket.code}</span> · {ticket.seatLabel ?? `${ticket.ticketTypeName} #${ticket.admissionNo}`}
-              </p>
-            </div>
-            <OrderStatusBadge status={ticket.status} />
-          </Card>
-        </Link>
+        <div key={ticket.id} className="space-y-1">
+          <Link to={`/tickets/${ticket.id}`} className="block">
+            <Card className="flex items-center justify-between gap-3 !p-4 transition hover:border-brand-600">
+              <div>
+                <p className="font-semibold">{ticket.event.title}</p>
+                <p className="text-sm text-slate-600">
+                  {formatDateTime(ticket.schedule.startAt)} · {ticket.venue.name}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  <span className="font-mono">{ticket.code}</span> · {ticket.seatLabel ?? `${ticket.ticketTypeName} #${ticket.admissionNo}`}
+                </p>
+              </div>
+              <OrderStatusBadge status={ticket.status} />
+            </Card>
+          </Link>
+          {/* Phase 19: went in → may review the event. */}
+          {ticket.status === 'USED' && (
+            <Link to={`/events/${ticket.event.id}#danh-gia`} className="ml-4 inline-block text-sm font-semibold text-brand-700 hover:underline">
+              ★ Đánh giá sự kiện
+            </Link>
+          )}
+        </div>
       ))}
     </section>
   )

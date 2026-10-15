@@ -2,7 +2,7 @@ const { buildSetClause } = require('../../utils/sql');
 const { escapeLike } = require('../../utils/pagination');
 
 const EVENT_COLUMNS = `e.id, e.organizer_id, e.title, e.slug, e.description, e.banner_url, e.thumbnail_url,
-  e.status, e.age_restriction, e.refund_policy, e.published_at, e.created_at, e.updated_at`;
+  e.status, e.age_restriction, e.refund_policy, e.rating_count, e.rating_sum, e.published_at, e.created_at, e.updated_at`;
 
 const UPDATABLE = {
   title: 'title',

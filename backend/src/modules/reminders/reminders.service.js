@@ -1,8 +1,8 @@
 const { pool } = require('../../database/pool');
-const { ORDER_STATUS, SCHEDULE_STATUS, TICKET_STATUS, CHECKIN } = require('../../config/constants');
+const { ORDER_STATUS, SCHEDULE_STATUS, TICKET_STATUS, CHECKIN, REVIEW } = require('../../config/constants');
 const { QUEUE, enqueue } = require('../../queue/queues');
 const mailer = require('../../mail/mailer');
-const { eventReminderEmail } = require('../../mail/templates');
+const { eventReminderEmail, reviewInviteEmail } = require('../../mail/templates');
 const tickets = require('../tickets');
 const remindersRepository = require('./reminders.repository');
 
@@ -27,7 +27,30 @@ async function sendDueReminders() {
       data: { orderId: row.order_id, orderCode: row.order_code, eventTitle: row.event_title, startAt: row.start_at, kind: row.kind },
     });
   }
-  return { sent: due.length };
+  // Phase 19: "how was the show?" a day after it.
+  const invites = await remindersRepository.claimDueReviewInvites(pool, { hoursAfter: REVIEW.INVITE_HOURS_AFTER_SHOW, limit: BATCH_SIZE });
+  for (const orderId of invites) {
+    await enqueue(QUEUE.EMAILS, 'review-invite', { orderId }, { jobId: `review-invite-${orderId}` });
+  }
+  return { sent: due.length, reviewInvites: invites.length };
+}
+
+/** Emails queue (Phase 19). Reviewed or turned off since the claim → nothing. */
+async function sendReviewInviteEmail({ orderId }) {
+  const { rows } = await pool.query(
+    `SELECT u.email, u.first_name, u.event_reminders, e.title AS event_title, es.start_at,
+            EXISTS (SELECT 1 FROM reviews r WHERE r.user_id = o.user_id AND r.event_id = e.id) AS reviewed
+     FROM orders o
+     JOIN users u ON u.id = o.user_id
+     JOIN event_schedules es ON es.id = o.schedule_id
+     JOIN events e ON e.id = es.event_id
+     WHERE o.id = $1`,
+    [orderId],
+  );
+  const row = rows[0];
+  if (!row || row.reviewed || !row.event_reminders) return 'skipped';
+  await mailer.sendMail({ to: row.email, ...reviewInviteEmail(row) });
+  return 'sent';
 }
 
 /** Emails queue. Checked again: refunded, cancelled or turned off since the claim → nothing. */
@@ -49,4 +72,4 @@ async function sendReminderEmail({ orderId, kind }) {
   return 'sent';
 }
 
-module.exports = { sendDueReminders, sendReminderEmail };
+module.exports = { sendDueReminders, sendReminderEmail, sendReviewInviteEmail };

@@ -80,6 +80,15 @@ const WAITLIST = Object.freeze({
   TYPES_PER_RUN: 200, // ticket types the offer job looks at per run
 });
 
+// Phase 19: event reviews.
+const REVIEW_STATUS = Object.freeze({ PUBLISHED: 'PUBLISHED', HIDDEN: 'HIDDEN' });
+const REVIEW = Object.freeze({
+  EDIT_DAYS_AFTER_SHOW: 60, // writing / editing closes this long after the show ends
+  INVITE_HOURS_AFTER_SHOW: 24, // the "how was the show?" email
+  MAX_COMMENT: 2000,
+  MAX_REPLY: 1000,
+});
+
 const PASSWORD = Object.freeze({
   MIN_LENGTH: 8,
   // bcrypt ignores everything after 72 BYTES. Vietnamese letters take 2-3
@@ -238,6 +247,8 @@ module.exports = {
   REFUND_POLICY_TIERS,
   WAITLIST_STATUS,
   WAITLIST,
+  REVIEW_STATUS,
+  REVIEW,
   PASSWORD,
   ORGANIZER_STATUS,
   EVENT_STATUS,

@@ -24,6 +24,12 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 // Phase 18.3: the refund policy too (an order cancelled later follows the policy of that moment).
 const EDITABLE_WHEN_PUBLISHED = ['description', 'bannerUrl', 'thumbnailUrl', 'refundPolicy'];
 
+/** Phase 19: average of the published reviews (kept on the event row). */
+const ratingOf = (row) => ({
+  average: row.rating_count > 0 ? Math.round((row.rating_sum / row.rating_count) * 10) / 10 : null,
+  count: row.rating_count ?? 0,
+});
+
 function toEventSummary(row) {
   return {
     id: row.id,
@@ -36,6 +42,7 @@ function toEventSummary(row) {
     cities: row.cities,
     organizer: { id: row.organizer_id, name: row.organizer_name },
     categories: row.categories,
+    rating: ratingOf(row),
   };
 }
 
@@ -49,6 +56,7 @@ function toEventDetail(row, schedules) {
     thumbnailUrl: row.thumbnail_url,
     ageRestriction: row.age_restriction,
     refundPolicy: row.refund_policy, // Phase 18.3
+    rating: ratingOf(row), // Phase 19
     status: row.status,
     publishedAt: row.published_at,
     createdAt: row.created_at,

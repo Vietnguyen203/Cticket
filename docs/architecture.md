@@ -48,6 +48,7 @@ flowchart LR
 | `promotions` | Mã giảm giá (giới hạn tổng / mỗi người, thời hạn) |
 | `payments` | Thanh toán qua VNPay (URL có chữ ký, IPN, Return URL, đối soát, hoàn tiền qua hàng đợi) và giả lập có idempotency; hoàn tiền (cả hoàn một phần); khách tự hủy đơn theo chính sách hoàn của sự kiện |
 | `reminders` | Nhắc lịch 24 giờ / 2 giờ trước giờ diễn (email + thông báo), mỗi lần nhắc gửi đúng một lần |
+| `reviews` | Đánh giá sự kiện của người đã vào cổng, điểm trung bình lưu trên dòng sự kiện (cập nhật cùng giao dịch, đối chiếu hằng đêm), trả lời của ban tổ chức, ẩn / hiện của admin |
 | `waitlist` | Danh sách chờ khi hạng vé hết: job mời người chờ sớm nhất, giữ chỗ cho họ 30 phút (kiểm tra ngay trong giao dịch giữ chỗ) |
 | `tickets` | Phát vé, mã QR ký HMAC có phiên bản, cấp lại QR |
 | `checkins` | Soát vé, lịch sử, thống kê |
@@ -147,7 +148,7 @@ sequenceDiagram
 
 ## 8. Hàng đợi và worker
 
-BullMQ trên Redis: `tickets`, `emails`, `holds` (hết hạn giữ chỗ đúng giờ), `notifications`, `payments` (hoàn tiền qua VNPay), `maintenance` (mỗi phút: phát bù vé, quét đơn quá hạn, đối soát lượt VNPay, mời người trong danh sách chờ; mỗi 5 phút: nhắc lịch; mỗi 10 phút: kết thúc suất đã diễn; mỗi giờ: dọn bộ đếm đăng nhập sai). Job thử lại có back-off; thao tác trong job **idempotent** (chạy lại không sinh vé trùng). Worker tắt an toàn: chờ job đang chạy xong.
+BullMQ trên Redis: `tickets`, `emails`, `holds` (hết hạn giữ chỗ đúng giờ), `notifications`, `payments` (hoàn tiền qua VNPay), `maintenance` (mỗi phút: phát bù vé, quét đơn quá hạn, đối soát lượt VNPay, mời người trong danh sách chờ; mỗi 5 phút: nhắc lịch và mời đánh giá; mỗi 10 phút: kết thúc suất đã diễn; mỗi giờ: dọn bộ đếm đăng nhập sai; mỗi ngày: đối chiếu điểm đánh giá). Job thử lại có back-off; thao tác trong job **idempotent** (chạy lại không sinh vé trùng). Worker tắt an toàn: chờ job đang chạy xong.
 
 ## 9. Web app
 

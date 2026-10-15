@@ -20,6 +20,7 @@ export const ADMIN_MENU: MenuEntry[] = [
   { to: '/admin/users', label: 'Người dùng', anyOf: ['user:manage'] },
   { to: '/admin/orders', label: 'Đơn hàng', anyOf: ['order:manage'] },
   { to: '/admin/promotions', label: 'Mã giảm giá', anyOf: ['promotion:manage'] },
+  { to: '/admin/reviews', label: 'Đánh giá', anyOf: ['review:manage'] }, // Phase 19
   { to: '/admin/audit', label: 'Audit log', anyOf: ['audit:read'] },
 ]
 
