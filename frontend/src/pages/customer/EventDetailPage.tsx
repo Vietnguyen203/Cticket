@@ -6,6 +6,7 @@ import { Alert, Card, FullPageSpinner } from '../../components/ui'
 import { formatDateTime, formatVnd } from '../../utils/format'
 import { useAsync } from '../../utils/useAsync'
 import { refundPolicyOf } from '../../payments/refundPolicy'
+import { EventReviews } from './EventReviews'
 
 type SaleState = 'on-sale' | 'not-yet' | 'closed' | 'over' | 'cancelled' | 'not-ready'
 
@@ -63,7 +64,14 @@ export function EventDetailPage() {
           </div>
           <h1 className="text-2xl font-bold sm:text-3xl">{e.title}</h1>
           <p className="text-sm text-slate-500">Ban tổ chức: {e.organizer.name}</p>
+          {e.rating?.average != null && (
+            <a href="#danh-gia" className="inline-block text-sm text-slate-700 hover:underline">
+              <span className="text-amber-500">★</span> {e.rating.average.toLocaleString('vi-VN')} · {e.rating.count} đánh giá
+            </a>
+          )}
           <div className="whitespace-pre-line text-slate-800">{e.description || 'Ban tổ chức chưa thêm mô tả.'}</div>
+          {/* Phase 19 */}
+          <EventReviews eventId={e.id} slug={e.slug} />
         </div>
         <aside className="space-y-3">
           <h2 className="text-lg font-semibold">Lịch diễn</h2>

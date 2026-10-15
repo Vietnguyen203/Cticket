@@ -51,4 +51,41 @@ async function claimDue(db, { limit }) {
   return rows;
 }
 
-module.exports = { claimDue };
+/**
+ * Phase 19: "how was the show?", once per person and event, from
+ * INVITE_HOURS after their show for a week, to people who went in (a ticket
+ * used at the gate), have not reviewed it, and want reminders.
+ */
+async function claimDueReviewInvites(db, { hoursAfter, limit }) {
+  const { rows } = await db.query(
+    `WITH due AS (
+       SELECT DISTINCT ON (o.user_id, e.id) o.id AS order_id
+       FROM orders o
+       JOIN event_schedules es ON es.id = o.schedule_id
+       JOIN events e ON e.id = es.event_id
+       JOIN users u ON u.id = o.user_id
+       WHERE es.end_at + make_interval(hours => $1) <= now()
+         AND es.end_at + make_interval(hours => $1) + interval '7 days' > now()
+         AND e.status <> 'CANCELLED'
+         AND u.status = 'ACTIVE' AND u.event_reminders
+         AND EXISTS (SELECT 1 FROM tickets t WHERE t.order_id = o.id AND t.status = 'USED')
+         AND NOT EXISTS (SELECT 1 FROM reviews r WHERE r.user_id = o.user_id AND r.event_id = e.id)
+         AND NOT EXISTS (
+           SELECT 1 FROM order_reminders rem
+           JOIN orders o2 ON o2.id = rem.order_id
+           JOIN event_schedules es2 ON es2.id = o2.schedule_id
+           WHERE rem.kind = 'REVIEW' AND o2.user_id = o.user_id AND es2.event_id = e.id
+         )
+       ORDER BY o.user_id, e.id, es.end_at DESC
+       LIMIT $2
+     )
+     INSERT INTO order_reminders (order_id, kind)
+     SELECT order_id, 'REVIEW' FROM due
+     ON CONFLICT DO NOTHING
+     RETURNING order_id`,
+    [hoursAfter, limit],
+  );
+  return rows.map((row) => row.order_id);
+}
+
+module.exports = { claimDue, claimDueReviewInvites };

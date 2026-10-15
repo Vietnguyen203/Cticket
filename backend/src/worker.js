@@ -22,6 +22,8 @@ const MAINTENANCE_SCHEDULE = [
   { name: 'send-reminders', every: 5 * MINUTE_MS },
   // Phase 18.4: freed places go to the waiting list.
   { name: 'offer-waitlist', every: MINUTE_MS },
+  // Phase 19: events' review figures checked against the reviews.
+  { name: 'reconcile-ratings', every: 24 * 60 * MINUTE_MS },
 ];
 
 /**

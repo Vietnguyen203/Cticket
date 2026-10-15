@@ -30,6 +30,11 @@ const COPY = {
     title: 'Đã hoàn tiền',
     message: `Đơn ${orderCode} đã được hoàn ${formatVnd(amount ?? 0)}.`,
   }),
+  // Phase 19
+  REVIEW_REPLIED: () => ({
+    title: 'Ban tổ chức đã trả lời đánh giá của bạn',
+    message: 'Mở trang sự kiện để xem câu trả lời.',
+  }),
   // Phase 18.4
   WAITLIST_OFFER: ({ eventTitle, ticketTypeName, quantity, offerExpiresAt }) => ({
     title: 'Đã có vé bạn đang chờ',

@@ -60,6 +60,8 @@ const LIMITS = Object.freeze({
   booking: { name: 'booking', limit: 10, windowSeconds: 60, key: (req) => req.user?.id },
   orderEdit: { name: 'order-edit', limit: 30, windowSeconds: 60, key: (req) => req.user?.id },
   upload: { name: 'upload', limit: 30, windowSeconds: 3600, key: (req) => req.user?.id },
+  // Phase 19: writing / editing reviews, per user.
+  review: { name: 'review', limit: 10, windowSeconds: 3600, key: (req) => req.user?.id },
 });
 
 /** For tests only. */

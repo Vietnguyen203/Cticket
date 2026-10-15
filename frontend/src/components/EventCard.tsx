@@ -15,6 +15,11 @@ export function EventCard({ event }: { event: EventSummary }) {
       <div className="flex flex-1 flex-col gap-1.5 p-4">
         {event.nextStartAt && <p className="text-sm font-semibold text-brand-700">{formatDateTime(event.nextStartAt)}</p>}
         <h3 className="line-clamp-2 font-semibold text-slate-900">{event.title}</h3>
+        {event.rating?.average != null && (
+          <p className="text-sm text-slate-600">
+            <span className="text-amber-500">★</span> {event.rating.average.toLocaleString('vi-VN')} ({event.rating.count})
+          </p>
+        )}
         <p className="mt-auto text-sm text-slate-500">
           {[event.cities.join(', '), event.organizer.name].filter(Boolean).join(' · ')}
         </p>

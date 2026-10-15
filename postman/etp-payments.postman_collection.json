@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "ETP — Payments (Phase 8)",
-    "description": "Checkout, mã giảm giá, thanh toán giả lập (Idempotency-Key), hoàn tiền. Điền email/password ở tab Variables rồi Run từ trên xuống. Tài khoản của bạn phải là organizer ACTIVE. Phase 17: thư mục 8 thử VNPay sandbox (cần cấu hình VNPay trên API). Phase 18: thư mục 9 (khách tự hủy đơn theo chính sách), 10 (danh sách chờ).",
+    "description": "Checkout, mã giảm giá, thanh toán giả lập (Idempotency-Key), hoàn tiền. Điền email/password ở tab Variables rồi Run từ trên xuống. Tài khoản của bạn phải là organizer ACTIVE. Phase 17: thư mục 8 thử VNPay sandbox (cần cấu hình VNPay trên API). Phase 18: thư mục 9 (khách tự hủy đơn theo chính sách), 10 (danh sách chờ). Phase 19: thư mục 11 (đánh giá sự kiện).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -2988,6 +2988,115 @@
             "method": "GET",
             "header": [],
             "url": "{{host}}/api/v1/waitlist",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. Đánh giá sự kiện (Phase 19)",
+      "description": "Chỉ người có vé đã vào cổng mới viết được: ở đây bạn chưa vào cổng, nên API trả NOT_ATTENDED / 403. Danh sách đánh giá thì ai cũng xem được.",
+      "item": [
+        {
+          "name": "Đánh giá của sự kiện (công khai)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  const data = pm.response.json().data;",
+                  "  pm.test('Tóm tắt có phân bố 5 → 1 sao', () => pm.expect(Object.keys(data.summary.distribution)).to.have.members(['1', '2', '3', '4', '5']));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/events/{{eventId}}/reviews?sort=newest",
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Tôi có được đánh giá không",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  pm.test('Chưa vào cổng → không', () => pm.expect(pm.response.json().data).to.include({ canReview: false, reason: 'NOT_ATTENDED' }));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/events/{{eventId}}/reviews/mine",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Viết khi chưa vào cổng → 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('403 REVIEW_NOT_ALLOWED', () => pm.expect(pm.response.json().error.code).to.eql('REVIEW_NOT_ALLOWED'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/events/{{eventId}}/reviews/mine",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 5,\n  \"comment\": \"Thử\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
             "auth": {
               "type": "bearer",
               "bearer": [

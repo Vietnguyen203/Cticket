@@ -200,7 +200,23 @@ function waitlistOfferEmail(entry) {
   };
 }
 
+/** Phase 19: a day after the show, to people who went in and have not reviewed it. */
+function reviewInviteEmail({ first_name: firstName, event_title: eventTitle, start_at: startAt }) {
+  const greeting = firstName ? `Xin chào ${firstName},` : 'Xin chào,';
+  const body = `Cảm ơn bạn đã đến ${eventTitle} (${formatTime(startAt)}). Bạn thấy buổi diễn thế nào? Chấm sao và để lại vài dòng nhận xét giúp người mua sau và ban tổ chức.`;
+  const action = 'Mở trang sự kiện trong ứng dụng, mục Đánh giá. Bạn có 60 ngày để viết hoặc sửa đánh giá.';
+  return {
+    subject: `Bạn thấy ${eventTitle} thế nào?`,
+    text: [greeting, '', body, '', action].join('\n'),
+    html: `<p>${escapeHtml(greeting)}</p>
+<p>${escapeHtml(body)}</p>
+<p>${escapeHtml(action)}</p>
+<p style="color:#64748b;font-size:12px">Không muốn nhận email như thế này? Tắt "Nhắc lịch" trong trang Tài khoản.</p>`,
+  };
+}
+
 module.exports = {
+  reviewInviteEmail,
   waitlistOfferEmail,
   eventReminderEmail,
   otpEmail,

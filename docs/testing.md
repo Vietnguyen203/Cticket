@@ -4,9 +4,9 @@ Dự án có 4 tầng kiểm thử, từ nhanh / hẹp tới chậm / rộng:
 
 | Tầng | Công cụ | Số lượng | Chạy ở đâu | Thời gian |
 |---|---|---|---|---|
-| Unit + integration (backend) | Jest + Supertest, PostgreSQL và Redis thật | **355 test**, 35 file | máy dev, CI | ≈ 1–2 phút |
+| Unit + integration (backend) | Jest + Supertest, PostgreSQL và Redis thật | **363 test**, 36 file | máy dev, CI | ≈ 1–2 phút |
 | Unit (web) | Vitest | **68 test**, 15 file | máy dev, CI | ≈ 2 giây |
-| End-to-end (trình duyệt) | Playwright (Chromium, desktop + điện thoại) | **17 kịch bản** | máy dev, CI | ≈ 1 phút |
+| End-to-end (trình duyệt) | Playwright (Chromium, desktop + điện thoại) | **18 kịch bản** | máy dev, CI | ≈ 1 phút |
 | Tải (load) | k6 | **4 kịch bản** | chạy tay | 1–5 phút / kịch bản |
 
 Mỗi lần push hoặc mở pull request, **GitHub Actions** chạy 3 tầng đầu (`.github/workflows/ci.yml`). Load test chạy tay vì lâu và số đo phụ thuộc máy.
@@ -37,6 +37,7 @@ Test chạy trên **PostgreSQL và Redis thật** (không giả lập database),
 | **Hủy đơn theo chính sách** (Phase 18.3): các mốc và ranh giới, số tiền khách đã thấy phải còn đúng, đã vào cổng, đơn 0đ, VNPay hoàn một phần (`03`), phí hủy trong báo cáo | `cancellation`, `refund-policy` | 11 |
 | **Nhắc lịch** (Phase 18.2): cửa sổ 24 giờ / 2 giờ, không gửi trùng, người tắt nhắc, đơn mua sau mốc, đơn đã hoàn | `reminders` | 3 |
 | **Danh sách chờ** (Phase 18.4): chỉ vào khi hết, mời đúng thứ tự và số lượng, chỗ đang dành không ai khác lấy được (vé đứng và ghế), hết 30 phút → người sau, suất ngừng bán → đóng | `waitlist` | 4 |
+| **Đánh giá** (Phase 19): chỉ người đã vào cổng, sửa tại chỗ, hạn 60 ngày, điểm và phân bố, trả lời của đúng ban tổ chức, admin ẩn / hiện (audit), đối chiếu điểm, email mời đánh giá | `reviews` | 8 |
 | Vé, QR, soát vé | `checkins` | 16 |
 | WebSocket real-time | `websocket` | 12 |
 | Hàng đợi BullMQ, email, hết hạn giữ chỗ | `queue` | 11 |
@@ -66,6 +67,7 @@ Các tình huống "nhiều người cùng làm một việc tại cùng một t
 | 4 lần sai mật khẩu cùng lúc cho một email (Phase 18.1) | đếm đủ 4, không lần nào mất |
 | **2 lần khách hủy cùng một đơn cùng lúc** (Phase 18.3) | hoàn đúng 1 lần |
 | Job nhắc lịch / job mời danh sách chờ chạy 2 bản cùng lúc (Phase 18) | không email trùng, không mời quá số chỗ trống |
+| **10 người đánh giá một sự kiện cùng lúc** (Phase 19) | số đánh giá và tổng điểm trên sự kiện đúng |
 | 2 người cùng dùng lượt cuối của 1 mã giảm giá | đúng 1 người được |
 | 2 admin cùng duyệt 1 sự kiện / 1 nhà tổ chức | 1 thành công, 1 xung đột |
 | 2 admin cùng gỡ quyền admin của nhau | nền tảng vẫn còn ít nhất 1 admin |
@@ -77,7 +79,7 @@ Các tình huống "nhiều người cùng làm một việc tại cùng một t
 
 | Statements | Branches | Functions | Lines |
 |---|---|---|---|
-| **93,7%** | **83,0%** | **94,9%** | **95,6%** |
+| **93,8%** | **82,9%** | **95,0%** | **95,8%** |
 
 CI **fail** nếu tụt dưới 90% / 80% / 90% / 90%. Phần thấp: `server.js` và `worker.js` (file khởi động tiến trình, Jest không chạy; E2E và load test chạy chúng).
 
@@ -120,6 +122,7 @@ Admin bắt buộc xác thực hai lớp (Phase 15): admin của môi trường 
 | **Trả qua VNPay** (Phase 17) | trình duyệt sang trang của một VNPay giả (`e2e/support/fake-vnpay.mjs`, kiểm chữ ký của URL), hủy → về trang kết quả với lý do; trả lại → IPN tới API, về thẳng trang đơn, có vé |
 | **Hủy đơn theo chính sách** (Phase 18.3) | trang sự kiện ghi chính sách; trang đơn hiện số được hoàn và phí; hủy → đơn hoàn tiền, mục Hoàn tiền "Đã hoàn" |
 | **Danh sách chờ** (Phase 18.4) | hết vé → "Báo tôi khi có vé"; người khác trả vé → lời mời (job chạy trong API của E2E mỗi 2 giây); vé đang dành không ai khác giữ được; đặt từ trang Danh sách chờ |
+| **Đánh giá** (Phase 19) | người đã vào cổng đi từ "Vé của tôi" tới trang sự kiện, chấm sao và viết; ban tổ chức trả lời ngay trên trang; admin ẩn → điểm trung bình đổi, người viết thấy lý do |
 | **2 trình duyệt cùng xem sơ đồ** | A giữ ghế → B thấy đổi màu ngay, ghế B đang chọn bị bỏ kèm thông báo |
 | Giữ chỗ hết hạn | đơn báo hết hạn, ghế trở lại trống |
 | **Đổi ghế trong đơn đang giữ** (BKG-02) | quay lại sơ đồ từ trang đơn, đổi 1 ghế, bỏ 1 ghế ở trang đơn; trình duyệt thứ hai thấy từng thay đổi |

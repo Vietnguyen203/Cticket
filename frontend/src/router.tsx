@@ -29,6 +29,7 @@ import { OrganizersPage } from './pages/admin/OrganizersPage'
 import { VenueDetailPage } from './pages/admin/VenueDetailPage'
 import { VenuesPage } from './pages/admin/VenuesPage'
 import { AuditLogPage } from './pages/admin/AuditLogPage'
+import { ReviewsPage } from './pages/admin/ReviewsPage'
 import { OrderDetailPage } from './pages/admin/OrderDetailPage'
 import { OrdersPage } from './pages/admin/OrdersPage'
 import { PromotionsPage } from './pages/admin/PromotionsPage'
@@ -95,6 +96,7 @@ export const router = createBrowserRouter([
           { path: 'orders/:id', element: guarded(['order:manage'], <OrderDetailPage />) },
           { path: 'promotions', element: guarded(['promotion:manage'], <PromotionsPage />) },
           { path: 'audit', element: guarded(['audit:read'], <AuditLogPage />) },
+          { path: 'reviews', element: guarded(['review:manage'], <ReviewsPage />) }, // Phase 19
           { path: 'reports', element: guarded(['report:read:any'], <ReportsPage />) },
           { path: 'reports/events/:id', element: guarded(['report:read:any'], <EventReportPage />) },
         ],

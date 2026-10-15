@@ -12,6 +12,7 @@ const notifications = require('../modules/notifications');
 const payments = require('../modules/payments');
 const reminders = require('../modules/reminders');
 const waitlist = require('../modules/waitlist');
+const reviews = require('../modules/reviews');
 const { QUEUE } = require('./queues');
 
 /**
@@ -59,6 +60,7 @@ const HANDLERS = {
     'login-locked': (data) => auth.sendLoginLockedEmail(data), // Phase 18.1
     'event-reminder': (data) => reminders.sendReminderEmail(data), // Phase 18.2
     'waitlist-offer': (data) => waitlist.sendOfferEmail(data), // Phase 18.4
+    'review-invite': (data) => reminders.sendReviewInviteEmail(data), // Phase 19
   },
   [QUEUE.HOLDS]: {
     expire: ({ orderId }) => orders.expireOrder(orderId),
@@ -79,6 +81,7 @@ const HANDLERS = {
     'purge-login-attempts': () => auth.purgeLoginAttempts(pool), // Phase 18.1
     'send-reminders': () => reminders.sendDueReminders(), // Phase 18.2
     'offer-waitlist': () => waitlist.offerSpacesToWaitlist(), // Phase 18.4
+    'reconcile-ratings': () => reviews.reconcileRatings(), // Phase 19
   },
   [QUEUE.PAYMENTS]: {
     'vnpay-refund': (data, job) => payments.processVnpayRefund(data, job),
