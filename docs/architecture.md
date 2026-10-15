@@ -46,7 +46,7 @@ flowchart LR
 | `events` | Sự kiện, suất diễn, hạng vé, sơ đồ ghế, tồn kho, máy trạng thái sự kiện, nhân viên soát vé |
 | `orders` | Giữ chỗ, đổi / bỏ ghế trong đơn đang giữ, đơn hàng, checkout, hết hạn, hủy, xóa dữ liệu bán của sự kiện |
 | `promotions` | Mã giảm giá (giới hạn tổng / mỗi người, thời hạn) |
-| `payments` | Thanh toán giả lập có idempotency, hoàn tiền |
+| `payments` | Thanh toán qua VNPay (URL có chữ ký, IPN, Return URL, đối soát, hoàn tiền qua hàng đợi) và giả lập có idempotency; hoàn tiền |
 | `tickets` | Phát vé, mã QR ký HMAC có phiên bản, cấp lại QR |
 | `checkins` | Soát vé, lịch sử, thống kê |
 | `notifications` | Thông báo trong app + đẩy qua WebSocket |
@@ -99,6 +99,12 @@ Kiểm chứng: test 100 người cùng giữ 1 ghế (kể cả tắt Redis) �
 - Đơn chuyển PAID trong transaction (khóa đơn, đúng trạng thái), rồi **sau commit** đưa job phát vé + email vào hàng đợi. Worker phát vé; job bảo trì `reconcile-tickets` mỗi phút phát bù vé còn thiếu nếu job bị mất.
 - **Mã QR** = id vé + phiên bản + chữ ký HMAC (`QR_SECRET`); DB chỉ lưu **hash** của mã. Cấp lại QR tăng phiên bản → mã cũ hết hiệu lực.
 - **Soát vé**: khóa dòng vé, kiểm tra chữ ký, đúng suất, đúng khung giờ (mở 3 giờ trước giờ diễn), chuyển VALID → USED một lần duy nhất.
+- **VNPay** (Phase 17, `docs/phase-17-vnpay-design.md`): mỗi lần bấm là một **lượt** (dòng `payments` PENDING, mã `vnp_TxnRef` riêng). Kết quả tới bằng 3 đường, cùng đi qua một hàm idempotent (khóa đơn rồi khóa lượt, compare-and-set):
+  - **IPN**: máy chủ VNPay gọi API, chữ ký HMAC-SHA512 được kiểm, số tiền phải khớp; API trả mã của VNPay (`00`, `02` dừng gửi lại; `01`, `04`, `97`, `99` để VNPay gửi lại).
+  - **Return URL**: khách quay về; URL chỉ cho biết lượt nào, API **hỏi lại VNPay** (querydr) chứ không tin URL.
+  - **Đối soát** (job bảo trì mỗi phút): đơn hết giờ khi đang có lượt chờ thì hỏi VNPay trước; quét hết hạn thường bỏ qua các đơn này để không mở bán ghế đã được trả tiền.
+  - Tiền tới khi đơn không dùng được nữa (hết hạn, đã hủy, đã trả bằng lượt khác) → lượt REFUNDED, **hoàn tự động** và email cho khách.
+  - Hoàn tiền VNPay chạy trong hàng đợi `payments` (gọi API refund của VNPay, thử lại có back-off); thất bại hẳn → admin bấm "Hoàn tiền lại". Không gọi VNPay khi đang giữ khóa dòng.
 
 ## 5. Xác thực
 
@@ -139,7 +145,7 @@ sequenceDiagram
 
 ## 8. Hàng đợi và worker
 
-BullMQ trên Redis: `tickets`, `emails`, `holds` (hết hạn giữ chỗ đúng giờ), `notifications`, `maintenance` (mỗi phút: phát bù vé, quét đơn quá hạn; mỗi 10 phút: kết thúc suất đã diễn). Job thử lại có back-off; thao tác trong job **idempotent** (chạy lại không sinh vé trùng). Worker tắt an toàn: chờ job đang chạy xong.
+BullMQ trên Redis: `tickets`, `emails`, `holds` (hết hạn giữ chỗ đúng giờ), `notifications`, `payments` (hoàn tiền qua VNPay), `maintenance` (mỗi phút: phát bù vé, quét đơn quá hạn, đối soát lượt VNPay; mỗi 10 phút: kết thúc suất đã diễn). Job thử lại có back-off; thao tác trong job **idempotent** (chạy lại không sinh vé trùng). Worker tắt an toàn: chờ job đang chạy xong.
 
 ## 9. Web app
 

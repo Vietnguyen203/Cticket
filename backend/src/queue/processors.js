@@ -8,6 +8,7 @@ const events = require('../modules/events');
 const orders = require('../modules/orders');
 const tickets = require('../modules/tickets');
 const notifications = require('../modules/notifications');
+const payments = require('../modules/payments');
 const { QUEUE } = require('./queues');
 
 /**
@@ -51,6 +52,7 @@ const HANDLERS = {
     'two-factor-alert': (data) => auth.sendTwoFactorAlert(data),
     'order-confirmed': sendOrderConfirmation,
     'order-refunded': sendRefundConfirmation,
+    'payment-returned': (data) => payments.sendPaymentReturnedEmail(data), // Phase 17: late VNPay money
   },
   [QUEUE.HOLDS]: {
     expire: ({ orderId }) => orders.expireOrder(orderId),
@@ -62,6 +64,10 @@ const HANDLERS = {
     'reconcile-tickets': () => tickets.reconcileTickets(),
     'sweep-holds': () => orders.expireDueOrders(),
     'finish-shows': finishShows,
+    'reconcile-payments': () => payments.reconcileGatewayPayments(), // Phase 17
+  },
+  [QUEUE.PAYMENTS]: {
+    'vnpay-refund': (data, job) => payments.processVnpayRefund(data, job),
   },
 };
 

@@ -40,6 +40,15 @@ x-app-env: &app-env
   SMTP_USER: ${SMTP_USER:-}
   SMTP_PASS: ${SMTP_PASS:-}
   MAIL_FROM: ${MAIL_FROM:?Set MAIL_FROM in deploy/.env}
+  # Phase 17: VNPay (docs/deployment.md, section 13). Empty TMN code = VNPay off.
+  VNPAY_TMN_CODE: ${VNPAY_TMN_CODE:-}
+  VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET:-}
+  VNPAY_PAY_URL: ${VNPAY_PAY_URL:-https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+  VNPAY_API_URL: ${VNPAY_API_URL:-https://sandbox.vnpayment.vn/merchant_webapi/api/transaction}
+  VNPAY_RETURN_URL: https://${DOMAIN}/payments/vnpay/return
+  VNPAY_SERVER_IP: ${VNPAY_SERVER_IP:-127.0.0.1}
+  # The free simulated payment: never on a site that sells real tickets.
+  PAYMENT_SIMULATOR: ${PAYMENT_SIMULATOR:-false}
   # The web origin: the WebSocket only accepts pages of this site.
   CORS_ORIGINS: https://${DOMAIN:?Set DOMAIN in deploy/.env}
   # Two proxies in front of the API: Caddy, then nginx (web).

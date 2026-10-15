@@ -1,6 +1,7 @@
 const IORedis = require('ioredis');
 const { Queue } = require('bullmq');
 const env = require('../config/env');
+const { VNPAY } = require('../config/constants');
 const logger = require('../utils/logger');
 
 /**
@@ -17,6 +18,7 @@ const QUEUE = Object.freeze({
   HOLDS: 'holds', // expire one order at its deadline
   NOTIFICATIONS: 'notifications', // in-app notification + WebSocket push
   MAINTENANCE: 'maintenance', // repeatable: reconcile tickets, sweep holds, finish shows
+  PAYMENTS: 'payments', // Phase 17: refunds sent to VNPay
 });
 
 // BullMQ adds its own key layout under this prefix (ioredis keyPrefix is not allowed).
@@ -38,6 +40,8 @@ const JOB_OPTIONS = {
   [QUEUE.HOLDS]: { ...KEEP, attempts: 3, backoff: { type: 'fixed', delay: retryDelay } },
   [QUEUE.NOTIFICATIONS]: { ...KEEP, attempts: 5, backoff: { type: 'exponential', delay: retryDelay } },
   [QUEUE.MAINTENANCE]: { removeOnComplete: true, removeOnFail: { age: DAY_SECONDS }, attempts: 1 },
+  // VNPay may be down for a while: 5 tries over ~10 minutes, then the refund is FAILED (admin retries).
+  [QUEUE.PAYMENTS]: { ...KEEP, attempts: VNPAY.REFUND_ATTEMPTS, backoff: { type: 'exponential', delay: 8 * retryDelay } },
 };
 
 const settings = { mode: env.QUEUE_MODE };

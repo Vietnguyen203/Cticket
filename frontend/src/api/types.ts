@@ -195,6 +195,39 @@ export interface OrderItem {
   totalAmount: number
 }
 
+/** One payment attempt of an order (order detail). */
+export interface OrderPayment {
+  id: string
+  /** PENDING: a VNPay attempt still waiting for VNPay's answer (Phase 17) */
+  status: 'PENDING' | 'SUCCESS' | 'FAILED' | 'CANCELLED' | 'REFUNDED'
+  amount: number
+  /** SIMULATOR or VNPAY */
+  provider: string
+  /** Why it failed: the simulator's code, or VNPay's response code (24 cancelled, 51 no funds…) */
+  failureCode: string | null
+  /** VNPay's transaction number (vnp_TransactionNo) */
+  providerTransactionId: string | null
+  providerResponseCode: string | null
+  bankCode: string | null
+  paidAt: string | null
+  createdAt: string
+}
+
+/** Money given back (Phase 17: VNPay refunds go through a queue, so they have a status). */
+export interface OrderRefund {
+  id: string
+  paymentId: string
+  amount: number
+  status: 'PENDING' | 'SUCCESS' | 'FAILED'
+  reason: string | null
+  /** Why VNPay refused or did not answer (FAILED); an admin can send it again */
+  failureMessage: string | null
+  attempts: number
+  providerRefundId: string | null
+  createdAt: string
+  completedAt: string | null
+}
+
 export interface Order {
   id: string
   orderCode: string
@@ -216,6 +249,7 @@ export interface Order {
   /** Admins see the buyer */
   buyerEmail?: string
   /** Order detail only */
-  payments?: Array<{ id: string; status: string; amount: number; provider: string; failureCode: string | null; paidAt: string | null; createdAt: string }>
+  payments?: OrderPayment[]
+  refunds?: OrderRefund[]
   tickets?: Array<{ id: string; code: string; seatLabel: string | null; ticketTypeName: string; admissionNo: number; status: string; issuedAt: string }>
 }

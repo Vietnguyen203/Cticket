@@ -1,3 +1,4 @@
+const env = require('../../config/env');
 const { pool } = require('../../database/pool');
 const { withTransaction } = require('../../database/transaction');
 const { ORDER_STATUS, PAYMENT_STATUS, PAYMENT_PROVIDER } = require('../../config/constants');
@@ -9,6 +10,7 @@ const { publishAfterCommit } = require('../../realtime/publisher');
 const { MESSAGE, userRoom } = require('../../realtime/messages');
 const paymentsRepository = require('./payments.repository');
 const simulator = require('./simulator');
+const { startRefund, enqueueRefund } = require('./refunds');
 
 const PAID_STATUSES = [ORDER_STATUS.PAID, ORDER_STATUS.COMPLETED];
 
@@ -50,6 +52,8 @@ function replay(existing, requestHash) {
  * seats, so the customer can retry with a NEW key until the order expires.
  */
 async function pay(context, actor, { orderId, simulate }, idempotencyKey) {
+  // Phase 17: the simulator pays for free, so it is off in production by default.
+  if (!env.PAYMENT_SIMULATOR) throw new AppError('PAYMENT_METHOD_DISABLED', 'The simulated payment is off on this server.');
   const requestHash = sha256(JSON.stringify({ orderId, simulate }));
   const earlier = await paymentsRepository.findByKey(pool, actor.userId, idempotencyKey);
   if (earlier) return replay(earlier, requestHash);
@@ -70,6 +74,10 @@ async function pay(context, actor, { orderId, simulate }, idempotencyKey) {
       await orders.releaseHeldOrder(client, orderId, { to: ORDER_STATUS.EXPIRED });
       return { expired: true }; // committed, then reported as ORDER_EXPIRED: nothing was charged
     }
+
+    // An unfinished VNPay attempt is replaced (paid anyway → refunded as late money).
+    const gatewayAttempt = await paymentsRepository.findPendingGatewayAttempt(client, orderId);
+    if (gatewayAttempt) await paymentsRepository.cancelAttempt(client, gatewayAttempt.id);
 
     const pending = await paymentsRepository.insertPending(client, {
       orderId,
@@ -112,11 +120,13 @@ async function getPayment(actor, paymentId) {
 /**
  * Refund a paid order in the caller's transaction (order already locked):
  * refund row, payment REFUNDED, then the order and its inventory, audited.
- * A 0đ order has no payment: only the order part applies.
+ * A 0đ order has no payment: only the order part applies. A VNPay payment's
+ * money goes back through the payments queue (refunds.js): the order and its
+ * tickets are refunded now, the refund row says when VNPay has accepted it.
  */
 async function refundLockedOrder(client, { orderId, payment, reason, context }) {
   if (payment) {
-    await paymentsRepository.insertRefund(client, { paymentId: payment.id, orderId, amount: payment.amount, reason });
+    await startRefund(client, { payment, orderId, reason, requestedBy: context?.userId ?? 'system' });
     await paymentsRepository.markRefunded(client, payment.id);
   }
   await orders.refundPaidOrder(client, orderId);
@@ -167,4 +177,26 @@ async function refundPaidOrders(client, scope, { reason, context }) {
   return ids.length;
 }
 
-module.exports = { pay, getPayment, refundPayment, refundPaidOrders };
+/** Phase 17: an admin sends a refund VNPay refused (or never answered) again. */
+async function retryRefund(context, refundId) {
+  return withTransaction(async (client) => {
+    const refund = await paymentsRepository.reopenRefund(client, refundId);
+    if (!refund) throw new AppError('REFUND_NOT_RETRYABLE');
+    await recordAudit(client, {
+      context,
+      action: 'REFUND_RETRIED',
+      entityType: 'order',
+      entityId: refund.order_id,
+      newValue: { refundId },
+    });
+    enqueueRefund(client, refundId, { again: true });
+    return { refundId, orderId: refund.order_id, status: 'PENDING' };
+  });
+}
+
+/** What the order page may offer (Phase 17). */
+function paymentMethods() {
+  return [...(env.VNPAY_ENABLED ? [PAYMENT_PROVIDER.VNPAY] : []), ...(env.PAYMENT_SIMULATOR ? [PAYMENT_PROVIDER.SIMULATOR] : [])];
+}
+
+module.exports = { pay, getPayment, refundPayment, refundPaidOrders, retryRefund, paymentMethods };

@@ -284,3 +284,26 @@ bash deploy/scripts/smoke.sh https://etp.localhost -k --resolve etp.localhost:44
 Dọn: `docker compose -p etp-prod down -v`, rồi xóa `deploy/.env`, `deploy/.state`, `deploy/backups`.
 
 Lưu ý: `deploy.sh <ref>` và `rollback.sh` sẽ **checkout commit khác** ngay trong thư mục đang đứng. Muốn thử chúng trên máy, hãy làm trên một bản `git clone` riêng.
+
+## 13. Thanh toán VNPay (Phase 17)
+
+Thiết kế và các tình huống: [`phase-17-vnpay-design.md`](phase-17-vnpay-design.md). Không cấu hình gì thì VNPay tắt; thanh toán giả lập cũng tắt trên production, nên **site chưa nhận thanh toán** cho tới khi làm mục này.
+
+1. **Lấy mã**. Để thử: đăng ký sandbox tại http://sandbox.vnpayment.vn/devreg/. Bán vé thật: ký hợp đồng với VNPay, họ cấp bộ mã production và hai địa chỉ production (trang thanh toán, API).
+2. Trên **máy chủ**, `nano deploy/.env`, điền:
+   - `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET` (từ email của VNPay; không dán vào chat, không gửi qua kênh nào khác);
+   - `VNPAY_SERVER_IP` = IP công khai của VPS;
+   - tiền thật: thêm `VNPAY_PAY_URL`, `VNPAY_API_URL` của production.
+   
+   Rồi `bash deploy/scripts/deploy.sh --checked-out`.
+3. Trong **trang quản lý merchant** của VNPay, khai báo IPN URL: `https://ve.example.com/api/v1/payments/vnpay/ipn`. Return URL thì API tự gửi theo `DOMAIN`: `https://ve.example.com/payments/vnpay/return`.
+4. **Thử**: mua 1 vé, trả bằng thẻ test → đơn PAID, có vé. Mua lần nữa và bấm hủy trên trang VNPay → trang kết quả báo "Bạn đã hủy giao dịch". Admin hoàn tiền đơn đầu → mục Hoàn tiền của đơn chuyển "Đã hoàn". Xem `logs api worker` không có lỗi.
+
+Vận hành:
+
+| Thấy gì | Làm gì |
+|---|---|
+| Đơn có hoàn tiền **"Hoàn lỗi"** (trang chi tiết đơn của admin, audit `REFUND_FAILED`) | Đọc lý do. VNPay tạm lỗi thì bấm **"Hoàn tiền lại"**; VNPay từ chối hẳn (sai số tiền, giao dịch không hoàn được) thì liên hệ VNPay |
+| Khách báo "đã trừ tiền mà đơn hết hạn" | Bình thường: tiền đến muộn được **hoàn tự động** (audit `LATE_PAYMENT_REFUNDED`, email cho khách). Kiểm tra mục Hoàn tiền của đơn |
+| VNPay không trả lời (log "VNPay querydr gave no answer") | Đơn đang chờ VNPay được giữ thêm tối đa 10 phút rồi hết hạn; tiền đến sau đó được hoàn. Kiểm tra máy chủ gọi ra được `VNPAY_API_URL` |
+| Lộ `VNPAY_HASH_SECRET` | Đổi ngay trong trang merchant của VNPay, sửa `deploy/.env`, deploy lại |

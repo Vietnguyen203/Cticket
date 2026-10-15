@@ -203,11 +203,31 @@ async function checkout(db, { orderId, discount, windowSeconds }) {
 /** Payments of an order, newest first (read model for the order page). */
 async function listPayments(db, orderId) {
   const { rows } = await db.query(
-    `SELECT id, status, amount, currency, provider, failure_code, paid_at, created_at
+    `SELECT id, status, amount, currency, provider, failure_code, paid_at, created_at,
+            provider_transaction_id, provider_response_code, provider_data->>'vnp_BankCode' AS bank_code
      FROM payments WHERE order_id = $1 ORDER BY created_at DESC`,
     [orderId],
   );
   return rows;
+}
+
+/** Refunds of an order (Phase 17: a gateway refund can be PENDING or FAILED for a while). */
+async function listRefunds(db, orderId) {
+  const { rows } = await db.query(
+    `SELECT id, payment_id, amount, status, reason, failure_message, attempts, provider_refund_id, created_at, completed_at
+     FROM refunds WHERE order_id = $1 ORDER BY created_at DESC`,
+    [orderId],
+  );
+  return rows;
+}
+
+/**
+ * The order ends unpaid (cancelled, expired): an attempt still waiting for
+ * its gateway is cancelled with it. If the customer pays it anyway, the money
+ * is refunded (payments module, "late money").
+ */
+async function cancelPendingPaymentsOfOrder(db, orderId) {
+  await db.query(`UPDATE payments SET status = 'CANCELLED' WHERE order_id = $1 AND status = 'PENDING'`, [orderId]);
 }
 
 /** After the show: PAID orders of finished schedules are COMPLETED (no regular refund any more). */
@@ -264,11 +284,16 @@ async function gaLines(db, orderId) {
 // Expiry
 // ---------------------------------------------------------------------------
 
+// Phase 17: an order with a gateway attempt still PENDING (the customer may be
+// paying on VNPay right now) is not expired here: the payments module asks
+// VNPay first (reconcile-payments), then expires it if nobody paid.
+const NO_PENDING_PAYMENT = `NOT EXISTS (SELECT 1 FROM payments p WHERE p.order_id = orders.id AND p.status = 'PENDING')`;
+
 /** Candidates only (no lock): each one is re-checked and locked in its own transaction. */
 async function findDueOrderIds(db, { scheduleId = null, userId = null, limit }) {
   const { rows } = await db.query(
     `SELECT id FROM orders
-     WHERE status IN ${OPEN} AND expires_at <= now()
+     WHERE status IN ${OPEN} AND expires_at <= now() AND ${NO_PENDING_PAYMENT}
        AND ($1::uuid IS NULL OR schedule_id = $1)
        AND ($2::uuid IS NULL OR user_id = $2)
      ORDER BY expires_at
@@ -284,7 +309,8 @@ async function findDueOrderIds(db, { scheduleId = null, userId = null, limit }) 
  */
 async function lockDueOrder(db, id) {
   const { rows } = await db.query(
-    `SELECT id FROM orders WHERE id = $1 AND status IN ${OPEN} AND expires_at <= now() FOR UPDATE SKIP LOCKED`,
+    `SELECT id FROM orders WHERE id = $1 AND status IN ${OPEN} AND expires_at <= now() AND ${NO_PENDING_PAYMENT}
+     FOR UPDATE SKIP LOCKED`,
     [id],
   );
   return rows[0] ?? null;
@@ -396,6 +422,8 @@ module.exports = {
   lockOrdersOf,
   checkout,
   listPayments,
+  listRefunds,
+  cancelPendingPaymentsOfOrder,
   refundTicketsOfOrder,
   lockTicketsHasUsed,
   completeOrdersOfFinishedSchedules,

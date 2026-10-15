@@ -120,4 +120,18 @@ function twoFactorEmail({ alert, firstName, codesLeft }) {
   };
 }
 
-module.exports = { otpEmail, orderConfirmedEmail, orderRefundedEmail, twoFactorEmail, escapeHtml };
+/**
+ * Phase 17: VNPay took the money after the order stopped waiting for it
+ * (expired, cancelled, or already paid by another attempt): it is refunded.
+ */
+function paymentReturnedEmail({ firstName, orderCode, amount }) {
+  const greeting = firstName ? `Xin chào ${firstName},` : 'Xin chào,';
+  const body = `Khoản thanh toán ${formatVnd(amount)} qua VNPay cho đơn ${orderCode} được ghi nhận khi đơn đã hết hạn, đã hủy hoặc đã được thanh toán bằng lượt khác. Chúng tôi đã gửi yêu cầu hoàn lại toàn bộ số tiền này qua VNPay; tiền về tài khoản của bạn theo thời gian xử lý của ngân hàng.`;
+  return {
+    subject: `Hoàn tiền thanh toán đơn ${orderCode}`,
+    text: `${greeting}\n\n${body}`,
+    html: `<p>${escapeHtml(greeting)}</p>\n<p>${escapeHtml(body)}</p>`,
+  };
+}
+
+module.exports = { otpEmail, orderConfirmedEmail, orderRefundedEmail, twoFactorEmail, paymentReturnedEmail, escapeHtml };

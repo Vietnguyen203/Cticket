@@ -5,6 +5,9 @@ const { VN_TIME_ZONE } = require('./vn-date');
  *
  * - A SOLD order is PAID or COMPLETED. A refunded order leaves the revenue of
  *   the day it was paid and shows up as a refund on the day it was refunded.
+ *   Every refund started counts (Phase 17: a VNPay refund stays PENDING until
+ *   VNPay accepts it, FAILED until an admin sends it again; the order and its
+ *   tickets are refunded at once either way).
  * - Tickets sold = the quantities of the sold orders' items (the same number as
  *   the tickets issued, without waiting for the worker to issue them).
  * - Days are Vietnamese calendar days: "$n::date" becomes the instant of that
@@ -90,7 +93,7 @@ async function ordersBySchedule(db, eventId) {
      FROM orders o
      JOIN event_schedules es ON es.id = o.schedule_id
      LEFT JOIN LATERAL (
-       SELECT sum(rf.amount)::bigint AS amount FROM refunds rf WHERE rf.order_id = o.id AND rf.status = 'SUCCESS'
+       SELECT sum(rf.amount)::bigint AS amount FROM refunds rf WHERE rf.order_id = o.id
      ) r ON true
      WHERE es.event_id = $1
      GROUP BY o.schedule_id`,
@@ -149,11 +152,11 @@ async function daily(db, { from, to, eventId = null }) {
        GROUP BY 1
      ),
      refunded AS (
-       SELECT ${vnDay('r.completed_at')} AS day, count(*)::int AS orders, sum(r.amount)::bigint AS amount
+       SELECT ${vnDay('r.created_at')} AS day, count(*)::int AS orders, sum(r.amount)::bigint AS amount
        FROM refunds r
        JOIN orders o ON o.id = r.order_id
        JOIN event_schedules es ON es.id = o.schedule_id
-       WHERE r.status = 'SUCCESS' AND r.completed_at >= ${vnStartOf('$1')} AND r.completed_at < ${vnEndOf('$2')}
+       WHERE r.created_at >= ${vnStartOf('$1')} AND r.created_at < ${vnEndOf('$2')}
          AND ($3::uuid IS NULL OR es.event_id = $3)
        GROUP BY 1
      )
@@ -186,7 +189,7 @@ async function rangeTotals(db, { from, to }) {
        (SELECT row_to_json(t) FROM (
           SELECT count(*)::int AS orders, coalesce(sum(r.amount), 0)::bigint AS amount
           FROM refunds r
-          WHERE r.status = 'SUCCESS' AND r.completed_at >= ${vnStartOf('$1')} AND r.completed_at < ${vnEndOf('$2')}
+          WHERE r.created_at >= ${vnStartOf('$1')} AND r.created_at < ${vnEndOf('$2')}
        ) t) AS refunded`,
     [from, to],
   );
@@ -266,7 +269,7 @@ async function eventsOfOrganizer(db, organizerId, limit) {
        FROM refunds rf
        JOIN orders o ON o.id = rf.order_id
        JOIN event_schedules es ON es.id = o.schedule_id
-       WHERE es.event_id = e.id AND rf.status = 'SUCCESS'
+       WHERE es.event_id = e.id
      ) r ON true
      WHERE e.organizer_id = $1
      ORDER BY e.created_at DESC

@@ -14,6 +14,8 @@ const MAINTENANCE_SCHEDULE = [
   { name: 'reconcile-tickets', every: MINUTE_MS }, // Q-04
   { name: 'sweep-holds', every: env.ORDER_SWEEP_INTERVAL_SECONDS * 1000 }, // Q-03 safety net
   { name: 'finish-shows', every: 10 * MINUTE_MS },
+  // Phase 17: VNPay attempts at their order's deadline are asked about before the seats are released.
+  { name: 'reconcile-payments', every: MINUTE_MS },
 ];
 
 /**

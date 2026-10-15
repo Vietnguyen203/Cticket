@@ -32,6 +32,15 @@ process.env.QR_SECRET ??= TEST_SECRET;
 // 32 bytes, base64: encrypts TOTP secrets (Phase 15). Admins must use two-factor, as in production.
 process.env.TOTP_ENCRYPTION_KEY ??= Buffer.from('test-only-totp-key-of-32-bytes!!').toString('base64');
 process.env.TWO_FACTOR_REQUIRED_ROLES = 'ADMIN';
+// Phase 17: VNPay with test-only credentials; its API is a fake server started
+// by the VNPay tests on this port (tests/helpers/fake-vnpay.js). Never the real one.
+process.env.VNPAY_TMN_CODE = 'TESTTMN1';
+process.env.VNPAY_HASH_SECRET = 'test-only-vnpay-hash-secret';
+process.env.VNPAY_PAY_URL = 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html';
+process.env.VNPAY_API_URL = 'http://127.0.0.1:39180/merchant_webapi/api/transaction';
+process.env.VNPAY_RETURN_URL = 'http://localhost:5173/payments/vnpay/return';
+process.env.VNPAY_TIMEOUT_MS = '2000';
+process.env.PAYMENT_SIMULATOR = 'true';
 // Jobs run inline, inside the request, so tests see emails and tickets at
 // once; the queue tests switch to real BullMQ workers.
 process.env.QUEUE_MODE = 'inline';

@@ -1,9 +1,20 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router'
 import { ApiError, toApiError } from '../../api/errors'
-import { cancelOrder, checkoutOrder, getOrder, payOrder, previewPromotion, removeOrderSeat, type PromotionPreview } from '../../api/orders'
+import {
+  cancelOrder,
+  checkoutOrder,
+  getOrder,
+  getPaymentMethods,
+  payOrder,
+  previewPromotion,
+  removeOrderSeat,
+  startVnpayPayment,
+  type PromotionPreview,
+} from '../../api/orders'
 import { OrderStatusBadge } from '../../admin/OrderStatusBadge'
 import { Alert, Button, Card, FullPageSpinner } from '../../components/ui'
+import { VNPAY_MIN_SECONDS, vnpayReason } from '../../payments/vnpayReasons'
 import { realtime } from '../../realtime'
 import { formatDateTime, formatVnd } from '../../utils/format'
 import { mmss, useCountdown } from '../../utils/useCountdown'
@@ -35,10 +46,11 @@ const ORDER_MESSAGES = [
   'TICKET_ISSUED',
 ]
 
-/** APP-C04: the held order → checkout (discount code) → pay (simulated) → tickets. */
+/** APP-C04: the held order → checkout (discount code) → pay (VNPay or the simulator) → tickets. */
 export function OrderPage() {
   const { id = '' } = useParams()
   const order = useAsync(() => getOrder(id), `order:${id}`)
+  const methods = useAsync(getPaymentMethods, 'payment-methods')
   const [error, setError] = useState<ApiError | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [code, setCode] = useState('')
@@ -50,6 +62,11 @@ export function OrderPage() {
   const ticketCount = o?.items.reduce((sum, item) => sum + item.quantity, 0) ?? 0
   const secondsLeft = useCountdown(payable ? o?.expiresAt : null)
   const { reload } = order
+  // Phase 17: payments come newest first.
+  const lastPayment = o?.payments?.[0]
+  const vnpayPending = lastPayment?.provider === 'VNPAY' && lastPayment.status === 'PENDING'
+  const offers = methods.data ?? []
+  const tooLateForVnpay = secondsLeft !== null && secondsLeft < VNPAY_MIN_SECONDS
 
   useEffect(
     () =>
@@ -62,13 +79,14 @@ export function OrderPage() {
   useEffect(() => {
     if (secondsLeft === 0) reload()
   }, [secondsLeft, reload])
-  // Tickets are issued by the worker a moment after payment.
+  // Tickets are issued by the worker a moment after payment. VNPay's answer
+  // arrives over the WebSocket; polling covers a missed message.
   const waitingTickets = o?.status === 'PAID' && (o.tickets ?? []).length === 0
   useEffect(() => {
-    if (!waitingTickets) return undefined
-    const timer = setInterval(reload, 2000)
+    if (!waitingTickets && !vnpayPending) return undefined
+    const timer = setInterval(reload, waitingTickets ? 2000 : 5000)
     return () => clearInterval(timer)
-  }, [waitingTickets, reload])
+  }, [waitingTickets, vnpayPending, reload])
 
   async function run(label: string, action: () => Promise<unknown>) {
     setBusy(label)
@@ -79,6 +97,19 @@ export function OrderPage() {
     } catch (err) {
       setError(toApiError(err))
     } finally {
+      setBusy(null)
+    }
+  }
+
+  /** Phase 17: a new VNPay attempt, then off to VNPay's page (it sends the customer back to /payments/vnpay/return). */
+  async function payWithVnpay() {
+    setBusy('vnpay')
+    setError(null)
+    try {
+      const { paymentUrl } = await startVnpayPayment(id)
+      window.location.assign(paymentUrl)
+    } catch (err) {
+      setError(toApiError(err))
       setBusy(null)
     }
   }
@@ -116,7 +147,12 @@ export function OrderPage() {
         </div>
       )}
       {error && <Alert>{messageOf(error)}</Alert>}
-      {o.status === 'PAYMENT_FAILED' && <Alert>Thanh toán bị từ chối. Ghế vẫn được giữ, bạn có thể thanh toán lại.</Alert>}
+      {o.status === 'PAYMENT_FAILED' && (
+        <Alert>
+          {lastPayment?.provider === 'VNPAY' ? `Thanh toán không thành công: ${vnpayReason(lastPayment.failureCode)}` : 'Thanh toán bị từ chối.'} Ghế vẫn
+          được giữ, bạn có thể thanh toán lại.
+        </Alert>
+      )}
       {o.status === 'EXPIRED' && <Alert tone="warning">Đã hết thời gian giữ chỗ, ghế đã được mở bán lại.</Alert>}
       {o.status === 'PAID' && <Alert tone="success">Thanh toán thành công! {waitingTickets ? 'Vé đang được phát hành…' : 'Vé đã được gửi tới email của bạn.'}</Alert>}
 
@@ -203,21 +239,62 @@ export function OrderPage() {
 
       {(o.status === 'PAYMENT_PENDING' || o.status === 'PAYMENT_FAILED') && (
         <Card className="space-y-3">
-          <p className="text-sm text-slate-600">
-            Cổng thanh toán là <strong>giả lập</strong>: không có tiền thật. Bấm "Giả lập thẻ bị từ chối" để thử trường hợp lỗi.
-          </p>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            {/* A new Idempotency-Key per click; retries of that click reuse it (api/orders.ts). */}
-            <Button className="flex-1" loading={busy === 'pay'} disabled={busy !== null} onClick={() => run('pay', () => payOrder(id, uuid()))}>
-              Thanh toán {formatVnd(o.totalAmount)}
-            </Button>
-            <Button variant="secondary" loading={busy === 'decline'} disabled={busy !== null} onClick={() => run('decline', () => payOrder(id, uuid(), 'FAILED'))}>
-              Giả lập thẻ bị từ chối
-            </Button>
-          </div>
+          {vnpayPending && (
+            <Alert tone="info">
+              Đang chờ VNPay xác nhận lượt thanh toán trước. Nếu bạn đã trả tiền, đơn sẽ tự cập nhật trong giây lát. Thanh toán lại sẽ thay lượt đó (nếu lượt cũ
+              vẫn bị trừ tiền, khoản đó được hoàn tự động).
+            </Alert>
+          )}
+          {offers.includes('VNPAY') &&
+            (tooLateForVnpay ? (
+              <p className="text-sm text-red-700">Còn dưới 3 phút: không đủ thời gian thanh toán qua VNPay. Hãy hủy đơn và đặt lại.</p>
+            ) : (
+              <Button className="w-full" loading={busy === 'vnpay'} disabled={busy !== null} onClick={payWithVnpay}>
+                Thanh toán {formatVnd(o.totalAmount)} qua VNPay
+              </Button>
+            ))}
+          {offers.includes('SIMULATOR') && (
+            <>
+              <p className="text-sm text-slate-600">
+                Thanh toán <strong>giả lập</strong> (chỉ để thử, không có tiền thật). Bấm "Giả lập thẻ bị từ chối" để thử trường hợp lỗi.
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                {/* A new Idempotency-Key per click; retries of that click reuse it (api/orders.ts). */}
+                <Button
+                  className="flex-1"
+                  variant={offers.includes('VNPAY') ? 'secondary' : 'primary'}
+                  loading={busy === 'pay'}
+                  disabled={busy !== null}
+                  onClick={() => run('pay', () => payOrder(id, uuid()))}
+                >
+                  {offers.includes('VNPAY') ? 'Giả lập thanh toán thành công' : `Thanh toán ${formatVnd(o.totalAmount)}`}
+                </Button>
+                <Button variant="secondary" loading={busy === 'decline'} disabled={busy !== null} onClick={() => run('decline', () => payOrder(id, uuid(), 'FAILED'))}>
+                  Giả lập thẻ bị từ chối
+                </Button>
+              </div>
+            </>
+          )}
+          {methods.data && offers.length === 0 && <Alert>Hiện chưa nhận thanh toán trực tuyến. Vui lòng thử lại sau.</Alert>}
+          {methods.error && <Alert>{methods.error.message}</Alert>}
           <Button variant="ghost" className="w-full" disabled={busy !== null} onClick={() => run('cancel', () => cancelOrder(id))}>
             Hủy đơn
           </Button>
+        </Card>
+      )}
+
+      {(o.refunds ?? []).length > 0 && (
+        <Card className="space-y-2 text-sm">
+          <h2 className="font-semibold">Hoàn tiền</h2>
+          {o.refunds?.map((refund) => (
+            <div key={refund.id} className="flex items-center justify-between gap-2">
+              <span>
+                {formatVnd(refund.amount)} · {formatDateTime(refund.createdAt)}
+              </span>
+              <span className={refund.status === 'SUCCESS' ? 'text-emerald-700' : 'text-amber-700'}>{refund.status === 'SUCCESS' ? 'Đã hoàn' : 'Đang xử lý'}</span>
+            </div>
+          ))}
+          <p className="text-xs text-slate-500">Tiền hoàn qua VNPay về tài khoản của bạn theo thời gian xử lý của ngân hàng.</p>
         </Card>
       )}
 

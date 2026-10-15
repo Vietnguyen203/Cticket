@@ -98,7 +98,9 @@ test('README screenshots', async ({ browser, api, admin }) => {
 
   // 4. Paid → a ticket with its QR code
   await page.getByRole('button', { name: 'Tiếp tục thanh toán' }).click()
-  await page.getByRole('button', { name: /^Thanh toán / }).click()
+  // Through VNPay (the E2E stack's fake VNPay page).
+  await page.getByRole('button', { name: /qua VNPay$/ }).click()
+  await page.getByRole('button', { name: 'Thanh toán', exact: true }).click()
   await expect(page.getByText('Thanh toán thành công!')).toBeVisible()
   await page.getByRole('link', { name: /Xem QR/ }).first().click()
   await expect(page.getByRole('img', { name: /Mã QR của vé/ })).toBeVisible()

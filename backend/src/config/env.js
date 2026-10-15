@@ -98,6 +98,20 @@ const envSchema = z.object({
   // Safety-net sweep of expired holds, run by the worker (each order also has its own timed job).
   ORDER_SWEEP_INTERVAL_SECONDS: z.coerce.number().int().min(5).max(3600).default(60),
 
+  // Payments (Phase 17). VNPay is on when both the TMN code and the hash secret
+  // are set (sandbox registration email). The simulated provider pays for free:
+  // off by default in production (set PAYMENT_SIMULATOR=true only for a demo).
+  VNPAY_TMN_CODE: z.string().trim().optional(),
+  VNPAY_HASH_SECRET: z.string().trim().optional(),
+  VNPAY_PAY_URL: z.url().default('https://sandbox.vnpayment.vn/paymentv2/vpcpay.html'),
+  VNPAY_API_URL: z.url().default('https://sandbox.vnpayment.vn/merchant_webapi/api/transaction'),
+  // The web page VNPay sends the customer back to (frontend route /payments/vnpay/return).
+  VNPAY_RETURN_URL: z.url().default('http://localhost:8080/payments/vnpay/return'),
+  // This server's address, sent with querydr / refund calls (VNPay requires one).
+  VNPAY_SERVER_IP: z.string().default('127.0.0.1'),
+  VNPAY_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60_000).default(10_000),
+  PAYMENT_SIMULATOR: booleanString.optional(),
+
   // Used only by `npm run seed:admin`.
   ADMIN_EMAIL: z.string().optional(),
   ADMIN_PASSWORD: z.string().optional(),
@@ -105,7 +119,13 @@ const envSchema = z.object({
   ADMIN_TOTP_SECRET: z.string().optional(),
 });
 
-const parsed = envSchema.safeParse(process.env);
+const parsed = envSchema
+  .transform((env) => ({
+    ...env,
+    PAYMENT_SIMULATOR: env.PAYMENT_SIMULATOR ?? env.NODE_ENV !== 'production',
+    VNPAY_ENABLED: Boolean(env.VNPAY_TMN_CODE && env.VNPAY_HASH_SECRET),
+  }))
+  .safeParse(process.env);
 
 if (!parsed.success) {
   // Fail fast: a misconfigured process must not start serving traffic.

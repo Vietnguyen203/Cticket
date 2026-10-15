@@ -39,6 +39,8 @@ async function releaseHeldOrder(client, orderId, { to, cancelReason = null }) {
   }
   // A promotion use taken at checkout goes back to the code: it was never paid for.
   await promotions.returnUsesOfOrder(client, orderId);
+  // Phase 17: an unfinished VNPay attempt goes with the order.
+  await ordersRepository.cancelPendingPaymentsOfOrder(client, orderId);
 
   // Live seat maps and the order's owner hear about it once this commits.
   const room = scheduleRoom(changed.schedule_id);
