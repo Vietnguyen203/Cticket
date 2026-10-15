@@ -158,6 +158,11 @@ Stack riêng chạy **image production** của API và worker (database `etp_loa
 | Tranh ghế: 500 người, 50 ghế | 500 | ≈ 1.100 | giữ ghế 250–370 ms; hủy đơn 1,0 s (3 bản API) – 3,4 s (1 bản) | 0% |
 | Hỗn hợp 5 phút (70% duyệt, 20% sơ đồ, 10% mua) | 200 | 283 | giữ chỗ 71 ms, thanh toán 52 ms | 0% |
 
+**Đo lại sau Phase 19** (15/10/2026, cùng máy, 1 bản API), vì Phase 18 thêm kiểm tra danh sách chờ vào luồng giữ chỗ: không chậm đi.
+- Hỗn hợp: giữ chỗ p95 **44 ms** (trước 71 ms), thanh toán p95 **33 ms** (trước 52 ms), 2.839 lượt mua, 0% lỗi.
+- Tranh ghế: giữ ghế p95 327 ms (trước 313 ms), 1.266 request/giây (trước 1.002), 0% lỗi.
+- Hủy đơn khi 500 người tranh 50 ghế với 1 bản API vẫn p95 ≈ 3,5 s, như trước; 3 bản API giảm còn ≈ 1 s.
+
 **Không ghế nào bị bán hai lần** sau mọi lần chạy (`node loadtest/verify.mjs`). Load test dẫn tới 4 cải tiến: giữ kết nối 65 giây sau proxy (sửa lỗi 502), "gợi ý ghế đã có người lấy" trong Redis (PostgreSQL bớt 22–30% CPU), gzip ở nginx (sơ đồ ghế 470 → 70 KB), chạy nhiều bản API (hủy đơn nhanh hơn 6 lần). Chi tiết, số đo trước / sau và cách chạy: `docs/phase-13-testing-design.md`, mục 8 (bước 13.2).
 
 ```
