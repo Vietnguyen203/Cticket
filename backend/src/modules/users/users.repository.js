@@ -7,9 +7,9 @@
 const { buildSetClause } = require('../../utils/sql');
 
 const USER_COLUMNS = `id, email, password_hash, first_name, last_name, phone, status,
-  email_verified_at, created_at, updated_at`;
+  email_verified_at, event_reminders, created_at, updated_at`;
 
-const PROFILE_COLUMNS = { firstName: 'first_name', lastName: 'last_name', phone: 'phone' };
+const PROFILE_COLUMNS = { firstName: 'first_name', lastName: 'last_name', phone: 'phone', eventReminders: 'event_reminders' };
 
 async function insertUser(db, { email, passwordHash, firstName, lastName, phone = null, status, emailVerifiedAt = null }) {
   const { rows } = await db.query(

@@ -8,6 +8,10 @@ const { VN_TIME_ZONE } = require('./vn-date');
  *   Every refund started counts (Phase 17: a VNPay refund stays PENDING until
  *   VNPay accepts it, FAILED until an admin sends it again; the order and its
  *   tickets are refunded at once either way).
+ * - Phase 18.3: a customer's cancellation refunds part of the order; the rest
+ *   (the cancellation fee) is money the organizer keeps: counted as revenue
+ *   on the day of the cancellation (fee = order total − its refund; 0 for an
+ *   admin's full refund).
  * - Tickets sold = the quantities of the sold orders' items (the same number as
  *   the tickets issued, without waiting for the worker to issue them).
  * - Days are Vietnamese calendar days: "$n::date" becomes the instant of that
@@ -89,11 +93,13 @@ async function ordersBySchedule(db, eventId) {
             coalesce(sum(o.discount_amount) FILTER (WHERE ${SOLD}), 0)::bigint AS discount,
             coalesce(sum(o.total_amount) FILTER (WHERE ${SOLD}), 0)::bigint AS revenue,
             count(*) FILTER (WHERE o.status = 'REFUNDED')::int AS refunded_orders,
-            coalesce(sum(r.amount), 0)::bigint AS refunded_amount
+            coalesce(sum(r.amount), 0)::bigint AS refunded_amount,
+            coalesce(sum(r.fees), 0)::bigint AS cancellation_fees
      FROM orders o
      JOIN event_schedules es ON es.id = o.schedule_id
      LEFT JOIN LATERAL (
-       SELECT sum(rf.amount)::bigint AS amount FROM refunds rf WHERE rf.order_id = o.id
+       SELECT sum(rf.amount)::bigint AS amount, sum(greatest(o.total_amount - rf.amount, 0))::bigint AS fees
+       FROM refunds rf WHERE rf.order_id = o.id
      ) r ON true
      WHERE es.event_id = $1
      GROUP BY o.schedule_id`,
@@ -152,7 +158,8 @@ async function daily(db, { from, to, eventId = null }) {
        GROUP BY 1
      ),
      refunded AS (
-       SELECT ${vnDay('r.created_at')} AS day, count(*)::int AS orders, sum(r.amount)::bigint AS amount
+       SELECT ${vnDay('r.created_at')} AS day, count(*)::int AS orders, sum(r.amount)::bigint AS amount,
+              sum(greatest(o.total_amount - r.amount, 0))::bigint AS fees
        FROM refunds r
        JOIN orders o ON o.id = r.order_id
        JOIN event_schedules es ON es.id = o.schedule_id
@@ -163,7 +170,8 @@ async function daily(db, { from, to, eventId = null }) {
      SELECT to_char(days.day, 'YYYY-MM-DD') AS date,
             coalesce(sold.orders, 0) AS orders, coalesce(sold.tickets, 0) AS tickets,
             coalesce(sold.revenue, 0) AS revenue,
-            coalesce(refunded.orders, 0) AS refunded_orders, coalesce(refunded.amount, 0) AS refunded_amount
+            coalesce(refunded.orders, 0) AS refunded_orders, coalesce(refunded.amount, 0) AS refunded_amount,
+            coalesce(refunded.fees, 0) AS cancellation_fees
      FROM days
      LEFT JOIN sold ON sold.day = days.day
      LEFT JOIN refunded ON refunded.day = days.day
@@ -187,8 +195,10 @@ async function rangeTotals(db, { from, to }) {
           WHERE ${SOLD} AND o.paid_at >= ${vnStartOf('$1')} AND o.paid_at < ${vnEndOf('$2')}
        ) t) AS sold,
        (SELECT row_to_json(t) FROM (
-          SELECT count(*)::int AS orders, coalesce(sum(r.amount), 0)::bigint AS amount
+          SELECT count(*)::int AS orders, coalesce(sum(r.amount), 0)::bigint AS amount,
+                 coalesce(sum(greatest(o.total_amount - r.amount, 0)), 0)::bigint AS fees
           FROM refunds r
+          JOIN orders o ON o.id = r.order_id
           WHERE r.created_at >= ${vnStartOf('$1')} AND r.created_at < ${vnEndOf('$2')}
        ) t) AS refunded`,
     [from, to],
@@ -255,7 +265,8 @@ async function eventsOfOrganizer(db, organizerId, limit) {
               + (SELECT coalesce(sum(g.blocked_quantity), 0) FROM ga_inventory g JOIN event_schedules es ON es.id = g.schedule_id
                  WHERE es.event_id = e.id) AS blocked,
             coalesce(s.orders, 0) AS orders, coalesce(s.tickets, 0) AS sold, coalesce(s.revenue, 0) AS revenue,
-            coalesce(r.orders, 0) AS refunded_orders, coalesce(r.amount, 0) AS refunded_amount
+            coalesce(r.orders, 0) AS refunded_orders, coalesce(r.amount, 0) AS refunded_amount,
+            coalesce(r.fees, 0) AS cancellation_fees
      FROM events e
      LEFT JOIN LATERAL (
        SELECT count(*)::int AS orders, coalesce(sum(q.n), 0)::int AS tickets, sum(o.total_amount)::bigint AS revenue
@@ -265,7 +276,8 @@ async function eventsOfOrganizer(db, organizerId, limit) {
        WHERE es.event_id = e.id AND ${SOLD}
      ) s ON true
      LEFT JOIN LATERAL (
-       SELECT count(*)::int AS orders, sum(rf.amount)::bigint AS amount
+       SELECT count(*)::int AS orders, sum(rf.amount)::bigint AS amount,
+              sum(greatest(o.total_amount - rf.amount, 0))::bigint AS fees
        FROM refunds rf
        JOIN orders o ON o.id = rf.order_id
        JOIN event_schedules es ON es.id = o.schedule_id

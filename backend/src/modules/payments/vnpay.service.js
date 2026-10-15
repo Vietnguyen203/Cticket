@@ -328,6 +328,7 @@ async function processRefund({ refundId }, job = {}) {
     answer = await vnpay.refund({
       txnRef: refund.provider_ref,
       amount: refund.amount,
+      partial: refund.amount < refund.payment_amount, // Phase 18.3
       transactionNo: refund.provider_transaction_id,
       transactionDate: refund.provider_create_date,
       createdBy: refund.requested_by ?? 'system',

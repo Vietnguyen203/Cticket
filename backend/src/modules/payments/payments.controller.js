@@ -3,6 +3,7 @@ const { requestContext } = require('../../utils/requestContext');
 const users = require('../users');
 const paymentsService = require('./payments.service');
 const vnpayService = require('./vnpay.service');
+const cancellation = require('./cancellation.service');
 
 const HTTP_CREATED = 201;
 
@@ -57,4 +58,32 @@ async function retryRefund(req, res) {
   return sendSuccess(res, { refund: await paymentsService.retryRefund(requestContext(req), req.valid.params.id) });
 }
 
-module.exports = { pay, get, refund, methods, startVnpay, vnpayIpn, vnpayReturn, retryRefund };
+// --- Phase 18.3 ------------------------------------------------------------------
+
+async function previewCancellation(req, res) {
+  return sendSuccess(res, { cancellation: await cancellation.previewCancellation(await resolveActor(req.user), req.valid.params.id) });
+}
+
+async function cancelOrder(req, res) {
+  const result = await cancellation.cancelOrder(
+    requestContext(req),
+    await resolveActor(req.user),
+    req.valid.params.id,
+    req.valid.body,
+    paymentsService.refundLockedOrder,
+  );
+  return sendSuccess(res, { cancellation: result });
+}
+
+module.exports = {
+  pay,
+  get,
+  refund,
+  methods,
+  startVnpay,
+  vnpayIpn,
+  vnpayReturn,
+  retryRefund,
+  previewCancellation,
+  cancelOrder,
+};

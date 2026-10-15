@@ -15,7 +15,13 @@ export function Layout() {
   const signedIn = status === 'authenticated'
   const links: Array<[string, string]> = [
     ['/events', 'Sự kiện'],
-    ...(signedIn ? ([['/tickets', 'Vé của tôi'], ['/orders', 'Đơn hàng']] as Array<[string, string]>) : []),
+    ...(signedIn
+      ? ([
+          ['/tickets', 'Vé của tôi'],
+          ['/orders', 'Đơn hàng'],
+          ['/waitlist', 'Danh sách chờ'], // Phase 18.4
+        ] as Array<[string, string]>)
+      : []),
     ...(signedIn && canUseOrganizer(user) ? ([['/organizer', 'Ban tổ chức']] as Array<[string, string]>) : []),
     ...(signedIn && canUseStaff(user) ? ([['/staff', 'Soát vé']] as Array<[string, string]>) : []),
     ...(signedIn && canUseAdmin(user) ? ([['/admin', 'Quản trị']] as Array<[string, string]>) : []),

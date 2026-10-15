@@ -19,6 +19,8 @@ function toAdminUser(row) {
     emailVerifiedAt: row.email_verified_at,
     roles: row.roles,
     twoFactorEnabled: row.two_factor_enabled,
+    // Phase 18.1: sign-in paused after wrong passwords, until this time (null = not locked).
+    loginLockedUntil: row.login_locked_until ?? null,
     createdAt: row.created_at,
   };
 }
@@ -28,7 +30,11 @@ const userNotFound = () => new AppError('NOT_FOUND', 'User not found.');
 /** USR-03 */
 async function listUsers({ q, role, status, page, pageSize }) {
   const { rows, total } = await adminUsersRepository.list(pool, { q, role, status, ...toLimitOffset({ page, pageSize }) });
-  return { users: rows.map(toAdminUser), meta: toPageMeta({ page, pageSize }, total) };
+  const locks = await auth.loginLockedUntilOf(pool, rows.map((row) => row.email));
+  return {
+    users: rows.map((row) => toAdminUser({ ...row, login_locked_until: locks.get(row.email) })),
+    meta: toPageMeta({ page, pageSize }, total),
+  };
 }
 
 /**
@@ -141,4 +147,15 @@ async function resetTwoFactor(context, adminId, userId, { reason }) {
   return toAdminUser(user);
 }
 
-module.exports = { listUsers, changeStatus, setRoles, resetTwoFactor };
+/** Phase 18.1: end a login lock early (the owner called support, it was not them…). */
+async function unlockLogin(context, userId) {
+  return withTransaction(async (client) => {
+    const user = await adminUsersRepository.findForUpdate(client, userId);
+    if (!user) throw userNotFound();
+    await auth.clearLoginLock(client, user.email);
+    await recordAudit(client, { context, action: 'LOGIN_UNLOCKED', entityType: 'user', entityId: userId });
+    return toAdminUser(user);
+  });
+}
+
+module.exports = { listUsers, changeStatus, setRoles, resetTwoFactor, unlockLogin };

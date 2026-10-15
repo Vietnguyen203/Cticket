@@ -16,6 +16,8 @@ function toPublicUser(row, roles) {
     phone: row.phone,
     status: row.status,
     emailVerifiedAt: row.email_verified_at,
+    // Phase 18.2: reminder emails before the show (on unless turned off).
+    eventReminders: row.event_reminders ?? true,
     createdAt: row.created_at,
   };
   if (roles) {

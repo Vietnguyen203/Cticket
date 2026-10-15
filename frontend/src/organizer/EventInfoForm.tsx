@@ -8,9 +8,10 @@ import { Alert, Button, TextField } from '../components/ui'
 import { hasAny } from '../admin/permissions'
 import { useAuth } from '../auth/AuthContext'
 import { useAsync } from '../utils/useAsync'
+import { REFUND_POLICIES, refundPolicyOf, type RefundPolicy } from '../payments/refundPolicy'
 
 /** Once PUBLISHED, only these may still change (backend EDITABLE_WHEN_PUBLISHED). */
-const EDITABLE_WHEN_PUBLISHED = new Set(['description', 'bannerUrl', 'thumbnailUrl'])
+const EDITABLE_WHEN_PUBLISHED = new Set(['description', 'bannerUrl', 'thumbnailUrl', 'refundPolicy'])
 
 function initialForm(event?: EventDetail) {
   return {
@@ -19,6 +20,7 @@ function initialForm(event?: EventDetail) {
     bannerUrl: event?.bannerUrl ?? '',
     thumbnailUrl: event?.thumbnailUrl ?? '',
     ageRestriction: event?.ageRestriction != null ? String(event.ageRestriction) : '',
+    refundPolicy: refundPolicyOf(event?.refundPolicy).value as RefundPolicy,
     categoryIds: event?.categories.map((c) => c.id) ?? [],
   }
 }
@@ -45,6 +47,7 @@ export function EventInfoForm({ event, onSubmit, submitLabel }: { event?: EventD
       bannerUrl: form.bannerUrl.trim() || null,
       thumbnailUrl: form.thumbnailUrl.trim() || null,
       ageRestriction: form.ageRestriction ? Number(form.ageRestriction) : null,
+      refundPolicy: form.refundPolicy,
       categoryIds: form.categoryIds,
     }
     if (!event) return all
@@ -85,7 +88,7 @@ export function EventInfoForm({ event, onSubmit, submitLabel }: { event?: EventD
     <form onSubmit={submit} className="space-y-4" noValidate>
       {error && <Alert>{error.message}</Alert>}
       {saved && nothingToSave && <Alert tone="success">Đã lưu.</Alert>}
-      {status === 'PUBLISHED' && <Alert tone="info">Sự kiện đang bán: chỉ sửa được mô tả và hình ảnh.</Alert>}
+      {status === 'PUBLISHED' && <Alert tone="info">Sự kiện đang bán: chỉ sửa được mô tả, hình ảnh và chính sách hủy.</Alert>}
       {status === 'PENDING_APPROVAL' && <Alert tone="info">Đang chờ duyệt: muốn sửa thì rút lại về nháp trước.</Alert>}
       <TextField label="Tên sự kiện" name="title" value={form.title} disabled={locked('title')} onChange={(e) => setForm({ ...form, title: e.target.value })} error={fieldErrors.title} />
       <label className="block text-sm">
@@ -128,6 +131,24 @@ export function EventInfoForm({ event, onSubmit, submitLabel }: { event?: EventD
         error={fieldErrors.ageRestriction}
         className="sm:w-1/2"
       />
+      <label className="block text-sm">
+        <span className="mb-1 block font-medium text-slate-700">Chính sách hủy đơn của khách</span>
+        <select
+          value={form.refundPolicy}
+          disabled={locked('refundPolicy')}
+          onChange={(e) => setForm({ ...form, refundPolicy: e.target.value as RefundPolicy })}
+          className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 sm:w-1/2"
+        >
+          {REFUND_POLICIES.map((policy) => (
+            <option key={policy.value} value={policy.value}>
+              {policy.label}
+            </option>
+          ))}
+        </select>
+        <span className="mt-1 block text-slate-500">
+          {refundPolicyOf(form.refundPolicy).summary} Phần không hoàn là phí hủy, tính vào doanh thu. Đổi chính sách thì đơn hủy sau đó theo chính sách mới.
+        </span>
+      </label>
       <fieldset disabled={locked('categoryIds')}>
         <legend className="mb-2 flex w-full flex-wrap items-center gap-x-3 text-sm font-medium text-slate-700">
           Danh mục (chọn ít nhất một)

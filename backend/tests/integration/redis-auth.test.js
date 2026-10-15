@@ -42,8 +42,9 @@ describe('rate limits (Redis counters)', () => {
 
   test('login: 5 attempts per minute per IP, then 429 with Retry-After', async () => {
     const ip = newIp();
+    // A new email each time: the per-email lock (Phase 18.1) is not what this test is about.
     const attempt = () =>
-      request(app).post('/api/v1/auth/login').set('X-Forwarded-For', ip).send({ email: 'nobody@example.com', password: 'Wrong123' });
+      request(app).post('/api/v1/auth/login').set('X-Forwarded-For', ip).send({ email: `nobody-${randomUUID()}@example.com`, password: 'Wrong123' });
 
     for (let i = 0; i < 5; i += 1) {
       const res = await attempt();
@@ -60,7 +61,7 @@ describe('rate limits (Redis counters)', () => {
     const other = await request(app)
       .post('/api/v1/auth/login')
       .set('X-Forwarded-For', newIp())
-      .send({ email: 'nobody@example.com', password: 'Wrong123' });
+      .send({ email: `nobody-${randomUUID()}@example.com`, password: 'Wrong123' });
     expect(other.status).toBe(401);
   });
 
@@ -83,7 +84,10 @@ describe('rate limits (Redis counters)', () => {
     breakRedis('rateLimitHit');
     const ip = newIp();
     for (let i = 0; i < 8; i += 1) {
-      const res = await request(app).post('/api/v1/auth/login').set('X-Forwarded-For', ip).send({ email: 'x@example.com', password: 'Wrong123' });
+      const res = await request(app)
+        .post('/api/v1/auth/login')
+        .set('X-Forwarded-For', ip)
+        .send({ email: `x-${randomUUID()}@example.com`, password: 'Wrong123' });
       expect(res.status).toBe(401);
     }
   });

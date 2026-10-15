@@ -10,7 +10,9 @@ export interface DayRow {
   date: string
   orders: number
   tickets: number
+  /** Sold orders + cancellation fees kept (Phase 18.3) */
   revenue: number
+  cancellationFees: number
   refunds: Refunds
 }
 
@@ -27,7 +29,9 @@ export interface MoneyTotals {
   orders: number
   gross: number
   discount: number
+  /** Sold orders + cancellation fees kept (Phase 18.3) */
   revenue: number
+  cancellationFees: number
   refunds: Refunds
 }
 
@@ -78,13 +82,14 @@ export interface MyEventLine {
   tickets: number
   fillRate: number | null
   revenue: number
+  cancellationFees: number
   refunds: Refunds
 }
 
 /** REP-01b: one line per event of my organizer. */
 export async function getMyEventsSales(): Promise<{
   events: MyEventLine[]
-  totals: { orders: number; tickets: number; revenue: number; refunds: Refunds }
+  totals: { orders: number; tickets: number; revenue: number; cancellationFees: number; refunds: Refunds }
   truncated: boolean
 }> {
   return (await api.get('/reports/my-events')).data.data
@@ -117,6 +122,7 @@ export interface PeriodTotals {
   orders: number
   tickets: number
   revenue: number
+  cancellationFees: number
   refunds: Refunds
 }
 

@@ -108,13 +108,15 @@ describe('logging in', () => {
     const email = await newAdmin({ totpSecret: ADMIN_TOTP_SECRET });
     const { mfaToken } = (await login(app, email, PASSWORD)).body.data;
     const left = [];
-    for (let i = 0; i < 5; i += 1) {
+    for (let i = 0; i < 4; i += 1) {
       left.push((await post('/auth/login/2fa', { mfaToken, code: '000000' })).body.error.details.attemptsLeft);
     }
-    expect(left).toEqual([4, 3, 2, 1, 0]);
+    expect(left).toEqual([4, 3, 2, 1]);
+    // Phase 18.1: the 5th wrong code also locks the email (codes count like passwords).
+    expect((await post('/auth/login/2fa', { mfaToken, code: '000000' })).body.error.code).toBe('LOGIN_LOCKED');
     const late = await post('/auth/login/2fa', { mfaToken, code: code(ADMIN_TOTP_SECRET) });
-    expect(late.status).toBe(401);
-    expect(late.body.error.code).toBe('MFA_TOKEN_INVALID');
+    expect(late.status).toBe(429);
+    expect(late.body.error.code).toBe('LOGIN_LOCKED');
   });
 
   test('an mfaToken is not an access token, has a purpose, and cannot be forged', async () => {

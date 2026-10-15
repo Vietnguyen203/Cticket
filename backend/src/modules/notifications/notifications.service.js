@@ -6,6 +6,8 @@ const { MESSAGE, userRoom } = require('../../realtime/messages');
 const notificationsRepository = require('./notifications.repository');
 
 const formatVnd = (amount) => `${Number(amount).toLocaleString('vi-VN')}đ`;
+const formatTime = (date) =>
+  new Date(date).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
 
 /** What the user reads for each notification type (Q-05). */
 const COPY = {
@@ -27,6 +29,16 @@ const COPY = {
   ORDER_REFUNDED: ({ orderCode, amount }) => ({
     title: 'Đã hoàn tiền',
     message: `Đơn ${orderCode} đã được hoàn ${formatVnd(amount ?? 0)}.`,
+  }),
+  // Phase 18.4
+  WAITLIST_OFFER: ({ eventTitle, ticketTypeName, quantity, offerExpiresAt }) => ({
+    title: 'Đã có vé bạn đang chờ',
+    message: `${quantity} vé hạng ${ticketTypeName} của ${eventTitle} được giữ cho bạn tới ${formatTime(offerExpiresAt)}. Mở Danh sách chờ để đặt.`,
+  }),
+  // Phase 18.2
+  EVENT_REMINDER: ({ eventTitle, startAt, kind }) => ({
+    title: kind === '24H' ? 'Ngày mai là buổi diễn của bạn' : 'Buổi diễn sắp bắt đầu',
+    message: `${eventTitle} bắt đầu lúc ${formatTime(startAt)}. Mở Vé của tôi để có mã QR vào cổng.`,
   }),
 };
 

@@ -4,6 +4,7 @@ const { EVENT_STATUS, INVENTORY_MODE, ZONE_KIND, SEAT_STATUS, TICKET_TYPE_STATUS
 const AppError = require('../../utils/AppError');
 const { recordAudit } = require('../audit');
 const inventoryRepository = require('./inventory.repository');
+const waitlist = require('../waitlist');
 const schedulesRepository = require('./schedules.repository');
 const eventsRepository = require('./events.repository');
 const ticketTypesRepository = require('./ticket-types.repository');
@@ -99,7 +100,17 @@ function toAvailability(row) {
     venueZoneId: row.venue_zone_id,
     total: row.total,
     available: row.available,
+    waitlistKept: row.waitlist_kept ?? 0, // Phase 18.4
   };
+}
+
+/** Phase 18.4: places kept for someone else on the waiting list are not for this viewer. */
+async function subtractWaitlist(rows, actor) {
+  const kept = await waitlist.keptForOthers(pool, { ticketTypeIds: rows.map((row) => row.id), userId: actor?.userId ?? null });
+  return rows.map((row) => {
+    const waitlistKept = kept.get(row.id) ?? 0;
+    return { ...row, available: Math.max(0, Number(row.available) - waitlistKept), waitlist_kept: waitlistKept };
+  });
 }
 
 /** The "choose a ticket class and quantity" step. Paused types are hidden from the public. */
@@ -107,7 +118,7 @@ async function getAvailability(actor, scheduleId) {
   const { event, schedule } = await loadViewableSchedule(actor, scheduleId);
   const rows = await inventoryRepository.availabilityBySchedule(pool, scheduleId);
   const visible = canManage(actor, event) ? rows : rows.filter((row) => row.status === TICKET_TYPE_STATUS.ACTIVE);
-  return { scheduleId: schedule.id, ticketTypes: visible.map(toAvailability) };
+  return { scheduleId: schedule.id, ticketTypes: (await subtractWaitlist(visible, actor)).map(toAvailability) };
 }
 
 /** Zones and seats of a schedule without any status: cacheable, it does not change after publishing. */
@@ -147,13 +158,14 @@ async function loadSeatMapLayout(scheduleId) {
  */
 async function getSeatMap(actor, scheduleId) {
   const { schedule } = await loadViewableSchedule(actor, scheduleId);
-  const [layout, statuses, availability] = await Promise.all([
+  const [layout, statuses, rawAvailability] = await Promise.all([
     // Kept parsed in process memory too: ~0.5 MB for 2.000 seats (not mutated below: seats are copied).
     remember(NAMESPACE.CATALOG, `seatmap:${scheduleId}`, TTL.SEAT_MAP_LAYOUT, () => loadSeatMapLayout(scheduleId), { local: true }),
     inventoryRepository.seatStatuses(pool, scheduleId),
     inventoryRepository.availabilityBySchedule(pool, scheduleId),
   ]);
   const statusBySeat = new Map(statuses.map((row) => [row.seat_id, row]));
+  const availability = await subtractWaitlist(rawAvailability, actor);
 
   return {
     scheduleId: schedule.id,

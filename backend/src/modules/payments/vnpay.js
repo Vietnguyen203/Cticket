@@ -188,17 +188,17 @@ async function queryTransaction({ txnRef, transactionDate }) {
 const FINAL_REFUSALS = new Set(['02', '03', '91', '95', '97']);
 
 /**
- * Full refund of a successful payment.
+ * Refund of a successful payment: all of it, or part of it (`partial`).
  * @returns {Promise<{ state: 'DONE'|'REFUSED', responseCode: string, message: string, refundTransactionNo: string|null, data: object }>}
  * @throws VnpayUnavailableError for a temporary failure (the caller retries)
  */
-async function refund({ txnRef, amount, transactionNo, transactionDate, createdBy }) {
+async function refund({ txnRef, amount, transactionNo, transactionDate, createdBy, partial = false }) {
   const request = {
     vnp_RequestId: requestId(),
     vnp_Version: VERSION,
     vnp_Command: 'refund',
     vnp_TmnCode: env.VNPAY_TMN_CODE,
-    vnp_TransactionType: '02', // full refund
+    vnp_TransactionType: partial ? '03' : '02', // 03 = part of the payment (Phase 18.3), 02 = all of it
     vnp_TxnRef: txnRef,
     vnp_Amount: String(amount * 100),
     vnp_OrderInfo: plainText(`Hoan tien giao dich ${txnRef}`),

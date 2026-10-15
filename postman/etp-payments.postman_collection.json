@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "ETP — Payments (Phase 8)",
-    "description": "Checkout, mã giảm giá, thanh toán giả lập (Idempotency-Key), hoàn tiền. Điền email/password ở tab Variables rồi Run từ trên xuống. Tài khoản của bạn phải là organizer ACTIVE. Phase 17: thư mục 8 thử VNPay sandbox (cần cấu hình VNPay trên API).",
+    "description": "Checkout, mã giảm giá, thanh toán giả lập (Idempotency-Key), hoàn tiền. Điền email/password ở tab Variables rồi Run từ trên xuống. Tài khoản của bạn phải là organizer ACTIVE. Phase 17: thư mục 8 thử VNPay sandbox (cần cấu hình VNPay trên API). Phase 18: thư mục 9 (khách tự hủy đơn theo chính sách), 10 (danh sách chờ).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -214,6 +214,14 @@
     },
     {
       "key": "vnpayUrl",
+      "value": ""
+    },
+    {
+      "key": "cancelOrderId",
+      "value": ""
+    },
+    {
+      "key": "cancelRefund",
       "value": ""
     }
   ],
@@ -2525,6 +2533,461 @@
             "method": "POST",
             "header": [],
             "url": "{{host}}/api/v1/orders/{{vnpayOrderId}}/cancel",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Khách tự hủy đơn theo chính sách (Phase 18.3)",
+      "description": "Ban tổ chức chọn chính sách Tiêu chuẩn (≥ 7 ngày trước giờ diễn hoàn 80%, ≥ 3 ngày hoàn 50%); khách xem mức hoàn rồi hủy. Gửi sai số tiền đã thấy → 409 REFUND_TERMS_CHANGED, không có gì xảy ra.",
+      "item": [
+        {
+          "name": "Ban tổ chức chọn chính sách \"Tiêu chuẩn\"",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  pm.test('refundPolicy STANDARD', () => pm.expect(pm.response.json().data.event.refundPolicy).to.eql('STANDARD'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/events/{{eventId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refundPolicy\": \"STANDARD\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Giữ ghế STD B01",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 201', () => pm.expect(pm.response.code).to.be.oneOf([201]));",
+                  "  const data = pm.response.json().data || {};",
+                  "  if (data.order) pm.collectionVariables.set('cancelOrderId', data.order.id);",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/schedules/{{scheduleId}}/orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"seatIds\": [\n    \"{{seatB01}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Checkout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/orders/{{cancelOrderId}}/checkout",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Thanh toán (giả lập)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.request.headers.upsert({ key: 'Idempotency-Key', value: 'pm-cancel-' + Date.now() });",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 201 (thành công)', () => pm.expect(pm.response.json().data.payment.status).to.eql('SUCCESS'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/payments",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{cancelOrderId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Xem mức hoàn nếu hủy bây giờ",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  const terms = pm.response.json().data.cancellation;",
+                  "  pm.collectionVariables.unset('cancelRefund');",
+                  "  if (terms.allowed) pm.collectionVariables.set('cancelRefund', terms.refundAmount);",
+                  "  pm.test('Có mức hoàn (80% hoặc 50%), hoặc lý do không hủy được', () => {",
+                  "    if (terms.allowed) pm.expect(terms.percent).to.be.oneOf([80, 50]);",
+                  "    else pm.expect(terms.reason).to.eql('TOO_LATE');",
+                  "  });",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/orders/{{cancelOrderId}}/cancellation",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Hủy với số tiền khác số đã thấy → 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  if (!pm.collectionVariables.get('cancelRefund')) return; // the event's show is too close for a refund",
+                  "  pm.test('409 REFUND_TERMS_CHANGED, kèm số đúng', () => {",
+                  "    pm.expect(pm.response.code).to.eql(409);",
+                  "    pm.expect(pm.response.json().error.details.refundAmount).to.eql(Number(pm.collectionVariables.get('cancelRefund')));",
+                  "  });",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/orders/{{cancelOrderId}}/cancellation",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refundAmount\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Hủy đơn (đúng số tiền) → hoàn một phần",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  if (!pm.collectionVariables.get('cancelRefund')) return; // the event's show is too close for a refund",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  const result = pm.response.json().data.cancellation;",
+                  "  pm.test('REFUNDED, phí hủy = tổng − hoàn', () => {",
+                  "    pm.expect(result.status).to.eql('REFUNDED');",
+                  "    pm.expect(result.fee).to.be.above(0);",
+                  "  });",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/orders/{{cancelOrderId}}/cancellation",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refundAmount\": {{cancelRefund}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Xem đơn: REFUNDED, dòng hoàn tiền một phần",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  if (!pm.collectionVariables.get('cancelRefund')) return; // the event's show is too close for a refund",
+                  "  const order = pm.response.json().data.order;",
+                  "  pm.test('REFUNDED', () => pm.expect(order.status).to.eql('REFUNDED'));",
+                  "  pm.test('Hoàn đúng số đã thấy', () => pm.expect(order.refunds[0].amount).to.eql(Number(pm.collectionVariables.get('cancelRefund'))));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/orders/{{cancelOrderId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Danh sách chờ (Phase 18.4)",
+      "description": "Chỉ vào được danh sách chờ khi hạng vé không còn đủ chỗ. Hạng GA ở đây còn nhiều vé nên API trả 409 WAITLIST_NOT_NEEDED.",
+      "item": [
+        {
+          "name": "Vào danh sách chờ khi còn vé → 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('409 WAITLIST_NOT_NEEDED', () => pm.expect(pm.response.json().error.code).to.eql('WAITLIST_NOT_NEEDED'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/schedules/{{scheduleId}}/waitlist",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ticketTypeId\": \"{{gaId}}\",\n  \"quantity\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Danh sách chờ của tôi",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  pm.test('Có mảng entries', () => pm.expect(pm.response.json().data.entries).to.be.an('array'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/waitlist",
             "auth": {
               "type": "bearer",
               "bearer": [

@@ -5,6 +5,8 @@ export interface ProfileChanges {
   firstName?: string
   lastName?: string
   phone?: string | null
+  /** Phase 18.2 */
+  eventReminders?: boolean
 }
 
 export async function getMe(): Promise<User> {

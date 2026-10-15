@@ -12,6 +12,7 @@ const otpService = require('./otp.service');
 const denylist = require('./denylist');
 const sessions = require('./sessions');
 const twoFactor = require('./two-factor.service');
+const loginGuard = require('./login-guard');
 
 /** Account status a user must have to receive / use a code for each purpose. */
 const REQUIRED_STATUS = {
@@ -113,6 +114,8 @@ async function verifyOtp({ email, purpose, otp, newPassword }) {
   if (purpose === OTP_PURPOSE.PASSWORD_RESET) {
     // Access tokens already handed out stop working now, not in 15 minutes.
     await denylist.revokeAllTokensOfUser(user.id);
+    // Phase 18.1: whoever reads this mailbox may sign in again at once.
+    await loginGuard.clear(pool, user.email);
   }
 }
 
@@ -126,11 +129,15 @@ async function verifyOtp({ email, purpose, otp, newPassword }) {
  * { mfaSetupRequired } (a role that requires two-factor, not set up yet).
  */
 async function login({ email, password, remember }, meta) {
+  // Phase 18.1: a locked email is refused before its password is even checked.
+  await loginGuard.assertNotLocked(pool, email);
   const user = await users.findByEmail(pool, email);
   const passwordMatches = await bcrypt.compare(password, user?.password_hash ?? (await getDummyHash()));
 
-  // Same error for "no such email" and "wrong password".
+  // Same error for "no such email" and "wrong password" (and the same lock).
   if (!user || !passwordMatches) {
+    const { locked, lockSeconds } = await loginGuard.failAndMaybeAlert(pool, email, user);
+    if (locked) throw new AppError('LOGIN_LOCKED', undefined, { details: { retryAfterSeconds: lockSeconds } });
     throw new AppError('INVALID_CREDENTIALS');
   }
   // Status is only revealed to someone who knows the password.
@@ -150,6 +157,9 @@ async function login({ email, password, remember }, meta) {
       expiresIn: TWO_FACTOR.MFA_TOKEN_TTL_SECONDS,
     };
   }
+  // Only a complete sign-in ends a streak: a right password alone does not
+  // (wrong two-factor codes count too).
+  await loginGuard.clear(pool, email);
   return sessions.openSession(pool, { user, roles, meta });
 }
 

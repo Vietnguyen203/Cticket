@@ -17,6 +17,7 @@ Bản Docker trong repo là **môi trường phát triển / demo**: chứng ch�
 - [ ] Tạo admin bằng `npm run seed:admin` với `ADMIN_EMAIL` / `ADMIN_PASSWORD` riêng (script **từ chối** mật khẩu mặc định khi `NODE_ENV=production`).
 - [ ] **Xác thực hai lớp** (Phase 15): admin đầu tiên quét QR ở lần đăng nhập đầu và **cất 10 mã khôi phục** ở nơi an toàn. `TWO_FACTOR_REQUIRED_ROLES` giữ `ADMIN` (không để trống). **Không** đặt `ADMIN_TOTP_SECRET` (chỉ cho môi trường test; script từ chối khi `NODE_ENV=production`).
 - [ ] Nên có **ít nhất 2 admin**: một người mất điện thoại thì người kia "Đặt lại 2FA" trong trang Người dùng. Không còn ai: chạy `npm run 2fa:reset -- <email>` trong container API (có ghi audit log).
+- [x] **[tự động]** **Khóa đăng nhập** (Phase 18.1): 5 lần sai mật khẩu / mã 2FA liền cho một email → khóa 15 phút (gấp đôi mỗi lần, tối đa 24 giờ), lưu trong PostgreSQL. Khách bị khóa nhầm (ai đó cố tình nhập sai email của họ): đặt lại mật khẩu, hoặc admin bấm "Mở khóa đăng nhập" ở trang Người dùng.
 - [ ] Không có tài khoản thử (`admin@etp.local`, `webtest-*`, mật khẩu `admin`…) trong database production.
 
 ## 3. Mạng và HTTPS
@@ -33,6 +34,7 @@ Bản Docker trong repo là **môi trường phát triển / demo**: chứng ch�
 
 - [ ] SMTP của dịch vụ gửi mail (có SPF, DKIM cho tên miền), không dùng Gmail cá nhân; bỏ Mailpit.
 - [ ] `MAIL_FROM` dùng tên miền của mình.
+- [ ] **Worker phải chạy**: nhắc lịch (mỗi 5 phút), mời người trong danh sách chờ (mỗi phút), đối soát VNPay đều là job của worker (Phase 17, 18). Worker dừng thì không ai nhận email nhắc / lời mời.
 
 ## 5. Dữ liệu và sao lưu
 

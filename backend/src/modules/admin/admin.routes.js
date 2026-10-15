@@ -19,6 +19,8 @@ router.post(
   validate({ params: schemas.idParams, body: schemas.resetTwoFactor }),
   controller.resetUserTwoFactor,
 );
+// Phase 18.1: sign-in paused after wrong passwords.
+router.post('/users/:id/login-unlock', ...canManageUsers, validate({ params: schemas.idParams }), controller.unlockUserLogin);
 
 router.get('/audit-logs', authenticate, authorize('audit:read'), validate({ query: schemas.listAuditQuery }), controller.listAuditLogs);
 router.get('/audit-logs/actions', authenticate, authorize('audit:read'), controller.listAuditActions);

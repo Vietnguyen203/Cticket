@@ -71,4 +71,19 @@ router.post(
   controller.refund,
 );
 
+/**
+ * Phase 18.3, mounted at /api/v1/orders (next to the orders module's router):
+ * a buyer cancels their paid order under the event's refund policy.
+ */
+const cancellationRouter = Router();
+const buyer = [authenticate, authorize('payment:create')];
+cancellationRouter.get('/:id/cancellation', ...buyer, validate({ params: schemas.idParams }), controller.previewCancellation);
+cancellationRouter.post(
+  '/:id/cancellation',
+  ...buyer,
+  validate({ params: schemas.idParams, body: schemas.cancelOrder }),
+  controller.cancelOrder,
+);
+
 module.exports = router;
+module.exports.cancellationRouter = cancellationRouter;

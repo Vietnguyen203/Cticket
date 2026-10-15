@@ -10,6 +10,8 @@ export interface User {
   phone: string | null
   status: string
   emailVerifiedAt: string | null
+  /** Phase 18.2: reminder emails 24 h / 2 h before the show */
+  eventReminders?: boolean
   createdAt: string
   roles?: Role[]
   permissions?: string[]
@@ -116,6 +118,8 @@ export interface EventDetail {
   bannerUrl: string | null
   thumbnailUrl: string | null
   ageRestriction: number | null
+  /** Phase 18.3: NONE / STANDARD / FLEXIBLE (payments/refundPolicy.ts) */
+  refundPolicy?: string
   status: string
   organizer: Organizer
   categories: Category[]
@@ -139,7 +143,10 @@ export interface TicketTypeAvailability {
   maxPerOrder: number
   venueZoneId: string | null
   total: number
+  /** For this viewer: places kept for someone else on the waiting list are already taken off */
   available: number
+  /** Phase 18.4: places kept for people on the waiting list */
+  waitlistKept?: number
 }
 
 export interface Seat {
