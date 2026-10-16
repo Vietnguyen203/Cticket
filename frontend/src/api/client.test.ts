@@ -115,4 +115,17 @@ describe('api client', () => {
     const failure = (await api.post('/auth/register', {}).catch((err: unknown) => err)) as ApiError
     expect(failure.fieldErrors()).toEqual({ email: 'Email không hợp lệ.', password: 'Cần ít nhất 8 ký tự.' })
   })
+
+  test('schedule times: why each field was refused, in Vietnamese', () => {
+    const failure = new ApiError(400, 'VALIDATION_ERROR', 'The request is invalid.', [
+      { field: 'body.startAt', message: 'must be in the future' },
+      { field: 'body.endAt', message: 'must be after startAt' },
+      { field: 'body.salesEndAt', message: 'must not be after startAt' },
+    ])
+    expect(failure.fieldErrors()).toEqual({
+      startAt: 'Phải là thời điểm chưa tới (giờ này đã qua).',
+      endAt: 'Phải sau giờ bắt đầu.',
+      salesEndAt: 'Không được sau giờ bắt đầu (để trống: đóng bán lúc bắt đầu).',
+    })
+  })
 })

@@ -137,6 +137,11 @@ function translateIssue(message: string): string {
   if (/8-15 digits/.test(message)) return 'Số điện thoại gồm 8–15 chữ số (có thể bắt đầu bằng +).'
   if (/digits/.test(message)) return 'Chỉ được nhập chữ số.'
   if (/required/i.test(message)) return 'Vui lòng nhập thông tin này.'
+  // Schedule times (backend schedules.service.js assertValidTimes).
+  if (/must be in the future/.test(message)) return 'Phải là thời điểm chưa tới (giờ này đã qua).'
+  if (/must be after startAt/.test(message)) return 'Phải sau giờ bắt đầu.'
+  if (/must be after salesStartAt/.test(message)) return 'Phải sau giờ mở bán.'
+  if (/must not be after startAt/.test(message)) return 'Không được sau giờ bắt đầu (để trống: đóng bán lúc bắt đầu).'
   return 'Giá trị không hợp lệ.'
 }
 

@@ -110,7 +110,7 @@ export function Layout() {
       </main>
 
       <footer className="border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500">
-        Event Ticket Platform — dự án học tập, thanh toán là giả lập.
+        Event Ticket Platform — dự án học tập, thanh toán qua VNPay sandbox.
       </footer>
     </div>
   )
