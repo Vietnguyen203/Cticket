@@ -65,6 +65,7 @@
     "jsonwebtoken": "^9.0.3",
     "node-pg-migrate": "^9.0.0",
     "nodemailer": "^10.0.16",
+    "pdfkit": "^0.20.2",
     "pg": "^8.23.1",
     "pino": "^10.4.0",
     "pino-http": "^11.0.0",

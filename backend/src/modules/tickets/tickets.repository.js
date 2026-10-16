@@ -104,6 +104,23 @@ const TICKET_VIEW_JOINS = `JOIN order_items oi ON oi.id = t.order_item_id
   JOIN events e ON e.id = t.event_id
   JOIN venues v ON v.id = es.venue_id`;
 
+/**
+ * Phase 20: what the ticket PDF prints, for the VALID tickets of an order
+ * (or one ticket), seat order: the show, the place, the order and its buyer.
+ */
+async function pdfTickets(db, { orderId = null, ticketId = null }) {
+  const { rows } = await db.query(
+    `SELECT ${TICKET_VIEW}, o.order_code, u.first_name, u.last_name
+     FROM tickets t ${TICKET_VIEW_JOINS}
+     JOIN orders o ON o.id = t.order_id
+     JOIN users u ON u.id = t.user_id
+     WHERE t.status = 'VALID' AND ($1::uuid IS NULL OR t.order_id = $1) AND ($2::uuid IS NULL OR t.id = $2)
+     ORDER BY oi.seat_label NULLS LAST, oi.ticket_type_name, t.admission_no`,
+    [orderId, ticketId],
+  );
+  return rows;
+}
+
 /** TKT-01: the user's tickets, next show first, then past ones (most recent first). */
 async function listForUser(db, { userId, status, limit, offset }) {
   const { rows } = await db.query(
@@ -162,4 +179,5 @@ module.exports = {
   findView,
   lockViewForCheckIn,
   markUsed,
+  pdfTickets,
 };

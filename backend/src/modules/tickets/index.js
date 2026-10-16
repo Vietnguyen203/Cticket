@@ -1,5 +1,14 @@
 /** Public API of the tickets module (used by background jobs, the orders and the check-ins modules). */
-const { issueTicketsForOrder, reconcileTickets, listForOrder, confirmationOf, toTicketView, reissueQr } = require('./tickets.service');
+const {
+  issueTicketsForOrder,
+  reconcileTickets,
+  listForOrder,
+  confirmationOf,
+  toTicketView,
+  reissueQr,
+  pdfAttachment,
+  sendQrReissuedEmail,
+} = require('./tickets.service');
 const ticketsRepository = require('./tickets.repository');
 const { qrTokenHash, parseQrToken } = require('./qr');
 
@@ -10,6 +19,9 @@ module.exports = {
   confirmationOf,
   toTicketView,
   reissueQr,
+  // Phase 20
+  pdfAttachment,
+  sendQrReissuedEmail,
   parseQrToken,
   qrTokenHash,
   lockTicketForCheckIn: ticketsRepository.lockViewForCheckIn,

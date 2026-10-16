@@ -60,14 +60,14 @@ function orderConfirmedEmail({ order, tickets }) {
       `Vé của bạn (${tickets.length}):`,
       ...lines,
       '',
-      'Mở mục Vé của tôi trong ứng dụng để xem mã QR khi vào cổng.',
+      'Vé có mã QR được đính kèm trong email này (PDF, mỗi vé một trang): in ra hoặc mở trên điện thoại khi vào cổng. Bạn cũng xem được trong mục Vé của tôi.',
     ].join('\n'),
     html: `<p>${escapeHtml(greeting)}</p>
 <p>Đơn <b>${escapeHtml(order.order_code)}</b> đã được thanh toán (${formatVnd(order.total_amount)}).</p>
 <p><b>${escapeHtml(order.event_title)}</b><br>${escapeHtml(when)}</p>
 <p>Vé của bạn (${tickets.length}):</p>
 <ul>${lines.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}</ul>
-<p>Mở mục <b>Vé của tôi</b> trong ứng dụng để xem mã QR khi vào cổng.</p>`,
+<p>Vé có mã QR được đính kèm trong email này (PDF, mỗi vé một trang): in ra hoặc mở trên điện thoại khi vào cổng. Bạn cũng xem được trong mục <b>Vé của tôi</b>.</p>`,
   };
 }
 
@@ -215,7 +215,22 @@ function reviewInviteEmail({ first_name: firstName, event_title: eventTitle, sta
   };
 }
 
+/** Phase 20: an admin re-issued a ticket's QR (the old one no longer opens the gate); the new PDF is attached. */
+function ticketQrReissuedEmail({ firstName, code, eventTitle }) {
+  const greeting = firstName ? `Xin chào ${firstName},` : 'Xin chào,';
+  const body = `Vé ${code} của ${eventTitle} vừa được cấp mã QR mới. Mã QR cũ (ảnh chụp, bản in, file PDF cũ) không còn dùng để vào cổng được.`;
+  const action = 'Vé mới có mã QR mới được đính kèm trong email này (PDF); bạn cũng xem được trong mục Vé của tôi.';
+  return {
+    subject: `Mã QR mới của vé ${code}`,
+    text: [greeting, '', body, '', action].join('\n'),
+    html: `<p>${escapeHtml(greeting)}</p>
+<p>${escapeHtml(body)}</p>
+<p>${escapeHtml(action)}</p>`,
+  };
+}
+
 module.exports = {
+  ticketQrReissuedEmail,
   reviewInviteEmail,
   waitlistOfferEmail,
   eventReminderEmail,

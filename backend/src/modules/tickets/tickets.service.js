@@ -12,6 +12,10 @@ const { publishAfterCommit } = require('../../realtime/publisher');
 const { MESSAGE, userRoom } = require('../../realtime/messages');
 const ticketsRepository = require('./tickets.repository');
 const { qrToken, qrTokenHash } = require('./qr');
+const { renderTicketsPdf } = require('./ticket-pdf');
+const logger = require('../../utils/logger');
+const mailer = require('../../mail/mailer');
+const { ticketQrReissuedEmail } = require('../../mail/templates');
 
 // Read out loud at the gate when a QR will not scan: no 0/O or 1/I.
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -175,8 +179,62 @@ async function reissueQr(context, ticketId) {
       oldValue: { qrVersion: ticket.qr_version },
       newValue: { qrVersion: version },
     });
+    // Phase 20: the customer gets the new QR (and its PDF) by email.
+    enqueueAfterCommit(client, QUEUE.EMAILS, 'ticket-qr-reissued', { ticketId }, { jobId: `ticket-qr-${ticketId}-${version}` });
     return toTicketView({ ...ticket, qr_version: version });
   });
+}
+
+// ---------------------------------------------------------------------------
+// Phase 20: tickets as PDF (made on demand, never stored)
+// ---------------------------------------------------------------------------
+
+const noValidTicket = () => new AppError('TICKET_NOT_VALID', 'There is no valid ticket to print.');
+
+/** GET /orders/:id/tickets.pdf: the valid tickets of my order. */
+async function orderPdfOfMine(userId, orderId) {
+  const order = (await pool.query(`SELECT user_id, order_code FROM orders WHERE id = $1`, [orderId])).rows[0];
+  if (!order || order.user_id !== userId) throw new AppError('NOT_FOUND', 'Order not found.');
+  const rows = await ticketsRepository.pdfTickets(pool, { orderId });
+  if (rows.length === 0) throw noValidTicket();
+  return { filename: `Ve-${order.order_code}.pdf`, pdf: await renderTicketsPdf(rows, { title: `Vé đơn ${order.order_code}` }) };
+}
+
+/** GET /tickets/:id/ticket.pdf: one of my valid tickets. */
+async function ticketPdfOfMine(userId, ticketId) {
+  const own = await findOwnTicket(userId, ticketId);
+  const rows = await ticketsRepository.pdfTickets(pool, { ticketId });
+  if (rows.length === 0) throw noValidTicket();
+  return { filename: `Ve-${own.ticket_code}.pdf`, pdf: await renderTicketsPdf(rows, { title: `Vé ${own.ticket_code}` }) };
+}
+
+/**
+ * For emails: the order's PDF as an attachment, or null if it cannot be made
+ * (logged): the email is sent anyway, a confirmation never waits on a PDF.
+ */
+async function pdfAttachment({ orderId = null, ticketId = null, filename }) {
+  try {
+    const rows = await ticketsRepository.pdfTickets(pool, { orderId, ticketId });
+    if (rows.length === 0) return null;
+    return { filename, content: await renderTicketsPdf(rows), contentType: 'application/pdf' };
+  } catch (err) {
+    logger.error({ err, orderId, ticketId }, 'Ticket PDF could not be made; the email goes without it');
+    return null;
+  }
+}
+
+/** Emails queue: "your ticket has a new QR", with its PDF. */
+async function sendQrReissuedEmail({ ticketId }) {
+  const row = await ticketsRepository.findView(pool, ticketId);
+  if (!row || row.status !== TICKET_STATUS.VALID) return 'skipped';
+  const { rows } = await pool.query(`SELECT email, first_name FROM users WHERE id = $1`, [row.user_id]);
+  const attachment = await pdfAttachment({ ticketId, filename: `Ve-${row.ticket_code}.pdf` });
+  await mailer.sendMail({
+    to: rows[0].email,
+    ...ticketQrReissuedEmail({ firstName: rows[0].first_name, code: row.ticket_code, eventTitle: row.event_title }),
+    attachments: attachment ? [attachment] : [],
+  });
+  return 'sent';
 }
 
 module.exports = {
@@ -190,4 +248,8 @@ module.exports = {
   listMine,
   getMine,
   qrPngOfMine,
+  orderPdfOfMine,
+  ticketPdfOfMine,
+  pdfAttachment,
+  sendQrReissuedEmail,
 };
