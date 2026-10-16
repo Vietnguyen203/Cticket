@@ -270,6 +270,11 @@ function NewTicketType({ scheduleId, zones, onCreated }: { scheduleId: string; z
             <option value="RESERVED">Ghế ngồi (chọn ghế)</option>
             <option value="GENERAL_ADMISSION">Vé đứng (theo số lượng)</option>
           </select>
+          <span className="mt-1 block text-xs text-slate-500">
+            {ga
+              ? 'Bán theo số lượng, không gắn ghế: không hiện trong phần "Gán hàng ghế".'
+              : 'Gắn với ghế: sau khi thêm, chọn hàng ghế cho hạng này ở phần "Gán hàng ghế" bên dưới.'}
+          </span>
         </label>
         {ga && (
           <>
