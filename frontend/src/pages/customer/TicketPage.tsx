@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Link, useParams } from 'react-router'
-import { getMyTicket, getTicketQrPng } from '../../api/tickets'
+import { downloadTicketPdf, getMyTicket, getTicketQrPng } from '../../api/tickets'
 import { OrderStatusBadge } from '../../admin/OrderStatusBadge'
 import { Alert, Card, FullPageSpinner } from '../../components/ui'
 import { formatDateTime } from '../../utils/format'
@@ -56,9 +56,17 @@ export function TicketPage() {
               <div className="mx-auto aspect-square w-64 animate-pulse rounded-lg bg-slate-100" />
             )}
             {qrUrl && (
-              <a href={qrUrl} download={`${t.code}.png`} className="inline-block text-sm font-semibold text-brand-700 hover:underline">
-                Tải ảnh QR
-              </a>
+              <p className="flex justify-center gap-4 text-sm font-semibold">
+                <a href={qrUrl} download={`${t.code}.png`} className="text-brand-700 hover:underline">
+                  Tải ảnh QR
+                </a>
+                {/* Phase 20: a printable ticket (valid ones only: a used ticket opens no gate). */}
+                {t.status === 'VALID' && (
+                  <button type="button" onClick={() => void downloadTicketPdf(t.id, t.code)} className="text-brand-700 hover:underline">
+                    Tải vé PDF
+                  </button>
+                )}
+              </p>
             )}
           </>
         ) : (

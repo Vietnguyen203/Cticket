@@ -25,7 +25,9 @@ async function sendOrderConfirmation({ orderId }) {
   const confirmation = await tickets.confirmationOf(orderId);
   // Refunded meanwhile, or nothing issued yet: nothing to confirm.
   if (!confirmation || confirmation.order.status !== ORDER_STATUS.PAID || confirmation.tickets.length === 0) return 'skipped';
-  await mailer.sendMail({ to: confirmation.order.email, ...orderConfirmedEmail(confirmation) });
+  // Phase 20: the tickets as a PDF (sent without it if it cannot be made).
+  const attachment = await tickets.pdfAttachment({ orderId, filename: `Ve-${confirmation.order.order_code}.pdf` });
+  await mailer.sendMail({ to: confirmation.order.email, ...orderConfirmedEmail(confirmation), attachments: attachment ? [attachment] : [] });
   return 'sent';
 }
 
@@ -58,6 +60,7 @@ const HANDLERS = {
     'order-refunded': sendRefundConfirmation,
     'payment-returned': (data) => payments.sendPaymentReturnedEmail(data), // Phase 17: late VNPay money
     'login-locked': (data) => auth.sendLoginLockedEmail(data), // Phase 18.1
+    'ticket-qr-reissued': (data) => tickets.sendQrReissuedEmail(data), // Phase 20
     'event-reminder': (data) => reminders.sendReminderEmail(data), // Phase 18.2
     'waitlist-offer': (data) => waitlist.sendOfferEmail(data), // Phase 18.4
     'review-invite': (data) => reminders.sendReviewInviteEmail(data), // Phase 19

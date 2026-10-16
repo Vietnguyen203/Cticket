@@ -36,6 +36,7 @@ apiRouter.use('/schedules', scheduleOrdersRouter); // POST /schedules/:id/orders
 apiRouter.use('/ticket-types', ticketTypesRouter);
 apiRouter.use('/orders', ordersRouter);
 apiRouter.use('/orders', paymentsRoutes.cancellationRouter); // Phase 18.3: /orders/:id/cancellation
+apiRouter.use('/orders', ticketsRoutes.orderTicketsRouter); // Phase 20: /orders/:id/tickets.pdf
 apiRouter.use('/payments', paymentsRoutes);
 apiRouter.use('/promotions', promotionsRoutes);
 apiRouter.use('/notifications', notificationsRoutes);

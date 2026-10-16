@@ -18,6 +18,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ./
 COPY src ./src
 COPY migrations ./migrations
+# Phase 20: fonts of the ticket PDF (Vietnamese diacritics).
+COPY assets ./assets
 
 # Uploaded images (a volume in docker-compose): owned by the node user, which runs the API.
 RUN mkdir -p /app/uploads && chown node:node /app/uploads

@@ -50,7 +50,7 @@ flowchart LR
 | `reminders` | Nhắc lịch 24 giờ / 2 giờ trước giờ diễn (email + thông báo), mỗi lần nhắc gửi đúng một lần |
 | `reviews` | Đánh giá sự kiện của người đã vào cổng, điểm trung bình lưu trên dòng sự kiện (cập nhật cùng giao dịch, đối chiếu hằng đêm), trả lời của ban tổ chức, ẩn / hiện của admin |
 | `waitlist` | Danh sách chờ khi hạng vé hết: job mời người chờ sớm nhất, giữ chỗ cho họ 30 phút (kiểm tra ngay trong giao dịch giữ chỗ) |
-| `tickets` | Phát vé, mã QR ký HMAC có phiên bản, cấp lại QR |
+| `tickets` | Phát vé, mã QR ký HMAC có phiên bản, cấp lại QR, vé PDF (PDFKit, tạo khi cần, không lưu file) |
 | `checkins` | Soát vé, lịch sử, thống kê |
 | `notifications` | Thông báo trong app + đẩy qua WebSocket |
 | `reports` | Doanh thu theo sự kiện / nhà tổ chức / ngày |

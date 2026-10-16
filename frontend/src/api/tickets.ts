@@ -31,3 +31,25 @@ export async function getMyTicket(id: string): Promise<MyTicket> {
 export async function getTicketQrPng(id: string): Promise<Blob> {
   return (await api.get(`/tickets/${id}/qr.png`, { responseType: 'blob' })).data
 }
+
+/** Phase 20: save a PDF the API sends (fetched with the session, then handed to the browser). */
+async function savePdf(url: string, fallbackName: string) {
+  const res = await api.get(url, { responseType: 'blob' })
+  const name = /filename="([^"]+)"/.exec(String(res.headers['content-disposition'] ?? ''))?.[1] ?? fallbackName
+  const href = URL.createObjectURL(res.data as Blob)
+  const link = Object.assign(document.createElement('a'), { href, download: name })
+  document.body.append(link)
+  link.click()
+  link.remove()
+  setTimeout(() => URL.revokeObjectURL(href), 10_000)
+}
+
+/** The valid tickets of an order, one page each. */
+export function downloadOrderTicketsPdf(orderId: string, orderCode: string) {
+  return savePdf(`/orders/${orderId}/tickets.pdf`, `Ve-${orderCode}.pdf`)
+}
+
+/** One valid ticket. */
+export function downloadTicketPdf(ticketId: string, code: string) {
+  return savePdf(`/tickets/${ticketId}/ticket.pdf`, `Ve-${code}.pdf`)
+}

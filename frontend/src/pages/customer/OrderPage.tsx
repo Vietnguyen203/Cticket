@@ -12,6 +12,7 @@ import {
   startVnpayPayment,
   type PromotionPreview,
 } from '../../api/orders'
+import { downloadOrderTicketsPdf } from '../../api/tickets'
 import { OrderStatusBadge } from '../../admin/OrderStatusBadge'
 import { Alert, Button, Card, FullPageSpinner } from '../../components/ui'
 import { VNPAY_MIN_SECONDS, vnpayReason } from '../../payments/vnpayReasons'
@@ -304,7 +305,20 @@ export function OrderPage() {
 
       {(o.tickets ?? []).length > 0 && (
         <Card className="space-y-2">
-          <h2 className="font-semibold">Vé của đơn</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-semibold">Vé của đơn</h2>
+            {/* Phase 20: every valid ticket of the order, one page each. */}
+            {o.tickets?.some((ticket) => ticket.status === 'VALID') && (
+              <Button
+                variant="secondary"
+                loading={busy === 'pdf'}
+                disabled={busy !== null}
+                onClick={() => void run('pdf', () => downloadOrderTicketsPdf(o.id, o.orderCode))}
+              >
+                Tải vé PDF
+              </Button>
+            )}
+          </div>
           {o.tickets?.map((ticket) => (
             <Link key={ticket.id} to={`/tickets/${ticket.id}`} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm hover:border-brand-600">
               <span>

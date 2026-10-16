@@ -18,4 +18,22 @@ async function qrPng(req, res) {
   return res.send(png);
 }
 
-module.exports = { list, get, qrPng };
+/** Phase 20: a PDF download (no cache: it holds the QR codes, bearer credentials for the gate). */
+function sendPdf(res, { filename, pdf }) {
+  res.set({
+    'Content-Type': 'application/pdf',
+    'Content-Disposition': `attachment; filename="${filename}"`,
+    'Cache-Control': 'no-store',
+  });
+  return res.send(pdf);
+}
+
+async function ticketPdf(req, res) {
+  return sendPdf(res, await ticketsService.ticketPdfOfMine(req.user.id, req.valid.params.id));
+}
+
+async function orderPdf(req, res) {
+  return sendPdf(res, await ticketsService.orderPdfOfMine(req.user.id, req.valid.params.id));
+}
+
+module.exports = { list, get, qrPng, ticketPdf, orderPdf };

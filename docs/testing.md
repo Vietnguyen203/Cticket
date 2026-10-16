@@ -4,9 +4,9 @@ Dự án có 4 tầng kiểm thử, từ nhanh / hẹp tới chậm / rộng:
 
 | Tầng | Công cụ | Số lượng | Chạy ở đâu | Thời gian |
 |---|---|---|---|---|
-| Unit + integration (backend) | Jest + Supertest, PostgreSQL và Redis thật | **363 test**, 36 file | máy dev, CI | ≈ 1–2 phút |
-| Unit (web) | Vitest | **68 test**, 15 file | máy dev, CI | ≈ 2 giây |
-| End-to-end (trình duyệt) | Playwright (Chromium, desktop + điện thoại) | **18 kịch bản** | máy dev, CI | ≈ 1 phút |
+| Unit + integration (backend) | Jest + Supertest, PostgreSQL và Redis thật | **369 test**, 38 file | máy dev, CI | ≈ 1–2 phút |
+| Unit (web) | Vitest | **69 test**, 15 file | máy dev, CI | ≈ 2 giây |
+| End-to-end (trình duyệt) | Playwright (Chromium, desktop + điện thoại) | **19 kịch bản** | máy dev, CI | ≈ 1 phút |
 | Tải (load) | k6 | **4 kịch bản** | chạy tay | 1–5 phút / kịch bản |
 
 Mỗi lần push hoặc mở pull request, **GitHub Actions** chạy 3 tầng đầu (`.github/workflows/ci.yml`). Load test chạy tay vì lâu và số đo phụ thuộc máy.
@@ -39,6 +39,7 @@ Test chạy trên **PostgreSQL và Redis thật** (không giả lập database),
 | **Danh sách chờ** (Phase 18.4): chỉ vào khi hết, mời đúng thứ tự và số lượng, chỗ đang dành không ai khác lấy được (vé đứng và ghế), hết 30 phút → người sau, suất ngừng bán → đóng | `waitlist` | 4 |
 | **Đánh giá** (Phase 19): chỉ người đã vào cổng, sửa tại chỗ, hạn 60 ngày, điểm và phân bố, trả lời của đúng ban tổ chức, admin ẩn / hiện (audit), đối chiếu điểm, email mời đánh giá | `reviews` | 8 |
 | Vé, QR, soát vé | `checkins` | 16 |
+| **Vé PDF** (Phase 20): nội dung trang, mã QR trong PDF đúng phiên bản, font có dấu; email xác nhận đính kèm, lỗi tạo PDF vẫn gửi email; tải PDF chỉ chủ đơn, đơn đã hoàn → 409; cấp lại QR → email kèm PDF mới | `ticket-pdf` (unit + tích hợp) | 6 |
 | WebSocket real-time | `websocket` | 12 |
 | Hàng đợi BullMQ, email, hết hạn giữ chỗ | `queue` | 11 |
 | Cache Redis | `cache` | 7 |
@@ -79,7 +80,7 @@ Các tình huống "nhiều người cùng làm một việc tại cùng một t
 
 | Statements | Branches | Functions | Lines |
 |---|---|---|---|
-| **93,8%** | **82,9%** | **95,0%** | **95,8%** |
+| **93,9%** | **82,9%** | **95,1%** | **95,8%** |
 
 CI **fail** nếu tụt dưới 90% / 80% / 90% / 90%. Phần thấp: `server.js` và `worker.js` (file khởi động tiến trình, Jest không chạy; E2E và load test chạy chúng).
 
@@ -123,6 +124,7 @@ Admin bắt buộc xác thực hai lớp (Phase 15): admin của môi trường 
 | **Hủy đơn theo chính sách** (Phase 18.3) | trang sự kiện ghi chính sách; trang đơn hiện số được hoàn và phí; hủy → đơn hoàn tiền, mục Hoàn tiền "Đã hoàn" |
 | **Danh sách chờ** (Phase 18.4) | hết vé → "Báo tôi khi có vé"; người khác trả vé → lời mời (job chạy trong API của E2E mỗi 2 giây); vé đang dành không ai khác giữ được; đặt từ trang Danh sách chờ |
 | **Đánh giá** (Phase 19) | người đã vào cổng đi từ "Vé của tôi" tới trang sự kiện, chấm sao và viết; ban tổ chức trả lời ngay trên trang; admin ẩn → điểm trung bình đổi, người viết thấy lý do |
+| **Tải vé PDF** (Phase 20) | nút "Tải vé PDF" ở trang đơn và trang vé tải về đúng tên file, nội dung là PDF |
 | **2 trình duyệt cùng xem sơ đồ** | A giữ ghế → B thấy đổi màu ngay, ghế B đang chọn bị bỏ kèm thông báo |
 | Giữ chỗ hết hạn | đơn báo hết hạn, ghế trở lại trống |
 | **Đổi ghế trong đơn đang giữ** (BKG-02) | quay lại sơ đồ từ trang đơn, đổi 1 ghế, bỏ 1 ghế ở trang đơn; trình duyệt thứ hai thấy từng thay đổi |
