@@ -123,7 +123,6 @@ export function EventReviewPage() {
             <li>Mỗi suất có địa điểm, giờ diễn, giờ mở / đóng bán hợp lý.</li>
             <li>Mọi ghế của khu ngồi đã thuộc một hạng vé, giá đúng.</li>
           </ul>
-          <p className="mt-3 text-xs text-slate-500">Backend vẫn kiểm tra lại cấu hình khi bấm duyệt.</p>
         </Card>
       </div>
 
