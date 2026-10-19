@@ -17,6 +17,7 @@ const reportsRoutes = require('./modules/reports/reports.routes');
 const { checkInsRouter, scheduleCheckInsRouter } = require('./modules/checkins/checkins.routes');
 const { waitlistRouter, scheduleWaitlistRouter } = require('./modules/waitlist/waitlist.routes');
 const { eventReviewsRouter, reviewsRouter, adminReviewsRouter } = require('./modules/reviews/reviews.routes');
+const { purchaseQueueRouter } = require('./modules/purchase-queue/purchase-queue.routes');
 
 /** Everything under /api/v1. Each module mounts its own router here. */
 const apiRouter = Router();
@@ -31,6 +32,7 @@ apiRouter.use('/seats', seatsRouter);
 apiRouter.use('/organizers', organizersRoutes);
 apiRouter.use('/events', eventsRouter);
 apiRouter.use('/events', eventReviewsRouter); // Phase 19: /events/:idOrSlug/reviews
+apiRouter.use('/events', purchaseQueueRouter); // Phase 21: /events/:id/queue
 apiRouter.use('/schedules', schedulesRouter);
 apiRouter.use('/schedules', scheduleOrdersRouter); // POST /schedules/:id/orders
 apiRouter.use('/ticket-types', ticketTypesRouter);

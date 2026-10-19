@@ -1,6 +1,7 @@
 const IORedis = require('ioredis');
 const { Worker } = require('bullmq');
 const env = require('./config/env');
+const { PURCHASE_QUEUE } = require('./config/constants');
 const logger = require('./utils/logger');
 const { closePool } = require('./database/pool');
 const { closeRedis } = require('./redis/client');
@@ -24,6 +25,8 @@ const MAINTENANCE_SCHEDULE = [
   { name: 'offer-waitlist', every: MINUTE_MS },
   // Phase 19: events' review figures checked against the reviews.
   { name: 'reconcile-ratings', every: 24 * 60 * MINUTE_MS },
+  // Phase 21: purchase queues let the next people in when turns run out.
+  { name: 'admit-queues', every: PURCHASE_QUEUE.ADMIT_INTERVAL_SECONDS * 1000 },
 ];
 
 /**

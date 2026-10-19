@@ -2,7 +2,7 @@ const { buildSetClause } = require('../../utils/sql');
 const { escapeLike } = require('../../utils/pagination');
 
 const EVENT_COLUMNS = `e.id, e.organizer_id, e.title, e.slug, e.description, e.banner_url, e.thumbnail_url,
-  e.status, e.age_restriction, e.refund_policy, e.rating_count, e.rating_sum, e.published_at, e.created_at, e.updated_at`;
+  e.status, e.age_restriction, e.refund_policy, e.queue_enabled, e.queue_capacity, e.queue_session_minutes, e.rating_count, e.rating_sum, e.published_at, e.created_at, e.updated_at`;
 
 const UPDATABLE = {
   title: 'title',
@@ -11,6 +11,10 @@ const UPDATABLE = {
   thumbnailUrl: 'thumbnail_url',
   ageRestriction: 'age_restriction',
   refundPolicy: 'refund_policy', // Phase 18.3
+  // Phase 21: purchase queue
+  queueEnabled: 'queue_enabled',
+  queueCapacity: 'queue_capacity',
+  queueSessionMinutes: 'queue_session_minutes',
 };
 
 // The categories of event `e`, as a JSON array (read model; see listEvents).

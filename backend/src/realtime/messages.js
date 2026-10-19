@@ -19,6 +19,7 @@ const MESSAGE = Object.freeze({
   PAYMENT_FAILED: 'PAYMENT_FAILED',
   TICKET_ISSUED: 'TICKET_ISSUED', // Phase 9
   NOTIFICATION: 'NOTIFICATION', // a new in-app notification (Q-05)
+  QUEUE_ADMITTED: 'QUEUE_ADMITTED', // Phase 21: your turn in the purchase queue
   CHECK_IN_SUCCESS: 'CHECK_IN_SUCCESS', // Phase 10: to the event's staff and organizer only (CHK-03)
 });
 

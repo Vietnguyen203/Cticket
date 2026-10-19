@@ -6,6 +6,9 @@ import { createOrder, listMyOrders, updateOrderItems } from '../../api/orders'
 import type { Order, Seat, SeatMap, TicketTypeAvailability } from '../../api/types'
 import { useAuth } from '../../auth/AuthContext'
 import { WaitlistOffer } from './WaitlistOffer'
+import { WaitingRoom } from './WaitingRoom'
+import { usePurchaseQueue } from '../../queue/usePurchaseQueue'
+import { mustWait } from '../../queue/waitingRoom'
 import { Alert, Button, Card, FullPageSpinner } from '../../components/ui'
 import { realtime } from '../../realtime'
 import {
@@ -84,6 +87,11 @@ export function SeatSelectPage() {
   const summary = selectionSummary(state)
   const changes = editChanges(state)
 
+  // Phase 21: the event's purchase queue (signed-in buyers; someone with an open order is never held back).
+  const queueOn = event.data?.queue?.enabled === true && status === 'authenticated'
+  const queue = usePurchaseQueue(event.data?.id, queueOn)
+  const turnSecondsLeft = useCountdown(queue.view?.enabled && queue.view.state === 'ACTIVE' ? queue.view.turnEndsAt : null)
+
   async function submit() {
     if (status !== 'authenticated') {
       navigate(`/login?next=${encodeURIComponent(location.pathname)}`)
@@ -107,9 +115,20 @@ export function SeatSelectPage() {
       setHoldError(apiError)
       if (['SEATS_UNAVAILABLE', 'INSUFFICIENT_INVENTORY'].includes(apiError.code)) void reload()
       if (['ACTIVE_ORDER_EXISTS', 'ORDER_EXPIRED', 'INVALID_STATE_TRANSITION'].includes(apiError.code)) reloadMyOrder()
+      if (apiError.code === 'QUEUE_TURN_REQUIRED') queue.refresh() // back to my place in line
     }
   }
 
+  if (queue.view && mustWait(queue.view, myOrder.data != null)) {
+    return (
+      <WaitingRoom
+        eventTitle={event.data?.title ?? 'Sự kiện'}
+        view={queue.view}
+        firstPlace={queue.firstPlace}
+        onLeave={() => void queue.leave().finally(() => navigate(`/events/${slug}`))}
+      />
+    )
+  }
   if (error && !state.map) {
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center">
@@ -171,6 +190,12 @@ export function SeatSelectPage() {
             <Link to={`/orders/${awaitingPayment.id}`} className="font-semibold underline">
               Mở đơn
             </Link>
+          </Alert>
+        )}
+        {!editing && !awaitingPayment && turnSecondsLeft !== null && (
+          <Alert tone="success">
+            Đến lượt bạn mua vé. Lượt của bạn còn <strong className="font-mono">{mmss(turnSecondsLeft)}</strong>: chọn chỗ và
+            bấm "Giữ chỗ" trước khi hết giờ.
           </Alert>
         )}
         <Notices state={state} map={map} dispatch={dispatch} holdError={holdError} />

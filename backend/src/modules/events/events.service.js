@@ -16,18 +16,36 @@ const { remember, invalidatesAfter, keyOf, NAMESPACE, TTL } = require('../../red
 const orders = require('../orders');
 const venues = require('../venues');
 const payments = require('../payments');
+const purchaseQueue = require('../purchase-queue');
 
 const SLUG_CONSTRAINT = 'events_slug_key';
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Fields an organizer may still change after the event is PUBLISHED. */
 // Phase 18.3: the refund policy too (an order cancelled later follows the policy of that moment).
-const EDITABLE_WHEN_PUBLISHED = ['description', 'bannerUrl', 'thumbnailUrl', 'refundPolicy'];
+// Phase 21: and the purchase queue, which is switched on for the rush of a sale.
+const EDITABLE_WHEN_PUBLISHED = [
+  'description',
+  'bannerUrl',
+  'thumbnailUrl',
+  'refundPolicy',
+  'queueEnabled',
+  'queueCapacity',
+  'queueSessionMinutes',
+];
+const QUEUE_FIELDS = ['queueEnabled', 'queueCapacity', 'queueSessionMinutes'];
 
 /** Phase 19: average of the published reviews (kept on the event row). */
 const ratingOf = (row) => ({
   average: row.rating_count > 0 ? Math.round((row.rating_sum / row.rating_count) * 10) / 10 : null,
   count: row.rating_count ?? 0,
+});
+
+/** Phase 21: the purchase queue settings (public: the seat page needs them). */
+const queueOf = (row) => ({
+  enabled: row.queue_enabled,
+  capacity: row.queue_capacity,
+  sessionMinutes: row.queue_session_minutes,
 });
 
 function toEventSummary(row) {
@@ -56,6 +74,7 @@ function toEventDetail(row, schedules) {
     thumbnailUrl: row.thumbnail_url,
     ageRestriction: row.age_restriction,
     refundPolicy: row.refund_policy, // Phase 18.3
+    queue: queueOf(row), // Phase 21
     rating: ratingOf(row), // Phase 19
     status: row.status,
     publishedAt: row.published_at,
@@ -126,6 +145,18 @@ async function updateEvent(context, actor, eventId, changes) {
     await eventsRepository.updateEvent(client, eventId, fields);
     if (categoryIds) {
       await eventsRepository.replaceCategories(client, eventId, categoryIds);
+    }
+    if (QUEUE_FIELDS.some((field) => field in changes)) {
+      // Phase 21: switching the purchase queue on / off changes who may buy: audited.
+      await recordAudit(client, {
+        context,
+        action: 'EVENT_QUEUE_UPDATED',
+        entityType: 'event',
+        entityId: eventId,
+        oldValue: queueOf(event),
+        newValue: queueOf((await eventsRepository.findById(client, eventId))),
+      });
+      client.afterCommit(() => purchaseQueue.settingsChanged(eventId));
     }
     return loadDetail(client, eventId);
   });

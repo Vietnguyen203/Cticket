@@ -5,6 +5,7 @@ const { MESSAGE, scheduleRoom, userRoom, seatUpdate, inventoryUpdate } = require
 const { QUEUE, enqueueAfterCommit } = require('../../queue/queues');
 const ordersRepository = require('./orders.repository');
 const { forgetTakenSeatsAfterCommit } = require('./fast-path');
+const purchaseQueue = require('../purchase-queue');
 
 /**
  * Order state changes driven by payments (Phase 8). All run in the caller's
@@ -41,6 +42,8 @@ async function markOrderPaid(client, orderId) {
   // Q-01: the worker issues the tickets (and then emails them). If this
   // enqueue is lost, the reconciliation job finds the order a minute later.
   enqueueAfterCommit(client, QUEUE.TICKETS, 'issue', { orderId }, { jobId: `issue-${orderId}` });
+  // Phase 21: bought, so the turn in the purchase queue goes to the next person.
+  purchaseQueue.releaseTurnAfterCommit(client, { userId: changed.user_id, scheduleId: changed.schedule_id });
   return changed;
 }
 

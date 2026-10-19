@@ -89,6 +89,17 @@ const REVIEW = Object.freeze({
   MAX_REPLY: 1000,
 });
 
+/** Phase 21: purchase queue ("waiting room") of an event. */
+const PURCHASE_QUEUE = Object.freeze({
+  DEFAULT_CAPACITY: 100,
+  MAX_CAPACITY: 10_000,
+  DEFAULT_SESSION_MINUTES: 10,
+  MIN_SESSION_MINUTES: 5,
+  MAX_SESSION_MINUTES: 30,
+  KEY_TTL_SECONDS: 24 * 60 * 60, // renewed on every use: a forgotten queue disappears a day later
+  ADMIT_INTERVAL_SECONDS: 5, // the admission job (safety net for turns that ran out)
+});
+
 const PASSWORD = Object.freeze({
   MIN_LENGTH: 8,
   // bcrypt ignores everything after 72 BYTES. Vietnamese letters take 2-3
@@ -249,6 +260,7 @@ module.exports = {
   WAITLIST,
   REVIEW_STATUS,
   REVIEW,
+  PURCHASE_QUEUE,
   PASSWORD,
   ORGANIZER_STATUS,
   EVENT_STATUS,

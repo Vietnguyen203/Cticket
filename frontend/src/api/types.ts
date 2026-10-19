@@ -124,6 +124,8 @@ export interface EventDetail {
   refundPolicy?: string
   /** Phase 19 */
   rating?: { average: number | null; count: number }
+  /** Phase 21: purchase queue (at most `capacity` people buy at once) */
+  queue?: { enabled: boolean; capacity: number; sessionMinutes: number }
   status: string
   organizer: Organizer
   categories: Category[]
