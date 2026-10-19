@@ -8,6 +8,7 @@ const { MESSAGE, scheduleRoom, userRoom, seatUpdate, inventoryUpdate } = require
 const { QUEUE, enqueueAfterCommit } = require('../../queue/queues');
 const ordersRepository = require('./orders.repository');
 const { forgetTakenSeatsAfterCommit } = require('./fast-path');
+const purchaseQueue = require('../purchase-queue');
 
 /**
  * End an open (unpaid) order — HELD, PAYMENT_PENDING or PAYMENT_FAILED — and
@@ -53,6 +54,8 @@ async function releaseHeldOrder(client, orderId, { to, cancelReason = null }) {
     type,
     data: { orderId, orderCode: changed.order_code, reason: cancelReason },
   });
+  // Phase 21: the buyer's turn in the purchase queue ends with the order.
+  purchaseQueue.releaseTurnAfterCommit(client, { userId: changed.user_id, scheduleId: changed.schedule_id });
   return true;
 }
 

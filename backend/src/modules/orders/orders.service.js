@@ -18,6 +18,7 @@ const { toLimitOffset, toPageMeta } = require('../../utils/pagination');
 const { recordAudit } = require('../audit');
 const events = require('../events');
 const waitlist = require('../waitlist');
+const purchaseQueue = require('../purchase-queue');
 const promotions = require('../promotions');
 const ordersRepository = require('./orders.repository');
 const { releaseHeldOrder, expireOrder, expireDueOrders } = require('./order-release');
@@ -346,6 +347,9 @@ async function createOrder(context, actor, scheduleId, body) {
   // Redis fast path (Phase 6): refuse early what PostgreSQL would refuse anyway.
   await fastPath.assertGaHint(body.items ?? []);
   await fastPath.assertSeatHints(scheduleId, body.seatIds ?? []);
+  // Phase 21: with the event's purchase queue on, only people whose turn it is. After the
+  // hints (they refuse without touching PostgreSQL), before the seat locks (not taken for nothing).
+  await purchaseQueue.assertTurn(actor.userId, scheduleId);
   const releaseSeatLocks = await fastPath.lockSeats(scheduleId, body.seatIds ?? []);
   try {
     await expireDueOrders({ scheduleId });
@@ -353,7 +357,9 @@ async function createOrder(context, actor, scheduleId, body) {
     if (await ordersRepository.findActiveForUser(pool, { userId: actor.userId, scheduleId })) {
       throw await activeOrderExists(actor.userId, scheduleId);
     }
-    return await placeOrder(actor, scheduleId, body);
+    const order = await placeOrder(actor, scheduleId, body);
+    await purchaseQueue.extendTurn(actor.userId, order.event.id, order.expiresAt); // the turn covers the hold
+    return order;
   } catch (err) {
     if (isUniqueViolation(err, ACTIVE_CART_CONSTRAINT)) {
       throw await activeOrderExists(actor.userId, scheduleId, err);
@@ -725,7 +731,9 @@ async function checkoutOrder(context, actor, orderId, { promotionCode }) {
   });
 
   if (outcome === 'EXPIRED') throw new AppError('ORDER_EXPIRED');
-  return loadOrder(pool, orderId);
+  const order = await loadOrder(pool, orderId);
+  await purchaseQueue.extendTurn(actor.userId, order.event.id, order.expiresAt); // and the payment window
+  return order;
 }
 
 /** PRO-01: preview a promotion code on one of my HELD orders, without using it. */

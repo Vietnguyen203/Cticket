@@ -54,7 +54,8 @@ export function EventInfoForm({ event, onSubmit, submitLabel }: { event?: EventD
     // Only what changed, and only what may change in this status.
     const before = initialForm(event)
     const changed: Partial<EventInput> = {}
-    for (const key of Object.keys(all) as Array<keyof EventInput>) {
+    // The fields of this form (the purchase queue has its own card: PurchaseQueueCard).
+    for (const key of Object.keys(all) as Array<keyof ReturnType<typeof initialForm>>) {
       const was = key === 'categoryIds' ? before.categoryIds.join() : String(before[key] ?? '')
       const now = key === 'categoryIds' ? all.categoryIds.join() : String(all[key] ?? '')
       if (was !== now && !locked(key)) Object.assign(changed, { [key]: all[key] })

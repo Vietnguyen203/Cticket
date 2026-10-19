@@ -9,6 +9,7 @@ import { Alert, Button, Card, FullPageSpinner } from '../../components/ui'
 import { DeleteEventDialog } from '../../organizer/DeleteEventDialog'
 import { EventInfoForm } from '../../organizer/EventInfoForm'
 import { NewScheduleForm } from '../../organizer/NewScheduleForm'
+import { PurchaseQueueCard, QueueStatsLine } from '../../organizer/PurchaseQueueCard'
 import { submitChecklist } from '../../organizer/readiness'
 import { ScheduleCard } from '../../organizer/ScheduleCard'
 import { loadSchedules } from '../../organizer/setup'
@@ -119,17 +120,28 @@ export function EventEditorPage() {
       />
 
       {tab === 'info' && (
-        <Card>
-          <EventInfoForm
-            key={`${e.id}:${e.status}`}
+        <div className="space-y-4">
+          <Card>
+            <EventInfoForm
+              key={`${e.id}:${e.status}`}
+              event={e}
+              submitLabel="Lưu thông tin"
+              onSubmit={async (input) => {
+                await updateEvent(e.id, input)
+                reload()
+              }}
+            />
+          </Card>
+          {/* Phase 21 */}
+          <PurchaseQueueCard
+            key={`queue:${e.id}:${e.status}:${JSON.stringify(e.queue ?? null)}`}
             event={e}
-            submitLabel="Lưu thông tin"
-            onSubmit={async (input) => {
+            onSave={async (input) => {
               await updateEvent(e.id, input)
               reload()
             }}
           />
-        </Card>
+        </div>
       )}
 
       {tab === 'schedules' && (
@@ -145,7 +157,12 @@ export function EventEditorPage() {
 
       {tab === 'staff' && <StaffPanel eventId={e.id} />}
 
-      {tab === 'sales' && hasSales && <EventSalesReport eventId={e.id} />}
+      {tab === 'sales' && hasSales && (
+        <div className="space-y-4">
+          {e.queue?.enabled && e.status === 'PUBLISHED' && <QueueStatsLine eventId={e.id} />}
+          <EventSalesReport eventId={e.id} />
+        </div>
+      )}
 
       {action === 'delete' && (
         <DeleteEventDialog

@@ -12,6 +12,7 @@ const notifications = require('../modules/notifications');
 const payments = require('../modules/payments');
 const reminders = require('../modules/reminders');
 const waitlist = require('../modules/waitlist');
+const purchaseQueue = require('../modules/purchase-queue');
 const reviews = require('../modules/reviews');
 const { QUEUE } = require('./queues');
 
@@ -85,6 +86,7 @@ const HANDLERS = {
     'send-reminders': () => reminders.sendDueReminders(), // Phase 18.2
     'offer-waitlist': () => waitlist.offerSpacesToWaitlist(), // Phase 18.4
     'reconcile-ratings': () => reviews.reconcileRatings(), // Phase 19
+    'admit-queues': () => purchaseQueue.admitQueues(), // Phase 21
   },
   [QUEUE.PAYMENTS]: {
     'vnpay-refund': (data, job) => payments.processVnpayRefund(data, job),

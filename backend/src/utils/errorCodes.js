@@ -91,6 +91,7 @@ const ERROR_CODES = Object.freeze({
   WAITLIST_NOT_NEEDED: { status: 409, message: 'There are tickets left: book them now instead of waiting.' },
   WAITLIST_ALREADY_JOINED: { status: 409, message: 'You are already on the waiting list for this ticket type.' },
   WAITLIST_RESERVED: { status: 409, message: 'These tickets are kept for people on the waiting list. Try again later.' },
+  QUEUE_TURN_REQUIRED: { status: 409, message: 'Too many people are buying this event right now. Wait for your turn in the queue.' },
   REVIEW_NOT_ALLOWED: { status: 403, message: 'Only people who attended this event can review it.' },
   REVIEW_CLOSED: { status: 409, message: 'Reviews of this event can no longer be written or changed.' },
   REVIEW_HIDDEN: { status: 409, message: 'This review was hidden by an administrator and cannot be changed.' },

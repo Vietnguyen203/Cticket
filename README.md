@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Vietnguyen203/Cticket/actions/workflows/ci.yml/badge.svg)](https://github.com/Vietnguyen203/Cticket/actions/workflows/ci.yml)
 
-> **English summary.** A ticketing platform for concerts and events, built as a learning project with production habits: a Node.js modular monolith (Express, PostgreSQL, Redis, BullMQ, WebSocket) and a React web app. Buyers pick seats on a **live seat map**, hold them for 10 minutes (and can swap seats in the held order without losing the others), pay through **VNPay** (sandbox: signed IPN, query-back, reconciliation, automatic refunds of late payments) or a simulator, and get **QR tickets** (a printable PDF in the confirmation email) with email reminders before the show; they can cancel under the event's refund policy (partial refunds) or join a **waiting list** that keeps freed places for them for 30 minutes; people who went in **review** the event (stars, comment, organizer replies, admin moderation); gate staff scan them with a **phone camera**; organizers build events and seat plans and follow their sales; admins approve, refund and see platform reports. **Two-factor authentication** with an authenticator app (TOTP, written from RFC 6238), required for admins, and a per-email lock after repeated wrong passwords. **No seat is ever sold twice**: Redis filters the rush, PostgreSQL row locks and constraints decide (proven by 100-buyers-one-seat tests and a 500-user k6 load test). 369 backend tests, 69 web tests, 19 Playwright end-to-end tests, CI on GitHub Actions. Ready to deploy on one VPS with Docker Compose: Caddy (automatic HTTPS), deploy on green CI with automatic fallback, nightly backups with tested restores. Documentation is in Vietnamese.
+> **English summary.** A ticketing platform for concerts and events, built as a learning project with production habits: a Node.js modular monolith (Express, PostgreSQL, Redis, BullMQ, WebSocket) and a React web app. Buyers pick seats on a **live seat map**, hold them for 10 minutes (and can swap seats in the held order without losing the others), pay through **VNPay** (sandbox: signed IPN, query-back, reconciliation, automatic refunds of late payments) or a simulator, and get **QR tickets** (a printable PDF in the confirmation email) with email reminders before the show; they can cancel under the event's refund policy (partial refunds) wait their turn in a **purchase queue** when the organizer switches it on for a rush, or join a **waiting list** that keeps freed places for them for 30 minutes; people who went in **review** the event (stars, comment, organizer replies, admin moderation); gate staff scan them with a **phone camera**; organizers build events and seat plans and follow their sales; admins approve, refund and see platform reports. **Two-factor authentication** with an authenticator app (TOTP, written from RFC 6238), required for admins, and a per-email lock after repeated wrong passwords. **No seat is ever sold twice**: Redis filters the rush, PostgreSQL row locks and constraints decide (proven by 100-buyers-one-seat tests and a 500-user k6 load test). 384 backend tests, 72 web tests, 20 Playwright end-to-end tests, CI on GitHub Actions. Ready to deploy on one VPS with Docker Compose: Caddy (automatic HTTPS), deploy on green CI with automatic fallback, nightly backups with tested restores. Documentation is in Vietnamese.
 
 Nền tảng bán vé sự kiện (concert, sân khấu…), làm như một dự án học tập nhưng theo thói quen của sản phẩm thật: thiết kế trước rồi mới code, test ở nhiều tầng, đo tải, tài liệu cho từng phase.
 
@@ -12,6 +12,7 @@ Nền tảng bán vé sự kiện (concert, sân khấu…), làm như một d�
 
 **Khách hàng**
 - Tìm sự kiện (không dấu cũng tìm được), xem lịch diễn và giá.
+- **Hàng chờ mua vé** khi mở bán đông khách (ban tổ chức bật): chỉ N người chọn chỗ cùng lúc, người đến sau thấy vị trí của mình và tự được vào khi tới lượt.
 - **Sơ đồ ghế cập nhật trực tiếp**: ghế người khác vừa giữ đổi màu ngay, không cần tải lại; ghế đang chọn bị người khác lấy thì tự bỏ ra và báo.
 - Giữ chỗ 10 phút (đồng hồ theo giờ server), mã giảm giá.
 - **Thanh toán qua VNPay** (sandbox): kết quả nhận bằng IPN có chữ ký và hỏi lại VNPay, đơn hết giờ khi đang trả thì đối soát trước khi mở bán lại ghế; tiền đến muộn hoặc trả trùng được **hoàn tự động**. Thêm thanh toán giả lập để thử (bấm hai lần không bị trừ tiền hai lần), tắt mặc định trên production.
@@ -22,7 +23,7 @@ Nền tảng bán vé sự kiện (concert, sân khấu…), làm như một d�
 - **Danh sách chờ** khi hạng vé hết: có vé trả lại thì người chờ sớm nhất được báo và được giữ vé 30 phút để đặt.
 
 **Ban tổ chức**
-- Tạo sự kiện, suất diễn, hạng vé, gán ghế theo hàng; khóa / mở ghế; đề xuất địa điểm mới; tải ảnh lên; chọn chính sách hủy đơn; trả lời công khai các đánh giá.
+- Tạo sự kiện, suất diễn, hạng vé, gán ghế theo hàng; khóa / mở ghế; đề xuất địa điểm mới; tải ảnh lên; chọn chính sách hủy đơn; bật **hàng chờ mua vé** và xem số người đang mua / đang chờ; trả lời công khai các đánh giá.
 - Thêm nhân viên soát vé; **báo cáo doanh thu** theo suất / hạng vé, tỷ lệ lấp đầy, số người đã vào cổng, xuất CSV.
 
 **Nhân viên soát vé**
@@ -164,9 +165,9 @@ API này nghe cổng 3000 (`PORT` trong `backend/.env`); việc nền chạy b�
 
 | Tầng | Lệnh | Số lượng |
 |---|---|---|
-| Backend (Jest, PostgreSQL + Redis thật) | `cd backend` → `npm test` / `npm run test:coverage` | 369 test, độ phủ 95,8% dòng (CI chặn nếu dưới 90%) |
-| Web (Vitest) | `cd frontend` → `npm test` | 69 test |
-| End-to-end (Playwright) | `cd e2e` → `npm install` → `npx playwright install chromium` → `npm test` | 19 kịch bản (có cảnh 2 trình duyệt cùng xem sơ đồ ghế, admin thiết lập 2FA lần đầu, trả qua một VNPay giả, hủy đơn theo chính sách, danh sách chờ, đánh giá, tải vé PDF) |
+| Backend (Jest, PostgreSQL + Redis thật) | `cd backend` → `npm test` / `npm run test:coverage` | 384 test, độ phủ 95,9% dòng (CI chặn nếu dưới 90%) |
+| Web (Vitest) | `cd frontend` → `npm test` | 72 test |
+| End-to-end (Playwright) | `cd e2e` → `npm install` → `npx playwright install chromium` → `npm test` | 20 kịch bản (có cảnh 2 trình duyệt cùng xem sơ đồ ghế, admin thiết lập 2FA lần đầu, trả qua một VNPay giả, hủy đơn theo chính sách, danh sách chờ, đánh giá, tải vé PDF, hàng chờ mua vé) |
 | Tải (k6) | xem `docs/testing.md` | 4 kịch bản |
 
 Test đồng thời đáng chú ý: **100 người cùng giữ 1 ghế → đúng 1 người được** (kể cả khi tắt Redis); 2 cổng quét cùng 1 vé cùng lúc → vào đúng 1 lần; cùng `Idempotency-Key` gửi 5 lần → thanh toán 1 lần.
@@ -189,7 +190,7 @@ docs/        Thiết kế từng phase, kiến trúc, kiểm thử, checklist pr
 ## Tài liệu
 
 - [Kiến trúc](docs/architecture.md) · [Kiểm thử](docs/testing.md) · [Triển khai lên VPS](docs/deployment.md) · [Checklist production](docs/production-checklist.md)
-- Thiết kế và ghi chú theo phase: [4 sơ đồ ghế, tồn kho](docs/phase-4-inventory-design.md) · [5 đặt chỗ](docs/phase-5-booking-design.md) · [6 Redis](docs/phase-6-redis-design.md) · [7 WebSocket](docs/phase-7-websocket-design.md) · [8 thanh toán](docs/phase-8-payments-design.md) · [9 hàng đợi](docs/phase-9-queue-design.md) · [10 soát vé](docs/phase-10-checkin-design.md) · [11 web](docs/phase-11-web-design.md) · [12 quản trị](docs/phase-12-admin-web-design.md) · [12.4 báo cáo](docs/phase-12.4-reports-design.md) · [13 kiểm thử](docs/phase-13-testing-design.md) · [14 hardening](docs/phase-14-hardening-design.md) · [BKG-02 đổi ghế trong đơn đang giữ](docs/bkg-02-edit-held-order-design.md) · [15 xác thực hai lớp](docs/phase-15-two-factor-design.md) · [16 triển khai](docs/phase-16-deployment-design.md) · [17 VNPay](docs/phase-17-vnpay-design.md) · [18 khóa đăng nhập, nhắc lịch, hủy đơn, danh sách chờ](docs/phase-18-customer-features-design.md) · [19 đánh giá](docs/phase-19-reviews-design.md) · [20 vé PDF](docs/phase-20-ticket-pdf-design.md)
+- Thiết kế và ghi chú theo phase: [4 sơ đồ ghế, tồn kho](docs/phase-4-inventory-design.md) · [5 đặt chỗ](docs/phase-5-booking-design.md) · [6 Redis](docs/phase-6-redis-design.md) · [7 WebSocket](docs/phase-7-websocket-design.md) · [8 thanh toán](docs/phase-8-payments-design.md) · [9 hàng đợi](docs/phase-9-queue-design.md) · [10 soát vé](docs/phase-10-checkin-design.md) · [11 web](docs/phase-11-web-design.md) · [12 quản trị](docs/phase-12-admin-web-design.md) · [12.4 báo cáo](docs/phase-12.4-reports-design.md) · [13 kiểm thử](docs/phase-13-testing-design.md) · [14 hardening](docs/phase-14-hardening-design.md) · [BKG-02 đổi ghế trong đơn đang giữ](docs/bkg-02-edit-held-order-design.md) · [15 xác thực hai lớp](docs/phase-15-two-factor-design.md) · [16 triển khai](docs/phase-16-deployment-design.md) · [17 VNPay](docs/phase-17-vnpay-design.md) · [18 khóa đăng nhập, nhắc lịch, hủy đơn, danh sách chờ](docs/phase-18-customer-features-design.md) · [19 đánh giá](docs/phase-19-reviews-design.md) · [20 vé PDF](docs/phase-20-ticket-pdf-design.md) · [21 hàng chờ mua vé](docs/phase-21-queue-design.md)
 
 Ảnh chụp màn hình được tạo tự động (`cd e2e` → `npm run screenshots`, dữ liệu mẫu).
 
