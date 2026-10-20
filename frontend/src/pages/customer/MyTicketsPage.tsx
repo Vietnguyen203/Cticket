@@ -1,7 +1,9 @@
 import { Link } from 'react-router'
 import { listMyTickets, type MyTicket } from '../../api/tickets'
 import { OrderStatusBadge } from '../../admin/OrderStatusBadge'
-import { Alert, Card, FullPageSpinner } from '../../components/ui'
+import { DateBlock } from '../../components/DateBlock'
+import { ChevronRightIcon, MapPinIcon, StarIcon, TicketIcon } from '../../components/icons'
+import { EmptyState, ErrorState, PageHeader, Skeleton } from '../../components/ui'
 import { formatDateTime } from '../../utils/format'
 import { useAsync } from '../../utils/useAsync'
 
@@ -19,59 +21,82 @@ export function MyTicketsPage() {
       past: tickets.filter((t) => Date.parse(t.schedule.endAt) < now),
     }
   }, 'my-tickets')
-  if (list.error) {
-    return (
-      <div className="mx-auto max-w-md px-4 py-16">
-        <Alert>{list.error.message}</Alert>
-      </div>
-    )
-  }
-  if (!list.data) return <FullPageSpinner />
-
-  const { upcoming, past } = list.data
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 px-4 py-6 sm:py-10">
-      <h1 className="text-2xl font-bold">Vé của tôi</h1>
-      {list.data.tickets.length === 0 && (
-        <Card className="text-center text-slate-500">
-          Bạn chưa có vé nào.{' '}
-          <Link to="/events" className="font-semibold text-brand-700 hover:underline">
-            Tìm sự kiện
-          </Link>
-        </Card>
+    <div className="mx-auto max-w-3xl space-y-8 px-4 py-8 sm:px-6 sm:py-12">
+      <PageHeader title="Vé của tôi" subtitle="Mở vé để xem mã QR khi vào cổng, hoặc tải bản PDF." />
+      {list.error ? (
+        <ErrorState message={list.error.message} onRetry={list.reload} />
+      ) : !list.data ? (
+        <div className="space-y-3" role="status" aria-label="Đang tải vé">
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} className="h-24 w-full !rounded-card" />
+          ))}
+        </div>
+      ) : list.data.tickets.length === 0 ? (
+        <EmptyState
+          icon={<TicketIcon />}
+          title="Bạn chưa có vé nào"
+          action={
+            <Link to="/events" className="inline-flex h-11 items-center rounded-control bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-800">
+              Tìm sự kiện
+            </Link>
+          }
+        >
+          Vé bạn mua sẽ hiện ở đây, kèm mã QR để vào cổng.
+        </EmptyState>
+      ) : (
+        <>
+          <Section title="Sắp diễn" tickets={list.data.upcoming} />
+          <Section title="Đã qua" tickets={list.data.past} past />
+        </>
       )}
-      <Section title="Sắp diễn" tickets={upcoming} />
-      <Section title="Đã qua" tickets={past} />
     </div>
   )
 }
 
-function Section({ title, tickets }: { title: string; tickets: MyTicket[] }) {
+function Section({ title, tickets, past = false }: { title: string; tickets: MyTicket[]; past?: boolean }) {
   if (tickets.length === 0) return null
   return (
-    <section className="space-y-2">
-      <h2 className="font-semibold text-slate-700">{title}</h2>
+    <section className="space-y-3">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+        {title} <span className="font-normal">({tickets.length})</span>
+      </h2>
       {tickets.map((ticket) => (
-        <div key={ticket.id} className="space-y-1">
-          <Link to={`/tickets/${ticket.id}`} className="block">
-            <Card className="flex items-center justify-between gap-3 !p-4 transition hover:border-brand-600">
-              <div>
-                <p className="font-semibold">{ticket.event.title}</p>
-                <p className="text-sm text-slate-600">
+        <div key={ticket.id} className="space-y-1.5">
+          <Link
+            to={`/tickets/${ticket.id}`}
+            className="group flex items-center gap-4 rounded-card border border-line bg-white p-4 shadow-card transition hover:border-slate-300 hover:shadow-raised"
+          >
+            <DateBlock iso={ticket.schedule.startAt} muted={past} />
+            <div className="min-w-0 flex-1">
+              <p className="line-clamp-2 font-semibold leading-snug text-ink group-hover:text-brand-700">{ticket.event.title}</p>
+              <p className="mt-1 flex items-start gap-1 text-sm text-slate-600">
+                <MapPinIcon size={15} className="mt-0.5 shrink-0 text-slate-400" />
+                <span>
                   {formatDateTime(ticket.schedule.startAt)} · {ticket.venue.name}
-                </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  <span className="font-mono">{ticket.code}</span> · {ticket.seatLabel ?? `${ticket.ticketTypeName} #${ticket.admissionNo}`}
-                </p>
+                </span>
+              </p>
+              <p className="mt-1.5 text-xs text-slate-500">
+                <span className="font-mono text-slate-700">{ticket.code}</span> · {ticket.seatLabel ?? `${ticket.ticketTypeName} #${ticket.admissionNo}`}
+              </p>
+              <div className="mt-2 sm:hidden">
+                <OrderStatusBadge status={ticket.status} />
               </div>
+            </div>
+            <div className="hidden shrink-0 flex-col items-end gap-2 sm:flex">
               <OrderStatusBadge status={ticket.status} />
-            </Card>
+              <ChevronRightIcon size={18} className="text-slate-400" />
+            </div>
           </Link>
           {/* Phase 19: went in → may review the event. */}
           {ticket.status === 'USED' && (
-            <Link to={`/events/${ticket.event.id}#danh-gia`} className="ml-4 inline-block text-sm font-semibold text-brand-700 hover:underline">
-              ★ Đánh giá sự kiện
+            <Link
+              to={`/events/${ticket.event.id}#danh-gia`}
+              className="ml-4 inline-flex items-center gap-1.5 rounded-control px-2 py-1 text-sm font-semibold text-brand-700 hover:bg-brand-50"
+            >
+              <StarIcon size={16} className="text-amber-500" />
+              Đánh giá sự kiện
             </Link>
           )}
         </div>

@@ -8,7 +8,7 @@ import { authState, type AuthPageState } from '../../auth/navigation'
 import { rememberPendingLogin } from '../../auth/pendingLogin'
 import { safeNext } from '../../auth/safeNext'
 import { CodeField, RecoveryCodesPanel, SetupInstructions } from '../../auth/TwoFactorParts'
-import { Alert, Button, FormPage, TextField } from '../../components/ui'
+import { Alert, Button, FormPage, PasswordField, TextField } from '../../components/ui'
 
 const FLASH = {
   verified: 'Email đã được xác minh. Mời bạn đăng nhập.',
@@ -263,10 +263,9 @@ export function LoginPage() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
-        <TextField
+        <PasswordField
           label="Mật khẩu"
           name="password"
-          type="password"
           autoComplete="current-password"
           required
           value={password}

@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { placeholderOf } from '../utils/placeholder'
 
 /**
  * An event picture. Images are links typed by organizers: when there is none,
@@ -11,9 +10,12 @@ export function EventImage({ src, title, className = '' }: { src: string | null;
   if (src && failedSrc !== src) {
     return <img src={src} alt="" loading="lazy" onError={() => setFailedSrc(src)} className={`h-full w-full object-cover ${className}`} />
   }
+  // One calm style for every event without a picture (ink panel, brand line), not a random colour.
   return (
-    <div className={`flex h-full w-full items-end bg-gradient-to-br p-4 ${placeholderOf(title)} ${className}`}>
-      <span className="line-clamp-2 text-lg font-bold text-white/90">{title}</span>
+    <div className={`relative flex h-full w-full items-end overflow-hidden bg-ink p-4 sm:p-5 ${className}`}>
+      <span aria-hidden="true" className="absolute -right-10 -top-10 h-40 w-40 rounded-full border-[18px] border-brand-500/25" />
+      <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1 bg-brand-500" />
+      <span className="relative line-clamp-2 text-lg font-bold leading-snug text-white sm:text-xl">{title}</span>
     </div>
   )
 }

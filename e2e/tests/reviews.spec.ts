@@ -17,7 +17,7 @@ test('review: attendee writes it, organizer answers, admin hides it', async ({ b
   const fanContext = await browser.newContext()
   const fanPage = await fanContext.newPage()
   await signIn(fanPage, fan.email, undefined, '/tickets')
-  await fanPage.getByRole('link', { name: '★ Đánh giá sự kiện' }).click()
+  await fanPage.getByRole('link', { name: 'Đánh giá sự kiện' }).click()
   await fanPage.getByRole('button', { name: 'Viết đánh giá' }).click()
   await fanPage.getByRole('radio', { name: '4 sao' }).click()
   await fanPage.getByLabel('Nhận xét').fill('Âm thanh rất tốt, vào cổng nhanh.')

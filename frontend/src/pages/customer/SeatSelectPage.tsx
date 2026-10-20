@@ -10,6 +10,7 @@ import { WaitingRoom } from './WaitingRoom'
 import { usePurchaseQueue } from '../../queue/usePurchaseQueue'
 import { mustWait } from '../../queue/waitingRoom'
 import { Alert, Button, Card, FullPageSpinner } from '../../components/ui'
+import { CalendarIcon, ChevronLeftIcon, MapPinIcon } from '../../components/icons'
 import { realtime } from '../../realtime'
 import {
   editChanges,
@@ -144,21 +145,29 @@ export function SeatSelectPage() {
   const editing = state.editing
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6">
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <Link to={`/events/${slug}`} className="text-sm text-brand-700 hover:underline">
-            ← {event.data?.title ?? 'Sự kiện'}
+    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <Link to={`/events/${slug}`} className="inline-flex max-w-full items-center gap-1 rounded-control text-sm font-medium text-slate-600 hover:text-ink">
+            <ChevronLeftIcon size={16} className="shrink-0" />
+            <span className="truncate">{event.data?.title ?? 'Sự kiện'}</span>
           </Link>
-          <h1 className="text-xl font-bold sm:text-2xl">{editing ? 'Đổi ghế' : 'Chọn chỗ'}</h1>
+          <h1 className="mt-1 text-2xl font-bold text-ink sm:text-3xl">{editing ? 'Đổi ghế' : 'Chọn chỗ'}</h1>
           {schedule && (
-            <p className="text-sm text-slate-600">
-              {formatDateTime(schedule.startAt)} · {schedule.venue.name}
+            <p className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600">
+              <span className="flex items-center gap-1.5">
+                <CalendarIcon size={16} className="text-slate-400" />
+                {formatDateTime(schedule.startAt)}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <MapPinIcon size={16} className="text-slate-400" />
+                {schedule.venue.name}
+              </span>
             </p>
           )}
         </div>
         <span
-          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
+          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
             connection === 'open' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'
           }`}
           title="Ghế đổi màu ngay khi người khác giữ / mua"
@@ -202,13 +211,16 @@ export function SeatSelectPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
-        <div className="space-y-4">
+        {/* min-w-0: a long row of seats scrolls inside its card instead of widening the page. */}
+        <div className="min-w-0 space-y-4">
           <Legend ticketTypes={map.ticketTypes} editing={editing !== null} />
           {map.zones.map((zone) =>
             zone.kind === 'SEATED' ? (
-              <Card key={zone.id} className="!p-4">
-                <p className="mb-3 text-sm font-semibold">{zone.name}</p>
-                <div className="mb-3 rounded bg-slate-200 py-1 text-center text-[10px] uppercase tracking-widest text-slate-500">Sân khấu</div>
+              <Card key={zone.id} className="!p-4 sm:!p-5">
+                <p className="mb-4 font-semibold text-ink">{zone.name}</p>
+                <div className="mx-auto mb-5 max-w-md rounded-b-[2rem] bg-ink py-2 text-center text-[11px] font-semibold uppercase tracking-[0.3em] text-white/80">
+                  Sân khấu
+                </div>
                 <SeatRows seats={zone.seats} state={state} ticketTypes={map.ticketTypes} dispatch={dispatch} />
               </Card>
             ) : (
@@ -226,15 +238,16 @@ export function SeatSelectPage() {
           {!editing && <WaitlistOffer scheduleId={scheduleId} ticketTypes={map.ticketTypes} />}
         </div>
 
-        <aside className="lg:sticky lg:top-20 lg:self-start">
-          <Card className="space-y-3 !p-4">
-            <h2 className="font-semibold">{editing ? `Đơn ${editing.orderCode} sau khi đổi` : 'Bạn đã chọn'}</h2>
+        {/* Phones: the summary and its button stay at the bottom of the screen while choosing. */}
+        <aside className="sticky bottom-0 z-10 -mx-4 sm:-mx-6 lg:top-24 lg:bottom-auto lg:mx-0 lg:self-start">
+          <Card className="space-y-3 !rounded-b-none !p-4 shadow-raised lg:!rounded-card lg:shadow-card">
+            <h2 className="font-semibold text-ink">{editing ? `Đơn ${editing.orderCode} sau khi đổi` : 'Bạn đã chọn'}</h2>
             {summary.lines.length === 0 ? (
-              <p className="text-sm text-slate-500">
+              <p className="hidden text-sm text-slate-500 lg:block">
                 {editing ? 'Muốn bỏ hết thì bấm "Hủy giữ chỗ" ở trang đơn.' : 'Chạm vào ghế trống trên sơ đồ, hoặc chọn số vé đứng.'}
               </p>
             ) : (
-              <ul className="space-y-1 text-sm">
+              <ul className="hidden max-h-60 space-y-1 overflow-y-auto text-sm lg:block">
                 {summary.lines.map((line) => (
                   <li key={line.label} className="flex justify-between gap-2">
                     <span>
@@ -247,7 +260,7 @@ export function SeatSelectPage() {
               </ul>
             )}
             {editing && !changes.none && <ChangeList changes={changes} map={map} />}
-            <div className="flex justify-between border-t border-slate-200 pt-2 font-semibold">
+            <div className="flex justify-between border-t border-line pt-3 font-semibold text-ink">
               <span>Tạm tính ({summary.count}/{MAX_TICKETS_PER_ORDER} vé)</span>
               <span>{formatVnd(summary.total)}</span>
             </div>
@@ -259,7 +272,7 @@ export function SeatSelectPage() {
             >
               {editing ? 'Cập nhật đơn' : status === 'authenticated' ? 'Giữ chỗ (10 phút)' : 'Đăng nhập để giữ chỗ'}
             </Button>
-            <p className="text-xs text-slate-500">
+            <p className="hidden text-xs leading-relaxed text-slate-500 lg:block">
               {editing
                 ? 'Ghế bạn bỏ ra được mở bán lại ngay. Thời gian giữ chỗ không đổi.'
                 : 'Giá cuối cùng do hệ thống tính lúc giữ chỗ. Ghế được giữ 10 phút để bạn thanh toán.'}
@@ -363,10 +376,10 @@ function SeatRows({ seats, state, ticketTypes, dispatch }: { seats: Seat[]; stat
   const reserved = ticketTypes.filter((tt) => tt.inventoryMode === 'RESERVED')
   const rows = [...new Set(seats.map((s) => s.rowLabel))].sort()
   return (
-    <div className="space-y-1 overflow-x-auto pb-1">
+    <div className="space-y-1.5 overflow-x-auto pb-2">
       {rows.map((rowLabel) => (
         <div key={rowLabel} className="flex items-center gap-1 whitespace-nowrap">
-          <span className="w-6 shrink-0 text-xs font-semibold text-slate-500">{rowLabel}</span>
+          <span className="sticky left-0 z-[1] w-7 shrink-0 bg-white text-xs font-semibold text-slate-500">{rowLabel}</span>
           {seats
             .filter((s) => s.rowLabel === rowLabel)
             .sort((a, b) => a.seatNumber - b.seatNumber)
@@ -406,7 +419,7 @@ function SeatRows({ seats, state, ticketTypes, dispatch }: { seats: Seat[]; stat
                   aria-label={`Ghế ${seat.code}, ${typeName}, ${statusText}`}
                   title={`${seat.code} · ${typeName}${seat.price ? ` · ${formatVnd(seat.price)}` : ''}`}
                   onClick={() => dispatch({ type: 'toggleSeat', seatId: seat.seatId })}
-                  className={`h-7 w-7 shrink-0 rounded-md text-[10px] font-medium transition sm:h-8 sm:w-8 ${color} disabled:cursor-not-allowed`}
+                  className={`h-8 w-8 shrink-0 rounded-md text-[11px] font-medium transition duration-150 sm:h-9 sm:w-9 ${color} disabled:cursor-not-allowed`}
                 >
                   {seat.seatNumber}
                 </button>
@@ -421,30 +434,31 @@ function SeatRows({ seats, state, ticketTypes, dispatch }: { seats: Seat[]; stat
 function StandingZone({ name, ticketTypes, state, dispatch }: { name: string; ticketTypes: TicketTypeAvailability[]; state: SeatMapState; dispatch: (a: SeatMapAction) => void }) {
   if (ticketTypes.length === 0) return null
   return (
-    <Card className="!p-4">
-      <p className="mb-3 text-sm font-semibold">{name}</p>
-      <div className="space-y-2">
+    <Card className="!p-4 sm:!p-5">
+      <p className="mb-3 font-semibold text-ink">{name}</p>
+      <div className="divide-y divide-line">
         {ticketTypes.map((tt) => {
           const left = state.gaAvailable[tt.id] ?? tt.available
           const quantity = state.gaQuantities[tt.id] ?? 0
           const set = (q: number) => dispatch({ type: 'setGaQuantity', ticketTypeId: tt.id, quantity: q })
           return (
-            <div key={tt.id} className="flex flex-wrap items-center justify-between gap-3">
+            <div key={tt.id} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
               <div>
-                <p className="font-medium">
-                  {tt.name} · {formatVnd(tt.price)}
+                <p className="font-medium text-ink">{tt.name}</p>
+                <p className="text-sm">
+                  <span className="font-semibold text-ink">{formatVnd(tt.price)}</span>
+                  <span className={`ml-2 ${left === 0 ? 'text-red-600' : 'text-slate-500'}`}>{left === 0 ? 'Hết vé' : `Còn ${left} vé`}</span>
                 </p>
-                <p className={`text-xs ${left === 0 ? 'text-red-600' : 'text-slate-500'}`}>{left === 0 ? 'Hết vé' : `Còn ${left} vé`}</p>
               </div>
-              <div className="flex items-center gap-2">
-                <Button variant="secondary" className="!px-3" disabled={quantity === 0} onClick={() => set(quantity - 1)} aria-label={`Bớt ${tt.name}`}>
+              <div className="flex items-center gap-1 rounded-control border border-line p-1">
+                <Button variant="ghost" size="sm" className="w-9 !px-0 text-lg" disabled={quantity === 0} onClick={() => set(quantity - 1)} aria-label={`Bớt ${tt.name}`}>
                   −
                 </Button>
-                <span className="w-6 text-center font-semibold" aria-live="polite">
+                <span className="w-8 text-center font-semibold text-ink" aria-live="polite">
                   {quantity}
                 </span>
                 {/* A held order's own standing tickets count as available to its buyer (BKG-02). */}
-                <Button variant="secondary" className="!px-3" disabled={gaLeftFor(state, tt.id) === 0} onClick={() => set(quantity + 1)} aria-label={`Thêm ${tt.name}`}>
+                <Button variant="ghost" size="sm" className="w-9 !px-0 text-lg" disabled={gaLeftFor(state, tt.id) === 0} onClick={() => set(quantity + 1)} aria-label={`Thêm ${tt.name}`}>
                   +
                 </Button>
               </div>

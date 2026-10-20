@@ -1,17 +1,74 @@
 @import 'tailwindcss';
 
+/*
+ * Design tokens (docs/ui-redesign.md, section 3). One accent (brand teal, as on
+ * the PDF tickets and emails), an ink colour for text and dark panels, a light
+ * canvas. Everything in the app uses these names, never raw hex values.
+ */
 @theme {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --color-brand-50: #f0fdfa;
-  --color-brand-100: #ccfbf1;
-  --color-brand-500: #14b8a6;
-  --color-brand-600: #0d9488;
-  --color-brand-700: #0f766e;
-  --color-brand-800: #115e59;
+  --font-sans: 'Be Vietnam Pro', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  --color-brand-50: #effcf9;
+  --color-brand-100: #c9f5ea;
+  --color-brand-200: #96e9d6;
+  --color-brand-300: #5bd6be;
+  --color-brand-400: #2dbaa3;
+  --color-brand-500: #149e89;
+  --color-brand-600: #0c8070;
+  --color-brand-700: #0d665b;
+  --color-brand-800: #0f524a;
+  --color-brand-900: #10443e;
+  --color-brand-950: #032825;
+
+  /* Text and dark surfaces (header band of the home page, footer). */
+  --color-ink: #0b1b24;
+  --color-ink-soft: #1d2f3a;
+  /* Page background, hairlines. */
+  --color-canvas: #f6f8f9;
+  --color-line: #e3e8ec;
+
+  --radius-control: 0.5rem; /* buttons, inputs, chips */
+  --radius-card: 0.75rem; /* cards, alerts */
+  --radius-panel: 1rem; /* large panels, images of the event page */
+
+  --shadow-card: 0 1px 2px rgb(11 27 36 / 0.04), 0 1px 3px rgb(11 27 36 / 0.06);
+  --shadow-raised: 0 8px 24px -6px rgb(11 27 36 / 0.16), 0 2px 6px rgb(11 27 36 / 0.06);
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 }
 
 @layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
   body {
-    @apply bg-slate-50 text-slate-900 antialiased;
+    @apply bg-canvas text-ink antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply tracking-tight;
+  }
+  /* One focus ring everywhere, for keyboard users only. */
+  :focus-visible {
+    outline: 2px solid var(--color-brand-600);
+    outline-offset: 2px;
+  }
+  input[type='checkbox'],
+  input[type='radio'] {
+    accent-color: var(--color-brand-700);
+  }
+  ::selection {
+    background: var(--color-brand-100);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

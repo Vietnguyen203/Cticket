@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router'
 import { requestOtp, resetPassword } from '../../api/auth'
 import { ApiError, toApiError } from '../../api/errors'
 import { authState, type AuthPageState } from '../../auth/navigation'
-import { Alert, Button, FormPage, TextField } from '../../components/ui'
+import { Alert, Button, FormPage, PasswordField, TextField } from '../../components/ui'
 import { useCooldown } from '../../utils/useCooldown'
 
 const RESEND_COOLDOWN_SECONDS = 60
@@ -98,20 +98,18 @@ export function ForgotPasswordPage() {
           value={otp}
           onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
         />
-        <TextField
+        <PasswordField
           label="Mật khẩu mới"
           name="password"
-          type="password"
           autoComplete="new-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           error={fieldErrors.password}
           hint="Ít nhất 8 ký tự, có cả chữ và số. Mọi thiết bị đang đăng nhập sẽ bị đăng xuất."
         />
-        <TextField
+        <PasswordField
           label="Nhập lại mật khẩu mới"
           name="confirm"
-          type="password"
           autoComplete="new-password"
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
