@@ -181,9 +181,17 @@ export function EventInfoForm({ event, onSubmit, submitLabel }: { event?: EventD
         </div>
         {fieldErrors.categoryIds && <p className="mt-1 text-sm text-red-600">Chọn ít nhất một danh mục.</p>}
       </fieldset>
-      <Button type="submit" loading={busy} disabled={!form.title.trim() || form.categoryIds.length === 0 || nothingToSave}>
-        {submitLabel}
-      </Button>
+      {/* Required only where it can still change: a published event keeps its title and categories (some older ones have none). */}
+      <div className="flex flex-wrap items-center gap-3">
+        <Button
+          type="submit"
+          loading={busy}
+          disabled={(!locked('title') && !form.title.trim()) || (!locked('categoryIds') && form.categoryIds.length === 0) || nothingToSave}
+        >
+          {submitLabel}
+        </Button>
+        {event && !nothingToSave && !busy && <span className="text-sm font-medium text-amber-700">Có thay đổi chưa lưu.</span>}
+      </div>
     </form>
   )
 }
