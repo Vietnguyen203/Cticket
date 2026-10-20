@@ -17,7 +17,9 @@ export function EventCard({ event }: { event: EventSummary }) {
       className="group flex flex-col overflow-hidden rounded-card border border-line bg-white shadow-card transition duration-200 ease-standard hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-raised"
     >
       <div className="relative aspect-video overflow-hidden bg-slate-100">
-        <EventImage src={event.thumbnailUrl} title={event.title} />
+        <div className="h-full w-full transition-transform duration-500 ease-out-soft group-hover:scale-[1.04]">
+          <EventImage src={event.thumbnailUrl} title={event.title} />
+        </div>
         {event.categories[0] && (
           <span className="absolute left-3 top-3 rounded-full bg-white/95 px-2.5 py-1 text-xs font-semibold text-ink shadow-card">
             {event.categories[0].name}

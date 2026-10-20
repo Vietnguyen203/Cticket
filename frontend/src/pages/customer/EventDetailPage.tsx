@@ -91,10 +91,10 @@ export function EventDetailPage() {
 
         {/* The picture and the essentials */}
         <section className="grid gap-6 lg:grid-cols-[1.55fr_1fr] lg:gap-8">
-          <div className="aspect-video overflow-hidden rounded-panel bg-slate-200 shadow-card">
+          <div className="aspect-video animate-scale-in overflow-hidden rounded-panel bg-slate-200 shadow-card">
             <EventImage src={e.bannerUrl ?? e.thumbnailUrl} title={e.title} />
           </div>
-          <div className="flex flex-col">
+          <div className="flex animate-fade-up flex-col [animation-delay:120ms]">
             <div className="flex flex-wrap gap-2">
               {e.categories.map((c) => (
                 <Link key={c.id} to={`/events?categoryId=${c.id}`} className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-800 hover:bg-brand-100">
@@ -142,7 +142,7 @@ export function EventDetailPage() {
               )}
               <a
                 href="#lich-dien"
-                className="inline-flex h-12 items-center gap-2 rounded-control bg-brand-700 px-6 font-semibold text-white shadow-card transition hover:bg-brand-800"
+                className="inline-flex h-12 items-center gap-2 rounded-control bg-brand-700 px-6 font-semibold text-white shadow-card transition hover:-translate-y-px hover:bg-brand-800 hover:shadow-raised active:scale-[0.98]"
               >
                 <TicketIcon size={20} />
                 {onSale.length > 0 ? 'Chọn suất diễn' : 'Xem lịch diễn'}
@@ -185,7 +185,7 @@ export function EventDetailPage() {
 
       {/* Phones: the way to buy stays on screen while reading. */}
       {onSale.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-white/95 px-4 py-3 shadow-raised backdrop-blur lg:hidden">
+        <div className="fixed inset-x-0 bottom-0 z-20 animate-slide-up border-t border-line bg-white/95 px-4 py-3 shadow-raised backdrop-blur [animation-delay:400ms] lg:hidden">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs text-slate-500">Giá vé từ</p>
@@ -220,7 +220,7 @@ function ScheduleBox({ schedule, slug, ticketTypes }: { schedule: Schedule; slug
   const left = ticketTypes?.reduce((sum, tt) => sum + tt.available, 0)
 
   return (
-    <div className={`rounded-card border bg-white p-4 shadow-card ${state === 'on-sale' ? 'border-line' : 'border-line/70 opacity-90'}`}>
+    <div className={`rounded-card border bg-white p-4 shadow-card transition duration-200 ${state === 'on-sale' ? 'border-line hover:border-slate-300 hover:shadow-raised' : 'border-line/70 opacity-90'}`}>
       <div className="flex gap-4">
         <div className="flex w-14 shrink-0 flex-col items-center rounded-control bg-canvas py-2 text-center" aria-hidden="true">
           <span className="text-[11px] font-semibold uppercase text-brand-700">{when.month}</span>
@@ -257,10 +257,10 @@ function ScheduleBox({ schedule, slug, ticketTypes }: { schedule: Schedule; slug
         ) : (
           <Link
             to={`/events/${slug}/schedules/${schedule.id}`}
-            className="mt-3 flex h-11 items-center justify-center gap-2 rounded-control bg-brand-700 px-4 text-sm font-semibold text-white transition hover:bg-brand-800"
+            className="group mt-3 flex h-11 items-center justify-center gap-2 rounded-control bg-brand-700 px-4 text-sm font-semibold text-white transition hover:bg-brand-800 active:scale-[0.98]"
           >
             Chọn chỗ · còn {left ?? '…'} vé
-            <ArrowRightIcon size={16} />
+            <ArrowRightIcon size={16} className="transition-transform group-hover:translate-x-0.5" />
           </Link>
         ))}
     </div>

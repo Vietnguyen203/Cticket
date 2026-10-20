@@ -172,7 +172,10 @@ export function SeatSelectPage() {
           }`}
           title="Ghế đổi màu ngay khi người khác giữ / mua"
         >
-          <span className={`h-2 w-2 rounded-full ${connection === 'open' ? 'bg-emerald-500' : 'animate-pulse bg-amber-500'}`} />
+          <span className="relative flex h-2 w-2">
+            {connection === 'open' && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />}
+            <span className={`relative inline-flex h-2 w-2 rounded-full ${connection === 'open' ? 'bg-emerald-500' : 'animate-pulse bg-amber-500'}`} />
+          </span>
           {connection === 'open' ? 'Cập nhật trực tiếp' : 'Đang kết nối lại…'}
         </span>
       </div>
@@ -392,13 +395,13 @@ function SeatRows({ seats, state, ticketTypes, dispatch }: { seats: Seat[]; stat
               const typeColor = TYPE_COLORS[typeIndex % TYPE_COLORS.length]
               const sellable = (live === 'AVAILABLE' || mine) && typeIndex >= 0
               const color = selected
-                ? 'bg-brand-800 text-white ring-2 ring-brand-300'
+                ? 'animate-pop bg-brand-800 text-white ring-2 ring-brand-300'
                 : mine
                   ? `${typeColor} text-white opacity-60 outline-2 outline-dashed outline-red-500`
                   : live === 'HELD'
                     ? 'bg-amber-200 text-amber-800'
                     : sellable
-                      ? `${typeColor} text-white hover:brightness-110`
+                      ? `${typeColor} text-white hover:-translate-y-px hover:brightness-110 hover:shadow-card`
                       : 'bg-slate-300 text-slate-500'
               const typeName = reserved[typeIndex]?.name ?? 'không bán'
               const statusText = mine

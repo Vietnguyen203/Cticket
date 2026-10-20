@@ -40,7 +40,7 @@ export function TicketPage() {
         Vé của tôi
       </Link>
 
-      <article className="overflow-hidden rounded-panel bg-white shadow-raised ring-1 ring-line">
+      <article className="animate-scale-in overflow-hidden rounded-panel bg-white shadow-raised ring-1 ring-line">
         <header className="space-y-2 bg-ink p-5 text-white">
           <p className="text-xs font-semibold uppercase tracking-wider text-brand-300">Vé điện tử</p>
           <h1 className="text-xl font-bold leading-snug">{t.event.title}</h1>
@@ -72,7 +72,7 @@ export function TicketPage() {
           {t.qrToken ? (
             <>
               {qrUrl ? (
-                <img src={qrUrl} alt={`Mã QR của vé ${t.code}`} className="mx-auto aspect-square w-64 max-w-full rounded-card ring-1 ring-line" />
+                <img src={qrUrl} alt={`Mã QR của vé ${t.code}`} className="mx-auto aspect-square w-64 max-w-full animate-fade-in rounded-card ring-1 ring-line" />
               ) : (
                 <div className="mx-auto aspect-square w-64 max-w-full animate-pulse rounded-card bg-slate-100" />
               )}

@@ -88,3 +88,24 @@
 - Phần đánh giá (`EventReviews`, `Stars`) và các trang ban tổ chức / quản trị / soát vé chỉ hưởng thành phần chung, chưa làm riêng.
 - Danh sách sự kiện chưa có "giá từ" (API danh sách không trả giá: cần thêm ở backend).
 - Bundle JS 672 kB (trước 640 kB); cảnh báo "> 500 kB" đã có từ trước: nên tách trang quản trị / quét vé thành chunk riêng (`import()`).
+
+## 8. Chuyển động (nhánh `feature/ui-motion`)
+
+Nguyên tắc: ngắn (150–600 ms), có mục đích (thứ tự xuất hiện, phản hồi khi bấm, trạng thái đang chạy), không vòng lặp gây rối mắt; **tắt hết khi hệ điều hành bật "giảm chuyển động"** (`prefers-reduced-motion`). Không thêm thư viện: keyframes trong `@theme` của `index.css`, `components/Reveal.tsx` (IntersectionObserver), `utils/motion.ts`.
+
+| Ở đâu | Hiệu ứng |
+|---|---|
+| Mọi trang | trang mới hiện dần (0,35 s); thanh tiêu đề có bóng khi cuộn; menu điện thoại trượt xuống, lớp phủ mờ dần |
+| Nút, chip | nhấn co nhẹ (98%); nút chính nhích lên khi rê chuột |
+| Thông báo, trạng thái rỗng | hiện dần / trồi lên |
+| Khung chờ tải | vệt sáng quét ngang thay cho nhấp nháy |
+| Trang chủ | quầng sáng teal trôi rất chậm sau khối giới thiệu; tiêu đề, mô tả, ô tìm kiếm trồi lên lần lượt; sự kiện nổi bật phóng nhẹ vào |
+| Thẻ sự kiện | trồi lên lần lượt khi cuộn tới; rê chuột: thẻ nhích lên, ảnh phóng 4% |
+| Chi tiết sự kiện | ảnh phóng nhẹ vào, thông tin trồi lên; thanh mua trên điện thoại trượt từ đáy lên; mũi tên "Chọn chỗ" nhích khi rê |
+| Chọn chỗ | ghế vừa chọn "nảy" một lần; chấm xanh "Cập nhật trực tiếp" tỏa sóng; ghế trống nhích lên khi rê |
+| Đơn hàng | phút cuối của đồng hồ giữ chỗ nhấp nháy nhẹ |
+| Vé | vé phóng nhẹ vào, mã QR hiện dần |
+| Hàng chờ mua vé | vệt sáng chạy trên thanh tiến độ |
+
+Bundle JS +3 kB. Lint, typecheck, 75 test web, build, 20 E2E đạt.
+
