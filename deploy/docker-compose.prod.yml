@@ -117,6 +117,9 @@ services:
     environment:
       <<: *app-env
       PORT: 3000
+      # API processes in the container (one CPU core each), sharing PG_POOL_MAX.
+      # 'auto' = every core the container sees; keep the memory limit in mind (~100 MB each).
+      API_WORKERS: ${API_WORKERS:-2}
     volumes:
       - uploads:/app/uploads
     depends_on:

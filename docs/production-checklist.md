@@ -44,8 +44,11 @@ Bản Docker trong repo là **môi trường phát triển / demo**: chứng ch�
 
 ## 6. Sức chứa
 
-- [ ] `max_connections` của PostgreSQL ≥ (số bản API × `PG_POOL_MAX`) + (số worker × `PG_POOL_MAX`) + migration + dư ~20%. Mặc định `PG_POOL_MAX=20`; PostgreSQL mặc định 100 kết nối → tối đa ~3 bản API + 1 worker với cấu hình mặc định.
-- [ ] Một tiến trình Node.js dùng 1 nhân CPU cho JavaScript: tải lớn → nhiều bản API sau load balancer (load test Phase 13: hủy đơn khi tranh ghế nhanh hơn 6 lần với 3 bản). WebSocket đồng bộ giữa các bản qua Redis pub/sub, worker chạy song song qua BullMQ.
+- [ ] `max_connections` của PostgreSQL ≥ (số container API × `PG_POOL_MAX`) + (số worker × `PG_POOL_MAX`) + migration + dư ~20%. Mặc định `PG_POOL_MAX=20`; PostgreSQL mặc định 100 kết nối → tối đa ~3 bản API + 1 worker với cấu hình mặc định.
+- [ ] Một tiến trình Node.js dùng 1 nhân CPU cho JavaScript. Tải lớn:
+  - trên một máy: `API_WORKERS` (mặc định 2 trong `deploy/docker-compose.prod.yml`; `auto` = số nhân) chạy nhiều tiến trình API trong một container, chia nhau `PG_POOL_MAX` của container. Mỗi tiến trình ≈ 100 MB: tăng giới hạn bộ nhớ (512 MB) nếu đặt trên 4. Đo ở bug review (mục 5): 4 tiến trình, 1.000 người tranh ghế → 3.549 request/giây (1 tiến trình: 1.143);
+  - nhiều máy: nhiều bản API sau load balancer (load test Phase 13: hủy đơn khi tranh ghế nhanh hơn 6 lần với 3 bản).
+  WebSocket đồng bộ giữa các tiến trình / bản qua Redis pub/sub, worker chạy song song qua BullMQ. Không khởi động lại API ngay trước giờ mở bán (tiến trình vừa bật chậm hơn ở đợt đầu).
 - [ ] `RATE_LIMIT_ENABLED` để mặc định (`true`).
 
 ## 7. Quan sát

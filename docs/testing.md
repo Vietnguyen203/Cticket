@@ -4,10 +4,12 @@ Dự án có 4 tầng kiểm thử, từ nhanh / hẹp tới chậm / rộng:
 
 | Tầng | Công cụ | Số lượng | Chạy ở đâu | Thời gian |
 |---|---|---|---|---|
-| Unit + integration (backend) | Jest + Supertest, PostgreSQL và Redis thật | **393 test**, 41 file | máy dev, CI | ≈ 1–2 phút |
+| Unit + integration (backend) | Jest + Supertest, PostgreSQL và Redis thật | **403 test**, 43 file | máy dev, CI | ≈ 1–2 phút |
 | Unit (web) | Vitest | **81 test**, 18 file | máy dev, CI | ≈ 2 giây |
 | End-to-end (trình duyệt) | Playwright (Chromium, desktop + điện thoại) | **20 kịch bản** | máy dev, CI | ≈ 1 phút |
 | Tải (load) | k6 | **5 kịch bản**, số người dùng chọn khi chạy | chạy tay | 1–5 phút / kịch bản |
+
+Danh sách kịch bản test theo chức năng (105 test case, gồm cả những case kiểm tra tay) và test tự động tương ứng: [`docs/test-scenarios.md`](test-scenarios.md).
 
 Mỗi lần push hoặc mở pull request, **GitHub Actions** chạy 3 tầng đầu (`.github/workflows/ci.yml`). Load test chạy tay vì lâu và số đo phụ thuộc máy.
 
@@ -149,6 +151,8 @@ npx playwright install chromium
 npm test
 ```
 
+Trước các kịch bản, project `warmup` (`e2e/tests/warmup.setup.ts`) mở vài trang để Vite biên dịch xong. Cả lần chạy quá 10 phút (CI 20 phút) thì dừng và báo test đang chạy (`globalTimeout`), không đứng im.
+
 `npx playwright install chromium` chỉ cần một lần cho mỗi máy. `npm run test:ui` để xem từng bước, `npm run report` để mở báo cáo HTML. Lỗi → ảnh chụp, video và trace trong `e2e/test-results/`. Cần Docker đang chạy `postgres`, `redis`, `mailpit`. Windows PowerShell 5.1: dùng `;` thay cho `&&` khi gộp lệnh.
 
 ---
@@ -225,6 +229,7 @@ docker run --rm --network etp_default -v "%CD%/loadtest:/loadtest" -e API_URL=ht
   - chạy 3 bản API thì giảm còn 0,36 s. Đây là hướng mở rộng đã thiết kế: Node.js dùng một nhân CPU cho mỗi tiến trình.
 
   Các điểm vượt ngưỡng được ghi lại để xử lý ở bước rà soát lỗi (ví dụ: lưu cấu hình hàng chờ trong bộ nhớ đệm thay vì đọc PostgreSQL ở mỗi lần vào hàng).
+- **Đã xử lý ở bug review** (`docs/bug-review.md` mục 5): nhiều tiến trình API trong một container (`API_WORKERS`; stack đo tải: `LOAD_API_WORKERS=4`). Với 4 tiến trình, 1.000 người: vào hàng p95 197 ms, tranh ghế 3.549 request/giây (giữ ghế 75 ms, hủy 1,03 s), hỗn hợp: sơ đồ ghế 56 ms, giữ chỗ 164 ms, thanh toán 195 ms; 0% lỗi, không bán trùng.
 - Kết quả thô nằm ở `loadtest/results/` trên máy chạy đo (không đưa vào git: `--summary-export` JSON và bản tóm tắt k6). Chi tiết và các lỗi của chính script đo tìm ra trong lúc đo: `docs/phase-22-load-config-design.md`, mục 12.
 
 **Không ghế nào bị bán hai lần** sau mọi lần chạy (`node loadtest/verify.mjs`). Load test dẫn tới 4 cải tiến: giữ kết nối 65 giây sau proxy (sửa lỗi 502), "gợi ý ghế đã có người lấy" trong Redis (PostgreSQL bớt 22–30% CPU), gzip ở nginx (sơ đồ ghế 470 → 70 KB), chạy nhiều bản API (hủy đơn nhanh hơn 6 lần). Chi tiết, số đo trước / sau và cách chạy: `docs/phase-13-testing-design.md`, mục 8 (bước 13.2).

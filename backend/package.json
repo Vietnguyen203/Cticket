@@ -77,5 +77,10 @@
     "jest": "^30.5.2",
     "pino-pretty": "^13.2.0",
     "supertest": "^7.3.1"
+  },
+  "overrides": {
+    "@istanbuljs/load-nyc-config": {
+      "js-yaml": "^4.1.0"
+    }
   }
 }
