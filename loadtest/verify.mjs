@@ -6,6 +6,9 @@
  *  - no seat line of two open / paid orders on the same seat (no double sale)
  *  - the inventory adds up: seat states vs orders, standing counters vs order
  *    lines (the same check as `npm run inventory:check` and the Jest tests)
+ *  - Phase 22: for each event with the purchase queue on, never more people
+ *    buying at once than its capacity, recounted from the orders (each one
+ *    open from its creation until paid / cancelled / expired)
  *  - what the run left behind: orders by status, tickets issued vs paid lines
  * Exit code 1 when something is wrong.
  */
@@ -48,6 +51,34 @@ failed ||= doubles.length > 0
 const mismatches = await findInventoryMismatches(client)
 console.log(mismatches.length === 0 ? '✓ inventory adds up (seats and standing counters match the orders)' : `✗ ${mismatches.length} inventory mismatches`, mismatches.slice(0, 5))
 failed ||= mismatches.length > 0
+
+// Phase 22: the most orders of a queued event open at the same moment (a sweep over start / end
+// points; at the same instant an order ending counts before one starting: the turn is given back first).
+const queued = (
+  await client.query(
+    `WITH spans AS (
+       SELECT e.id AS event_id, e.title, e.queue_capacity, o.created_at AS starts,
+              coalesce(o.paid_at, o.cancelled_at, CASE WHEN o.status IN ('HELD', 'PAYMENT_PENDING', 'PAYMENT_FAILED') THEN now() ELSE o.expires_at END) AS ends
+       FROM orders o
+       JOIN event_schedules s ON s.id = o.schedule_id
+       JOIN events e ON e.id = s.event_id
+       WHERE e.queue_enabled
+     ), points AS (
+       SELECT event_id, title, queue_capacity, starts AS at, 1 AS change FROM spans
+       UNION ALL
+       SELECT event_id, title, queue_capacity, ends, -1 FROM spans
+     ), running AS (
+       SELECT event_id, title, queue_capacity, sum(change) OVER (PARTITION BY event_id ORDER BY at, change) AS open FROM points
+     )
+     SELECT event_id, title, queue_capacity AS capacity, max(open)::int AS most_open, (SELECT count(*)::int FROM spans x WHERE x.event_id = r.event_id) AS orders
+     FROM running r GROUP BY event_id, title, queue_capacity ORDER BY title`,
+  )
+).rows
+for (const row of queued) {
+  const ok = row.most_open <= row.capacity
+  console.log(`${ok ? '✓' : '✗'} purchase queue "${row.title}": at most ${row.most_open} of ${row.orders} orders open at once (capacity ${row.capacity})`)
+  failed ||= !ok
+}
 
 const byStatus = (await client.query(`SELECT status, count(*)::int AS n FROM orders GROUP BY status ORDER BY status`)).rows
 console.log('orders by status:', Object.fromEntries(byStatus.map((r) => [r.status, r.n])))

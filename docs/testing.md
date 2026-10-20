@@ -7,7 +7,7 @@ Dự án có 4 tầng kiểm thử, từ nhanh / hẹp tới chậm / rộng:
 | Unit + integration (backend) | Jest + Supertest, PostgreSQL và Redis thật | **384 test**, 40 file | máy dev, CI | ≈ 1–2 phút |
 | Unit (web) | Vitest | **72 test**, 16 file | máy dev, CI | ≈ 2 giây |
 | End-to-end (trình duyệt) | Playwright (Chromium, desktop + điện thoại) | **20 kịch bản** | máy dev, CI | ≈ 1 phút |
-| Tải (load) | k6 | **4 kịch bản** | chạy tay | 1–5 phút / kịch bản |
+| Tải (load) | k6 | **5 kịch bản**, số người dùng chọn khi chạy | chạy tay | 1–5 phút / kịch bản |
 
 Mỗi lần push hoặc mở pull request, **GitHub Actions** chạy 3 tầng đầu (`.github/workflows/ci.yml`). Load test chạy tay vì lâu và số đo phụ thuộc máy.
 
@@ -167,6 +167,64 @@ Stack riêng chạy **image production** của API và worker (database `etp_loa
 - Hỗn hợp: giữ chỗ p95 **44 ms** (trước 71 ms), thanh toán p95 **33 ms** (trước 52 ms), 2.839 lượt mua, 0% lỗi.
 - Tranh ghế: giữ ghế p95 327 ms (trước 313 ms), 1.266 request/giây (trước 1.002), 0% lỗi.
 - Hủy đơn khi 500 người tranh 50 ghế với 1 bản API vẫn p95 ≈ 3,5 s, như trước; 3 bản API giảm còn ≈ 1 s.
+
+### Số người dùng cùng lúc cấu hình được (Phase 22)
+
+Mọi kịch bản nhận số người dùng ảo khi chạy, không phải sửa code (`loadtest/k6/profile.js`):
+
+| Biến | Ý nghĩa | Mặc định |
+|---|---|---|
+| `VUS` | số người dùng ảo cùng lúc | số cũ của từng kịch bản (300 / 200 / 500 / 200; hàng chờ 500) |
+| `RAMP` | thời gian tăng từ 0 lên `VUS` | như cũ |
+| `DURATION` | thời gian giữ ở mức cao nhất | như cũ |
+| `SHAPE` | `ramp` (tăng dần), `spike` (tất cả cùng lúc), `steps` (25 / 50 / 75 / 100%) | `ramp` |
+
+Kịch bản thứ 5 **`queue.js`** mô phỏng giờ mở bán với **hàng chờ mua vé** (Phase 21):
+- mỗi người dùng ảo là một khách: vào hàng, hỏi vị trí mỗi 3 giây, tới lượt thì chọn vé 5–15 giây rồi giữ chỗ và thanh toán;
+- một người dùng ảo "ban tổ chức" đọc số người đang mua mỗi giây. Ngưỡng: lớn nhất ≤ N;
+- tham số thêm: `SPREAD` (rải người đến trong khoảng thời gian này), `THINK`, `MAX_WAIT`.
+
+```
+LOAD_CUSTOMERS=1000 node loadtest/seed.mjs            # đủ tài khoản cho VUS; LOAD_QUEUE_CAPACITY=N (mặc định 50)
+k6 run -e VUS=1000 -e SHAPE=spike -e DURATION=1m loadtest/k6/contention.js
+k6 run -e VUS=1000 loadtest/k6/queue.js
+node loadtest/verify.mjs
+```
+
+**Trên Windows nên chạy k6 trong mạng Docker.** Chạy k6 trên máy rồi gọi `localhost:3200` thì ở 500–1.000 người, 3,5–4,4% kết nối bị chính Docker Desktop từ chối (`connectex: ... actively refused`) trước khi tới API. Trong mạng Docker, cùng tải đó cho 0% lỗi:
+
+```
+docker run --rm --network etp_default -v "%CD%/loadtest:/loadtest" -e API_URL=http://load-lb:3200/api/v1 grafana/k6:2.2.0 run -e VUS=1000 /loadtest/k6/queue.js
+```
+
+(PowerShell: thay `%CD%` bằng `${PWD}`.)
+
+**Kết quả** (19/10/2026, cùng laptop; k6 trong mạng Docker; 1 bản API trừ khi ghi khác; mỗi người dùng ảo một tài khoản):
+
+| Kịch bản | Người cùng lúc | Request/giây | p95 | Lỗi | Ghi chú |
+|---|---|---|---|---|---|
+| **Hàng chờ** N = 50, tất cả đến cùng lúc | 200 | 37 | vào hàng 121 ms; hỏi vị trí 20 ms; giữ chỗ 39 ms; thanh toán 20 ms | 0% | chờ trung bình 17 s, lâu nhất 39 s; 200/200 mua được |
+| | 500 | 86 | vào hàng 230 ms; hỏi vị trí 73 ms; giữ chỗ 36 ms | 0% | chờ trung bình 51 s, lâu nhất 1 ph 49 s; 500/500 |
+| | 1.000 | 170 | **vào hàng 1,21 s** ✗; hỏi vị trí 38 ms; giữ chỗ 37 ms; thanh toán 24 ms | 0% | chờ trung bình 1 ph 47 s, lâu nhất 3 ph 42 s; 1.000/1.000 |
+| | 1.000, **3 bản API** | 168 | **vào hàng 361 ms**; hỏi vị trí 20 ms; giữ chỗ 37 ms | 0% | như trên |
+| **Tranh ghế** 50 ghế, tất cả đến cùng lúc | 200 | 677 | giữ ghế 79 ms; hủy 206 ms | 0% | |
+| | 500 | 1.156 | giữ ghế 496 ms; **hủy 1,19 s** ✗ | 0% | |
+| | 1.000 | 1.143 | **giữ ghế 854 ms** ✗; **hủy 4,5 s** ✗ | 0% | 1 bản API đã bão hòa (≈ 1.150 request/giây) |
+| **Hỗn hợp** 70 / 20 / 10, 2 phút | 200 | 242 | giữ chỗ 34 ms; thanh toán 22 ms | 0% | 1.400 lượt mua |
+| | 500 | 603 | giữ chỗ 75 ms; thanh toán 70 ms | 0% | 2.695 lượt mua |
+| | 1.000 | 1.164 | giữ chỗ 727 ms; thanh toán 725 ms; **sơ đồ ghế 307 ms** ✗ | 0% | 4.283 lượt mua |
+
+✗: vượt ngưỡng của kịch bản (p95 < 300 ms cho đọc / vào hàng, < 800 ms cho giữ chỗ / thanh toán / hủy).
+
+- **Hàng chờ giữ đúng giới hạn ở mọi mức:** số người đang mua lớn nhất đúng 50 (ban tổ chức đọc mỗi giây), và tính lại từ đơn hàng (`verify.mjs`) không lúc nào quá 50. Mọi người đều được vào theo thứ tự và mua được vé, 0% lỗi.
+- **Không ghế nào bán hai lần, tồn kho và vé phát ra khớp** sau toàn bộ các lần chạy (`verify.mjs`).
+- **Giới hạn của 1 tiến trình API trên laptop:**
+  - khoảng 1.150 request/giây;
+  - ở 1.000 người, độ trễ tăng mà không có lỗi. Riêng lúc 1.000 người cùng bấm "vào hàng" trong một khoảnh khắc, p95 lên 1,2 s;
+  - chạy 3 bản API thì giảm còn 0,36 s. Đây là hướng mở rộng đã thiết kế: Node.js dùng một nhân CPU cho mỗi tiến trình.
+
+  Các điểm vượt ngưỡng được ghi lại để xử lý ở bước rà soát lỗi (ví dụ: lưu cấu hình hàng chờ trong bộ nhớ đệm thay vì đọc PostgreSQL ở mỗi lần vào hàng).
+- Kết quả thô nằm ở `loadtest/results/` trên máy chạy đo (không đưa vào git: `--summary-export` JSON và bản tóm tắt k6). Chi tiết và các lỗi của chính script đo tìm ra trong lúc đo: `docs/phase-22-load-config-design.md`, mục 12.
 
 **Không ghế nào bị bán hai lần** sau mọi lần chạy (`node loadtest/verify.mjs`). Load test dẫn tới 4 cải tiến: giữ kết nối 65 giây sau proxy (sửa lỗi 502), "gợi ý ghế đã có người lấy" trong Redis (PostgreSQL bớt 22–30% CPU), gzip ở nginx (sơ đồ ghế 470 → 70 KB), chạy nhiều bản API (hủy đơn nhanh hơn 6 lần). Chi tiết, số đo trước / sau và cách chạy: `docs/phase-13-testing-design.md`, mục 8 (bước 13.2).
 

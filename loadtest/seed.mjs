@@ -9,6 +9,9 @@
  *  - 1 big event: 2.000 seats (VIP rows A–J, STD rows K–AN, 50 per row) + 5.000 standing
  *  - 50 smaller events (standing only) so lists and search have something to page through
  *  - 2.000 customers with access tokens (2 hours, signed with the load stack's test-only secret)
+ *    (LOAD_CUSTOMERS=N for more: at least the VUS of the scenarios that need one account per user)
+ *  - Phase 22: 1 event with the purchase queue on (LOAD_QUEUE_CAPACITY people buy at once,
+ *    default 50; 5-minute turns) and 20.000 standing tickets, for k6/queue.js
  * and writes loadtest/.data/data.json for k6 (git-ignored).
  *
  * Accounts are made straight in the database (registration and its emails are
@@ -26,6 +29,8 @@ const ROOT = path.resolve(HERE, '..')
 const API = process.env.LOAD_API_URL ?? 'http://localhost:3200/api/v1'
 const CUSTOMERS = Number(process.env.LOAD_CUSTOMERS ?? 2000)
 const SMALL_EVENTS = 50
+const QUEUE_CAPACITY = Number(process.env.LOAD_QUEUE_CAPACITY ?? 50)
+const QUEUE_TICKETS = 20_000
 
 // Database address from the root .env (the same PostgreSQL the dev stack uses).
 const rootEnv = parseEnv(readFileSync(path.join(ROOT, '.env'), 'utf8'))
@@ -160,6 +165,21 @@ for (let i = 0; i < SMALL_EVENTS; i++) {
 }
 console.log(`${events.length} published events`)
 
+// --- Phase 22: the event with the purchase queue on -------------------------------
+
+const { venue: arena } = await asAdmin('POST', '/venues', { name: `Sân khấu hàng chờ ${run}`, addressLine: '3 Hai Bà Trưng', city: 'Hà Nội', capacity: QUEUE_TICKETS })
+const { zone: floor } = await asAdmin('POST', `/venues/${arena.id}/zones`, { code: 'FLOOR', name: 'Sàn', kind: 'STANDING', capacity: QUEUE_TICKETS })
+const { event: rush } = await asOrganizer('POST', '/events', { title: `Mở bán hàng chờ ${run}`, categoryIds: [category.id] })
+const { schedule: rushSchedule } = await asOrganizer('POST', `/events/${rush.id}/schedules`, { venueId: arena.id, startAt: at(40, 12), endAt: at(40, 15) })
+const rushGa = (
+  await asOrganizer('POST', `/schedules/${rushSchedule.id}/ticket-types`, {
+    code: 'GA', name: 'Vé sàn', price: 400_000, inventoryMode: 'GENERAL_ADMISSION', capacity: QUEUE_TICKETS, venueZoneId: floor.id,
+  })
+).ticketType
+await publish(rush.id)
+await asOrganizer('PATCH', `/events/${rush.id}`, { queueEnabled: true, queueCapacity: QUEUE_CAPACITY, queueSessionMinutes: 5 })
+console.log(`queue event: ${QUEUE_TICKETS} standing tickets, ${QUEUE_CAPACITY} people buy at once`)
+
 // --- customers -----------------------------------------------------------------
 
 const customers = await createUsers(CUSTOMERS, ['CUSTOMER'], 'buyer')
@@ -179,6 +199,13 @@ const data = {
     hotSeatIds: Array.from({ length: 50 }, (_, i) => seatId('A', i + 1)),
     // purchases in the mixed scenario: every other seat
     seatIds: seats.filter((s) => s.rowLabel !== 'A').map((s) => s.id),
+  },
+  queue: {
+    eventId: rush.id,
+    scheduleId: rushSchedule.id,
+    gaTicketTypeId: rushGa.id,
+    capacity: QUEUE_CAPACITY,
+    organizerToken: organizerUser.token, // the queue numbers (GET /events/:id/queue/stats)
   },
   events,
   searchTerms: WORDS,
