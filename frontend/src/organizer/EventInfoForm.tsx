@@ -104,16 +104,18 @@ export function EventInfoForm({ event, onSubmit, submitLabel }: { event?: EventD
       </label>
       <div className="grid gap-4">
         <ImageField
-          label="Ảnh bìa (ngang, ví dụ 1920×640)"
+          label="Ảnh bìa (trang sự kiện, khung ngang 16:9)"
           name="bannerUrl"
+          previewTitle={form.title}
           value={form.bannerUrl}
           disabled={locked('bannerUrl')}
           onChange={(bannerUrl) => setForm((f) => ({ ...f, bannerUrl }))}
           error={fieldErrors.bannerUrl ? 'Link ảnh không hợp lệ.' : undefined}
         />
         <ImageField
-          label="Ảnh nhỏ (cho danh sách, ví dụ 800×450)"
+          label="Ảnh nhỏ (thẻ trong danh sách, khung 16:9)"
           name="thumbnailUrl"
+          previewTitle={form.title}
           value={form.thumbnailUrl}
           disabled={locked('thumbnailUrl')}
           onChange={(thumbnailUrl) => setForm((f) => ({ ...f, thumbnailUrl }))}

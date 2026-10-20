@@ -109,3 +109,13 @@ Nguyên tắc: ngắn (150–600 ms), có mục đích (thứ tự xuất hiện
 
 Bundle JS +3 kB. Lint, typecheck, 75 test web, build, 20 E2E đạt.
 
+## 9. Căn chỉnh ảnh sự kiện trước khi tải lên
+
+Vấn đề: ảnh tải lên có tỉ lệ bất kỳ, giao diện hiển thị theo khung 16:9 và cắt giữa, nên ảnh vuông kiểu logo bị mất chữ ("X-OR" thành "-O").
+
+- Chọn ảnh từ máy (JPEG / PNG / WebP, tới 20 MB) → hộp **"Căn chỉnh ảnh"** (`components/ImageCropDialog.tsx`, thẻ `<dialog>`: bẫy focus, Esc để hủy): khung đúng 16:9, **kéo** (chuột / chạm / phím mũi tên), **thu phóng** (thanh trượt, phím + / −), nút **"Lấp đầy khung"** và **"Hiện trọn ảnh"**; phần trống lấp bằng **nền mờ từ chính ảnh**, trắng hoặc tối; lưới 1/3 để căn; **xem trước thẻ sự kiện** với tên thật.
+- "Dùng ảnh này": canvas vẽ đúng khung đang thấy ở **1600 × 900, JPEG** (nhỏ hơn 5 MB) rồi mới tải lên: API và cách lưu không đổi.
+- Ảnh đã tải lên trước (đường dẫn `/api/v1/uploads/…`) có nút **"Căn chỉnh lại"**.
+- Hình học thuần ở `utils/imageCrop.ts` (6 test): khung chỉ hở khi chọn hiện trọn ảnh, kéo dừng ở mép, thu phóng giữ nguyên điểm giữa.
+- Nhãn ô ảnh đổi thành "khung 16:9" (trước ghi 1920×640, không còn đúng với giao diện mới).
+- Đã thử trên stack E2E bằng kịch bản tạm (ảnh vuông → "Hiện trọn ảnh" → ảnh lưu đúng 1600 × 900; hộp vừa màn hình điện thoại).
