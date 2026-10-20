@@ -53,8 +53,10 @@ const envSchema = z.object({
     .string()
     .transform((value) => Buffer.from(value, 'base64'))
     .refine((key) => key.length === 32, 'must be 32 random bytes, base64-encoded'),
-  // Roles that cannot use the platform without two-factor (comma-separated). Keep ADMIN in production.
+  // Roles that cannot use the platform without two-factor (comma-separated). Must include ADMIN in
+  // production (checked below), unless ALLOW_ADMIN_WITHOUT_2FA=true (a local Docker stack only).
   TWO_FACTOR_REQUIRED_ROLES: z.string().default('ADMIN').transform(csv),
+  ALLOW_ADMIN_WITHOUT_2FA: booleanString.default(false),
   // The name authenticator apps show next to the code.
   TOTP_ISSUER: z.string().min(1).max(50).default('ETP Tickets'),
 
@@ -120,6 +122,17 @@ const envSchema = z.object({
 });
 
 const parsed = envSchema
+  // Bug review BUG-05: a value copied from a development .env (e.g. NONE) must not
+  // quietly let admins of a real server sign in without two-factor.
+  .superRefine((env, ctx) => {
+    if (env.NODE_ENV === 'production' && !env.TWO_FACTOR_REQUIRED_ROLES.includes('ADMIN') && !env.ALLOW_ADMIN_WITHOUT_2FA) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['TWO_FACTOR_REQUIRED_ROLES'],
+        message: 'must include ADMIN in production (admins sign in with two-factor); a local Docker stack may set ALLOW_ADMIN_WITHOUT_2FA=true',
+      });
+    }
+  })
   .transform((env) => ({
     ...env,
     PAYMENT_SIMULATOR: env.PAYMENT_SIMULATOR ?? env.NODE_ENV !== 'production',
@@ -133,6 +146,10 @@ if (!parsed.success) {
   const issues = parsed.error.issues.map((issue) => `  - ${issue.path.join('.')}: ${issue.message}`);
   console.error(`Invalid environment configuration:\n${issues.join('\n')}`);
   process.exit(1);
+}
+
+if (parsed.data.NODE_ENV === 'production' && !parsed.data.TWO_FACTOR_REQUIRED_ROLES.includes('ADMIN')) {
+  console.warn('WARNING: admins can sign in WITHOUT two-factor (ALLOW_ADMIN_WITHOUT_2FA=true). Never on a real server.');
 }
 
 module.exports = Object.freeze(parsed.data);

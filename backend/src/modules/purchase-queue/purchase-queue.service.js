@@ -23,6 +23,31 @@ const repository = require('./purchase-queue.repository');
  */
 
 const STATE = Object.freeze({ NONE: 'NONE', ACTIVE: 'ACTIVE', WAITING: 'WAITING' });
+
+// Bug review BUG-03: the settings are read on every join / place asked / booking,
+// up to 1.000 times at once when a sale opens. Kept in memory a few seconds
+// (a change on this instance clears them at once; other instances follow
+// within SETTINGS_TTL_MS).
+const SETTINGS_TTL_MS = 5_000;
+const SETTINGS_CACHE_MAX = 10_000;
+const settingsCache = new Map(); // "event:id" / "schedule:id" → { at, value: Promise }
+
+function cachedSettings(key, load) {
+  const hit = settingsCache.get(key);
+  if (hit && Date.now() - hit.at < SETTINGS_TTL_MS) return hit.value;
+  if (settingsCache.size >= SETTINGS_CACHE_MAX) settingsCache.clear();
+  const value = load().catch((err) => {
+    settingsCache.delete(key); // never remember a failure
+    throw err;
+  });
+  settingsCache.set(key, { at: Date.now(), value });
+  return value;
+}
+const eventSettings = (eventId) => cachedSettings(`event:${eventId}`, () => repository.settingsOfEvent(pool, eventId));
+const scheduleSettings = (scheduleId) =>
+  cachedSettings(`schedule:${scheduleId}`, () => repository.settingsOfSchedule(pool, scheduleId));
+/** For tests (a setting changed straight in the database). */
+const forgetSettings = () => settingsCache.clear();
 const STATES = [STATE.NONE, STATE.ACTIVE, STATE.WAITING];
 const MS_PER_MINUTE = 60_000;
 
@@ -78,7 +103,7 @@ function toView(settings, { state, endsAt, place }) {
 const OPEN = Object.freeze({ enabled: false, state: STATE.ACTIVE, turnEndsAt: null, place: null, ahead: null, estimatedWaitSeconds: null });
 
 async function publicSettings(eventId) {
-  const settings = await repository.settingsOfEvent(pool, eventId);
+  const settings = await eventSettings(eventId);
   if (!settings || !events.PUBLIC_STATUSES.includes(settings.status)) throw new AppError('NOT_FOUND', 'Event not found.');
   return settings;
 }
@@ -121,7 +146,7 @@ async function leave(userId, eventId) {
  * @throws QUEUE_TURN_REQUIRED (409)
  */
 async function assertTurn(userId, scheduleId) {
-  const settings = await repository.settingsOfSchedule(pool, scheduleId);
+  const settings = await scheduleSettings(scheduleId);
   if (!isQueued(settings)) return;
   const [active] = keysOf(settings.event_id);
   const hasTurn = await tryRedis('purchase queue turn', () => redis.queueHasTurn(active, userId), 1);
@@ -138,6 +163,16 @@ async function extendTurn(userId, eventId, untilIso) {
 }
 
 /**
+ * Bug review BUG-02: a VNPay payment can outlive its order's deadline (the
+ * order stays open until VNPay is asked). The turn lasts as long, so nobody
+ * else is let in while this buyer may still be paying.
+ */
+async function extendTurnOfSchedule(userId, scheduleId, untilIso) {
+  const settings = await scheduleSettings(scheduleId);
+  if (isQueued(settings)) await extendTurn(userId, settings.event_id, untilIso);
+}
+
+/**
  * An order ended (paid, cancelled, expired): once that commits, its owner's
  * turn ends too, unless they still have another open order for the event,
  * and the next people in line are let in.
@@ -145,7 +180,7 @@ async function extendTurn(userId, eventId, untilIso) {
  */
 function releaseTurnAfterCommit(db, { userId, scheduleId }) {
   const release = async () => {
-    const settings = await repository.settingsOfSchedule(pool, scheduleId);
+    const settings = await scheduleSettings(scheduleId);
     if (!isQueued(settings)) return;
     if (await repository.hasOpenOrderInEvent(pool, { userId, eventId: settings.event_id })) return;
     await tryRedis('purchase queue release', () => runScript('queueLeave', settings, userId), null);
@@ -180,6 +215,7 @@ async function stats(user, eventId) {
  * people in at once.
  */
 async function settingsChanged(eventId) {
+  forgetSettings();
   const settings = await repository.settingsOfEvent(pool, eventId);
   if (!settings) return;
   if (!isQueued(settings)) {
@@ -211,7 +247,9 @@ module.exports = {
   leave,
   assertTurn,
   extendTurn,
+  extendTurnOfSchedule,
   releaseTurnAfterCommit,
+  forgetSettings,
   stats,
   settingsChanged,
   admitQueues,

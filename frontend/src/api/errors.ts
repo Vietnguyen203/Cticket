@@ -34,6 +34,7 @@ export class ApiError extends Error {
 /** What the user reads for each error code of the API (backend/src/utils/errorCodes.js). */
 const MESSAGES: Record<string, string> = {
   NETWORK_ERROR: 'Không kết nối được máy chủ. Kiểm tra mạng rồi thử lại.',
+  TIMEOUT: 'Máy chủ phản hồi quá lâu. Vui lòng thử lại sau ít phút.',
   VALIDATION_ERROR: 'Thông tin chưa hợp lệ, vui lòng kiểm tra lại.',
   INVALID_OTP: 'Mã xác minh không đúng hoặc đã hết hạn.',
   UNAUTHENTICATED: 'Vui lòng đăng nhập.',
@@ -155,6 +156,8 @@ export function toApiError(err: unknown): ApiError {
       const { code, message, details } = body.error
       return new ApiError(err.response.status, code, messageFor(code, message), details)
     }
+    // No answer within REQUEST_TIMEOUT_MS (client.ts): the server is there but stuck.
+    if (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT') return new ApiError(0, 'TIMEOUT', messageFor('TIMEOUT'))
     if (!err.response) return new ApiError(0, 'NETWORK_ERROR', messageFor('NETWORK_ERROR'))
     return new ApiError(err.response.status, 'INTERNAL_ERROR', messageFor('INTERNAL_ERROR'))
   }

@@ -5,6 +5,7 @@ const { query, closePool } = require('../../src/database/pool');
 const { redis } = require('../../src/redis/client');
 const { QUEUE } = require('../../src/queue/queues');
 const processors = require('../../src/queue/processors');
+const purchaseQueueRepository = require('../../src/modules/purchase-queue/purchase-queue.repository');
 const { useFakeMailbox } = require('../helpers/auth');
 const { bearer, createAdmin, createOrganizer, createCategory } = require('../helpers/catalog');
 const { createConfiguredEvent, publishEvent } = require('../helpers/inventory');
@@ -203,6 +204,38 @@ describe('one at a time (capacity 1)', () => {
     for (const buyer of [a, b, c]) await join(buyer.token, event.id).expect(200);
     await setQueue(event.id, { queueCapacity: 3 }).expect(200);
     expect(await stateOf(c.token, event.id)).toMatchObject({ state: 'ACTIVE' });
+  });
+});
+
+describe('bug review', () => {
+  test('BUG-02: paying through VNPay keeps the turn until VNPay has been asked (past the order deadline)', async () => {
+    const { event, schedule, seat } = await onSale({ queueCapacity: 1 });
+    const [a] = await createCustomers(1);
+    await join(a.token, event.id).expect(200);
+    const { order } = (await book(app, a.token, schedule.id, { seatIds: [seat.A01] }).expect(201)).body.data;
+    const checkedOut = (await request(app).post(`/api/v1/orders/${order.id}/checkout`).set(bearer(a.token)).send({}).expect(200)).body.data.order;
+    await request(app).post('/api/v1/payments/vnpay').set(bearer(a.token)).send({ orderId: order.id }).expect(201);
+
+    const turnEnds = Number(await redis.zscore(`queue:${event.id}:active`, a.id));
+    // The order's deadline + 10 minutes of VNPay questions + 1 minute of the job.
+    expect(turnEnds).toBeGreaterThanOrEqual(new Date(checkedOut.expiresAt).getTime() + 11 * 60_000 - 1000);
+  });
+
+  test('BUG-03: the settings are read once for a burst of joins, and again as soon as they change', async () => {
+    const { event } = await onSale({ queueCapacity: 5 });
+    const buyers = await createCustomers(20);
+    const read = jest.spyOn(purchaseQueueRepository, 'settingsOfEvent');
+    try {
+      await Promise.all(buyers.map((buyer) => join(buyer.token, event.id).expect(200)));
+      expect(read).toHaveBeenCalledTimes(1);
+
+      await setQueue(event.id, { queueCapacity: 20 }).expect(200); // this instance forgets them at once
+      const reads = read.mock.calls.length;
+      expect(queueOf(await join(buyers[19].token, event.id).expect(200))).toMatchObject({ state: 'ACTIVE', capacity: 20 });
+      expect(read.mock.calls.length).toBe(reads + 1);
+    } finally {
+      read.mockRestore();
+    }
   });
 });
 

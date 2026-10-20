@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { getAccessToken, refreshHttp, setAccessToken } from '../auth/session'
 import { apiError, fakeJwt, networkDown, recordingAdapter, reply } from '../test/fakeHttp'
-import { api } from './client'
+import { AxiosError } from 'axios'
+import { api, REQUEST_TIMEOUT_MS } from './client'
 import { ApiError } from './errors'
 
 const OLD = fakeJwt(600)
@@ -97,6 +98,20 @@ describe('api client', () => {
     const failure = (await api.get('/events').catch((err: unknown) => err)) as ApiError
     expect(failure.code).toBe('NETWORK_ERROR')
     expect(failure.message).toMatch(/Không kết nối được máy chủ/)
+  })
+
+  // Bug review BUG-04: a server that never answers.
+  test('no answer in 30 seconds → ApiError TIMEOUT ("the server takes too long"), not a spinner forever', async () => {
+    let sentTimeout: number | undefined
+    api.defaults.adapter = (config) => {
+      sentTimeout = config.timeout
+      return Promise.reject(new AxiosError(`timeout of ${config.timeout}ms exceeded`, 'ECONNABORTED', config, null))
+    }
+    const failure = (await api.get('/events').catch((err: unknown) => err)) as ApiError
+    expect(sentTimeout).toBe(REQUEST_TIMEOUT_MS)
+    expect(REQUEST_TIMEOUT_MS).toBe(30_000)
+    expect(failure.code).toBe('TIMEOUT')
+    expect(failure.message).toMatch(/phản hồi quá lâu/)
   })
 
   test('validation details become messages per form field', async () => {

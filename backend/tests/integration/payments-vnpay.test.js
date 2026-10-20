@@ -338,6 +338,53 @@ describe('a second attempt', () => {
     expect(await refundsOf(attempt.id)).toHaveLength(1);
   });
 
+  // Bug review BUG-01: money taken after VNPay first said "not paid" was ignored (no ticket, no refund).
+  test('paid after a failure (held as suspicious, 07): the order is paid with it', async () => {
+    const { buyer, order } = await checkedOutOrder();
+    const attempt = await startAttempt(buyer.token, order.id);
+    expect((await ipn(callback(attempt, { code: '07' }))).body.RspCode).toBe('00');
+    expect((await paymentRow(attempt.id)).status).toBe('FAILED');
+    expect(await orderStatus(order.id)).toBe('PAYMENT_FAILED');
+
+    const transactionNo = nextTransactionNo();
+    expect((await ipn(callback(attempt, { transactionNo }))).body.RspCode).toBe('00');
+    expect(await paymentRow(attempt.id)).toMatchObject({ status: 'SUCCESS', provider_transaction_id: transactionNo, failure_code: null });
+    expect(await orderStatus(order.id)).toBe('PAID');
+    expect(await ticketCount(order.id)).toBe(1);
+    expect((await ipn(callback(attempt, { transactionNo }))).body.RspCode).toBe('02');
+  });
+
+  test('paid after a failure while a newer attempt is open: the old one pays, the newer one gives way', async () => {
+    const { buyer, order } = await checkedOutOrder();
+    const failed = await startAttempt(buyer.token, order.id);
+    expect((await ipn(callback(failed, { code: '07' }))).body.RspCode).toBe('00');
+    const newer = await startAttempt(buyer.token, order.id);
+
+    expect((await ipn(callback(failed))).body.RspCode).toBe('00');
+    expect((await paymentRow(failed.id)).status).toBe('SUCCESS');
+    expect((await paymentRow(newer.id)).status).toBe('CANCELLED');
+    expect(await orderStatus(order.id)).toBe('PAID');
+
+    // The customer also paid the newer one: refunded, never kept.
+    expect((await ipn(callback(newer))).body.RspCode).toBe('00');
+    expect((await paymentRow(newer.id)).status).toBe('REFUNDED');
+    expect(await refundsOf(newer.id)).toEqual([expect.objectContaining({ status: 'SUCCESS', amount: 2_000_000 })]);
+    expect(await ticketCount(order.id)).toBe(1);
+  });
+
+  test('paid after a failure, the order cancelled meanwhile: the money is refunded', async () => {
+    const { buyer, order } = await checkedOutOrder();
+    const attempt = await startAttempt(buyer.token, order.id);
+    expect((await ipn(callback(attempt, { code: '07' }))).body.RspCode).toBe('00');
+    await cancelOrder(app, buyer.token, order.id).expect(200);
+
+    expect((await ipn(callback(attempt))).body.RspCode).toBe('00');
+    expect((await paymentRow(attempt.id)).status).toBe('REFUNDED');
+    expect(await refundsOf(attempt.id)).toEqual([expect.objectContaining({ status: 'SUCCESS', requested_by: 'system' })]);
+    expect(await orderStatus(order.id)).toBe('CANCELLED');
+    expect(await auditActions(order.id)).toContain('LATE_PAYMENT_REFUNDED');
+  });
+
   test('the customer cancels the order while at VNPay: the attempt is closed with it', async () => {
     const { buyer, order } = await checkedOutOrder();
     const attempt = await startAttempt(buyer.token, order.id);

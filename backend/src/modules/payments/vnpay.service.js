@@ -15,6 +15,7 @@ const { paymentReturnedEmail } = require('../../mail/templates');
 const paymentsRepository = require('./payments.repository');
 const { startRefund } = require('./refunds');
 const vnpay = require('./vnpay');
+const purchaseQueue = require('../purchase-queue');
 
 /**
  * Payments through VNPay (Phase 17). See docs/phase-17-vnpay-design.md.
@@ -57,6 +58,9 @@ function customerIp(ip) {
  * - paid, order can no longer use it    → "late money": REFUNDED, refund queued, email
  *   (expired, cancelled, or paid by another attempt)
  * - not paid                            → FAILED, order PAYMENT_FAILED (can pay again)
+ * A "paid" verdict also counts for an attempt already FAILED (bug review
+ * BUG-01): VNPay may hold a payment as suspicious (07) and take the money
+ * later. The money is then used for the order, or given back, never kept.
  * @returns {Promise<{ result: 'APPLIED'|'ALREADY'|'NOT_FOUND'|'AMOUNT_MISMATCH', status?: string }>}
  */
 async function applyGatewayResult(paymentId, { paid, responseCode, amount, transactionNo, data }) {
@@ -71,13 +75,17 @@ async function applyGatewayResult(paymentId, { paid, responseCode, amount, trans
     const room = userRoom(payment.user_id);
 
     if (paid) {
-      if (payment.status === PAYMENT_STATUS.PENDING && orders.PAYABLE_STATUSES.includes(order.status)) {
+      const unsettled = payment.status === PAYMENT_STATUS.PENDING || payment.status === PAYMENT_STATUS.FAILED;
+      if (unsettled && orders.PAYABLE_STATUSES.includes(order.status)) {
+        // A newer attempt opened after this one failed gives way (paid anyway → refunded as late money).
+        const newer = await paymentsRepository.findPendingGatewayAttempt(client, order.id);
+        if (newer && newer.id !== paymentId) await paymentsRepository.cancelAttempt(client, newer.id);
         await paymentsRepository.settleAttempt(client, paymentId, { status: PAYMENT_STATUS.SUCCESS, ...fields });
         await orders.markOrderPaid(client, order.id);
         publishAfterCommit(client, room, { type: MESSAGE.PAYMENT_SUCCEEDED, paymentId, orderId: order.id });
         return { result: 'APPLIED', status: PAYMENT_STATUS.SUCCESS };
       }
-      if (payment.status === PAYMENT_STATUS.PENDING || payment.status === PAYMENT_STATUS.CANCELLED) {
+      if (unsettled || payment.status === PAYMENT_STATUS.CANCELLED) {
         const late = await paymentsRepository.markLateMoney(client, paymentId, fields);
         await startRefund(client, {
           payment: late,
@@ -184,6 +192,9 @@ async function startPayment(actor, { orderId }, { ip }) {
   });
 
   const deadline = new Date(order.expires_at).getTime() - VNPAY.EXPIRE_MARGIN_SECONDS * 1000;
+  // BUG-02: until VNPay has been asked about this attempt (reconcileAttempts gives up after UNKNOWN_GRACE).
+  const decidedBy = new Date(order.expires_at).getTime() + (VNPAY.UNKNOWN_GRACE_SECONDS + 60) * 1000;
+  await purchaseQueue.extendTurnOfSchedule(actor.userId, order.schedule_id, new Date(decidedBy).toISOString());
   return {
     paymentId: payment.id,
     paymentUrl: vnpay.paymentUrl({
