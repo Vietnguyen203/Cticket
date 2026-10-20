@@ -111,12 +111,13 @@ async function findPendingGatewayAttempt(db, orderId) {
  * @returns {Promise<object|null>} null when the attempt was no longer PENDING
  */
 async function settleAttempt(db, id, { status, transactionNo, responseCode, data, failureMessage = null }) {
+  // A FAILED attempt may still turn SUCCESS: VNPay took the money after all (bug review BUG-01).
   const { rows } = await db.query(
     `UPDATE payments
      SET status = $2::payment_status, provider_transaction_id = $3, provider_response_code = $4::text, provider_data = $5,
          failure_code = CASE WHEN $2::payment_status = 'FAILED' THEN $4::text END, failure_message = $6,
          paid_at = CASE WHEN $2::payment_status = 'SUCCESS' THEN now() END
-     WHERE id = $1 AND status = 'PENDING'
+     WHERE id = $1 AND (status = 'PENDING' OR (status = 'FAILED' AND $2::payment_status = 'SUCCESS'))
      RETURNING ${COLUMNS}`,
     [id, status, transactionNo, responseCode, data, failureMessage],
   );
@@ -142,7 +143,7 @@ async function markLateMoney(db, id, { transactionNo, responseCode, data }) {
     `UPDATE payments
      SET status = 'REFUNDED', paid_at = now(), provider_transaction_id = $2, provider_response_code = $3, provider_data = $4,
          failure_message = 'Paid after the order could no longer use it: refunded'
-     WHERE id = $1 AND status IN ('PENDING', 'CANCELLED')
+     WHERE id = $1 AND status IN ('PENDING', 'CANCELLED', 'FAILED')
      RETURNING ${COLUMNS}`,
     [id, transactionNo, responseCode, data],
   );

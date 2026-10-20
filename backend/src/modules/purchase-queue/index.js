@@ -7,6 +7,7 @@ const service = require('./purchase-queue.service');
 module.exports = {
   assertTurn: service.assertTurn,
   extendTurn: service.extendTurn,
+  extendTurnOfSchedule: service.extendTurnOfSchedule,
   releaseTurnAfterCommit: service.releaseTurnAfterCommit,
   settingsChanged: service.settingsChanged,
   admitQueues: service.admitQueues,

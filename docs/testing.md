@@ -4,8 +4,8 @@ Dự án có 4 tầng kiểm thử, từ nhanh / hẹp tới chậm / rộng:
 
 | Tầng | Công cụ | Số lượng | Chạy ở đâu | Thời gian |
 |---|---|---|---|---|
-| Unit + integration (backend) | Jest + Supertest, PostgreSQL và Redis thật | **384 test**, 40 file | máy dev, CI | ≈ 1–2 phút |
-| Unit (web) | Vitest | **72 test**, 16 file | máy dev, CI | ≈ 2 giây |
+| Unit + integration (backend) | Jest + Supertest, PostgreSQL và Redis thật | **393 test**, 41 file | máy dev, CI | ≈ 1–2 phút |
+| Unit (web) | Vitest | **73 test**, 16 file | máy dev, CI | ≈ 2 giây |
 | End-to-end (trình duyệt) | Playwright (Chromium, desktop + điện thoại) | **20 kịch bản** | máy dev, CI | ≈ 1 phút |
 | Tải (load) | k6 | **5 kịch bản**, số người dùng chọn khi chạy | chạy tay | 1–5 phút / kịch bản |
 
@@ -33,13 +33,14 @@ Test chạy trên **PostgreSQL và Redis thật** (không giả lập database),
 | Giữ chỗ, đơn hàng, khóa Redis, gợi ý ghế | `orders`, `booking-redis` | 25 |
 | Đổi / bỏ ghế trong đơn đang giữ (BKG-02) | `order-edit` | 15 |
 | Thanh toán (idempotency), mã giảm giá, hoàn tiền | `payments`, `payments-simulator-off` | 17 |
-| **VNPay** (Phase 17, với một VNPay giả trong test): ký / kiểm chữ ký, URL thanh toán, IPN (mọi mã trả lời), Return URL hỏi lại VNPay, lượt thứ hai, tiền đến muộn và trả trùng → hoàn tự động, đối soát khi đơn hết giờ, hoàn tiền qua hàng đợi (thành công / thử lại / bị từ chối / admin gửi lại), hủy sự kiện | `payments-vnpay`, `vnpay` | 27 |
+| **VNPay** (Phase 17, với một VNPay giả trong test): ký / kiểm chữ ký, URL thanh toán, IPN (mọi mã trả lời), Return URL hỏi lại VNPay, lượt thứ hai, tiền đến muộn và trả trùng → hoàn tự động, đối soát khi đơn hết giờ, hoàn tiền qua hàng đợi (thành công / thử lại / bị từ chối / admin gửi lại), hủy sự kiện; **đã thu tiền sau khi báo thất bại** (rà soát lỗi BUG-01) | `payments-vnpay`, `vnpay` | 30 |
 | **Hủy đơn theo chính sách** (Phase 18.3): các mốc và ranh giới, số tiền khách đã thấy phải còn đúng, đã vào cổng, đơn 0đ, VNPay hoàn một phần (`03`), phí hủy trong báo cáo | `cancellation`, `refund-policy` | 11 |
 | **Nhắc lịch** (Phase 18.2): cửa sổ 24 giờ / 2 giờ, không gửi trùng, người tắt nhắc, đơn mua sau mốc, đơn đã hoàn | `reminders` | 3 |
 | **Danh sách chờ** (Phase 18.4): chỉ vào khi hết, mời đúng thứ tự và số lượng, chỗ đang dành không ai khác lấy được (vé đứng và ghế), hết 30 phút → người sau, suất ngừng bán → đóng | `waitlist` | 4 |
 | **Đánh giá** (Phase 19): chỉ người đã vào cổng, sửa tại chỗ, hạn 60 ngày, điểm và phân bố, trả lời của đúng ban tổ chức, admin ẩn / hiện (audit), đối chiếu điểm, email mời đánh giá | `reviews` | 8 |
 | Vé, QR, soát vé | `checkins` | 16 |
-| **Hàng chờ mua vé** (Phase 21): tắt thì như cũ; N = 1 → người thứ hai chờ, giữ chỗ bị từ chối; thanh toán / hủy / hết hạn / hết lượt → người sau vào và được báo qua WebSocket; người mới không chen trước; vào lại không mất chỗ; lời mời danh sách chờ không cần lượt; tắt / tăng N; số liệu chỉ cho ban tổ chức; Redis lỗi → cho qua | `purchase-queue` (unit + tích hợp) | 15 |
+| **Cấu hình khởi động** (rà soát lỗi BUG-05): production bắt buộc 2FA cho admin, trừ khi bật rõ ràng cho stack Docker ở máy | `env` | 4 |
+| **Hàng chờ mua vé** (Phase 21): tắt thì như cũ; N = 1 → người thứ hai chờ, giữ chỗ bị từ chối; thanh toán / hủy / hết hạn / hết lượt → người sau vào và được báo qua WebSocket; người mới không chen trước; vào lại không mất chỗ; lời mời danh sách chờ không cần lượt; tắt / tăng N; số liệu chỉ cho ban tổ chức; Redis lỗi → cho qua | `purchase-queue` (unit + tích hợp) | 17 |
 | **Vé PDF** (Phase 20): nội dung trang, mã QR trong PDF đúng phiên bản, font có dấu; email xác nhận đính kèm, lỗi tạo PDF vẫn gửi email; tải PDF chỉ chủ đơn, đơn đã hoàn → 409; cấp lại QR → email kèm PDF mới | `ticket-pdf` (unit + tích hợp) | 6 |
 | WebSocket real-time | `websocket` | 12 |
 | Hàng đợi BullMQ, email, hết hạn giữ chỗ | `queue` | 11 |
@@ -82,7 +83,7 @@ Các tình huống "nhiều người cùng làm một việc tại cùng một t
 
 | Statements | Branches | Functions | Lines |
 |---|---|---|---|
-| **93,9%** | **82,9%** | **95,1%** | **95,9%** |
+| **93,8%** | **82,8%** | **95,1%** | **95,9%** |
 
 CI **fail** nếu tụt dưới 90% / 80% / 90% / 90%. Phần thấp: `server.js` và `worker.js` (file khởi động tiến trình, Jest không chạy; E2E và load test chạy chúng).
 

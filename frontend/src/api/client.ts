@@ -10,10 +10,18 @@ const REFRESH_AHEAD_SECONDS = 15
 type RetriableConfig = InternalAxiosRequestConfig & { retried?: boolean; sentAt?: number }
 
 /**
+ * Bug review BUG-04: a call the server never answers ends after this long
+ * (TIMEOUT: "the server takes too long") instead of a button spinning forever.
+ */
+export const REQUEST_TIMEOUT_MS = 30_000
+/** Image uploads (up to 5 MB on a slow connection) get longer. */
+export const UPLOAD_TIMEOUT_MS = 60_000
+
+/**
  * The API client. Same origin as the page (/api/v1, forwarded by Vite or
  * nginx), so no CORS and no base URL to configure.
  */
-export const api = axios.create({ baseURL: '/api/v1' })
+export const api = axios.create({ baseURL: '/api/v1', timeout: REQUEST_TIMEOUT_MS })
 
 // /auth/* manages tokens itself: never refresh around those calls.
 const isAuthCall = (config: InternalAxiosRequestConfig) => (config.url ?? '').startsWith('/auth/')
