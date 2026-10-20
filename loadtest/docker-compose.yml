@@ -7,6 +7,8 @@
 #
 # LOAD_API_REPLICAS=N runs N API containers behind nginx (round robin), to
 # measure horizontal scaling: one Node.js process uses one core for JavaScript.
+# LOAD_API_WORKERS=N runs N API processes in each container instead (API_WORKERS,
+# bug review follow-up): the same scaling without more containers.
 #
 # Every service name starts with "load-": the stacks share the dev network,
 # where Docker's DNS answers a service name with EVERY container of that name
@@ -73,6 +75,7 @@ services:
     environment:
       <<: *load-env
       PORT: 3000
+      API_WORKERS: ${LOAD_API_WORKERS:-1}
     deploy:
       replicas: ${LOAD_API_REPLICAS:-1}
     depends_on:

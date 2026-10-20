@@ -1,3 +1,7 @@
+/**
+ * One API process: the HTTP server, the WebSocket endpoint, graceful shutdown.
+ * Started by server.js, alone or as one of several workers (api-cluster.js).
+ */
 const http = require('node:http');
 const env = require('./config/env');
 const logger = require('./utils/logger');
@@ -21,7 +25,7 @@ const realtimeHub = new RealtimeHub();
 realtimeHub.attach(server).catch((err) => logger.error({ err }, 'Failed to start the WebSocket endpoint'));
 
 server.listen(env.PORT, () => {
-  logger.info({ port: env.PORT, env: env.NODE_ENV }, 'API server listening');
+  logger.info({ port: env.PORT, env: env.NODE_ENV, pid: process.pid, pgPoolMax: env.PG_POOL_MAX }, 'API server listening');
 });
 
 // Connect now so the first requests do not pay for it. If Redis is down the

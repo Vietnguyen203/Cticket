@@ -9,6 +9,8 @@ import { API_URL, FRONTEND_DIR, WEB_PORT, WEB_URL } from './stack.mjs'
 export default defineConfig({
   testDir: './tests',
   timeout: 60_000,
+  // Bug review follow-up: a whole run never hangs (it once did, past every test's own timeout): it stops and names what was running.
+  globalTimeout: process.env.CI ? 20 * 60_000 : 10 * 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
@@ -24,8 +26,10 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'] }, testIgnore: /\.mobile\.spec\.ts$/ },
-    { name: 'mobile', use: { ...devices['Pixel 7'] }, testMatch: /\.mobile\.spec\.ts$/ },
+    // Opens the app once so the dev server has compiled it before the first spec (tests/warmup.setup.ts).
+    { name: 'warmup', testMatch: /warmup\.setup\.ts$/, use: { ...devices['Desktop Chrome'] } },
+    { name: 'desktop', use: { ...devices['Desktop Chrome'] }, testIgnore: /\.mobile\.spec\.ts$|warmup\.setup\.ts$/, dependencies: ['warmup'] },
+    { name: 'mobile', use: { ...devices['Pixel 7'] }, testMatch: /\.mobile\.spec\.ts$/, dependencies: ['warmup'] },
     // README images (npm run screenshots); never part of npm test / CI.
     { name: 'screenshots', testDir: './screenshots', use: { ...devices['Desktop Chrome'] } },
   ],

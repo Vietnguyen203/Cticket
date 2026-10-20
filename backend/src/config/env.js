@@ -25,6 +25,9 @@ const envSchema = z.object({
 
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
   PG_POOL_MAX: z.coerce.number().int().min(1).max(100).default(20),
+  // API processes in one container (Node.js uses one CPU core per process): a number, or 'auto' = the
+  // CPU cores. PG_POOL_MAX is then shared between them (api-cluster.js). Bug review follow-up.
+  API_WORKERS: z.union([z.literal('auto'), z.coerce.number().int().min(1).max(32)]).default(1),
   PG_IDLE_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
   PG_CONNECTION_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
   PG_STATEMENT_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
