@@ -4,7 +4,7 @@ import type { TwoFactorSetup } from '../../api/types'
 import { confirmTwoFactorSetup, disableTwoFactor, getTwoFactorStatus, regenerateRecoveryCodes, startTwoFactorSetup } from '../../api/twoFactor'
 import { setAccessToken } from '../../auth/session'
 import { CodeField, RecoveryCodesPanel, SetupInstructions } from '../../auth/TwoFactorParts'
-import { Alert, Button, Card, TextField } from '../../components/ui'
+import { Alert, Button, Card, PasswordField } from '../../components/ui'
 import { formatDateTime } from '../../utils/format'
 import { useAsync } from '../../utils/useAsync'
 
@@ -103,7 +103,7 @@ export function TwoFactorSection({ email }: { email: string }) {
 
       {mode.kind === 'password' && (
         <form onSubmit={submit(async () => open({ kind: 'scan', setup: await startTwoFactorSetup(password) }))} className="space-y-3">
-          <TextField label="Mật khẩu hiện tại" type="password" autoComplete="current-password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} />
+          <PasswordField label="Mật khẩu hiện tại" autoComplete="current-password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} />
           <div className="flex gap-2">
             <Button type="submit" loading={busy} disabled={!password}>
               Tiếp tục
@@ -171,7 +171,7 @@ export function TwoFactorSection({ email }: { email: string }) {
           })}
           className="space-y-3"
         >
-          <TextField label="Mật khẩu hiện tại" type="password" autoComplete="current-password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} />
+          <PasswordField label="Mật khẩu hiện tại" autoComplete="current-password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} />
           <CodeField value={code} onChange={setCode} disabled={busy} />
           <div className="flex gap-2">
             <Button type="submit" variant="danger" loading={busy} disabled={!password || code.length !== 6}>

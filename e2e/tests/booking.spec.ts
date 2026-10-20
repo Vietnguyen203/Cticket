@@ -46,7 +46,7 @@ test('buy 2 seats + 1 standing: hold, wrong then right code, declined card, paid
   await expect(tickets).toHaveCount(3)
   await tickets.first().click()
   await expect(page.getByRole('img', { name: /Mã QR của vé TKT-/ })).toBeVisible()
-  await page.getByRole('link', { name: '← Vé của tôi' }).click()
+  await page.getByRole('main').getByRole('link', { name: 'Vé của tôi' }).click()
   await expect(page.getByText(world.title)).toHaveCount(3)
 })
 

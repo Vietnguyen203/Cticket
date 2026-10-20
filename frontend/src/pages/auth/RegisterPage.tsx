@@ -6,7 +6,7 @@ import { useAuth } from '../../auth/AuthContext'
 import { authState, type AuthPageState } from '../../auth/navigation'
 import { rememberPendingLogin } from '../../auth/pendingLogin'
 import { safeNext } from '../../auth/safeNext'
-import { Alert, Button, FormPage, TextField } from '../../components/ui'
+import { Alert, Button, FormPage, PasswordField, TextField } from '../../components/ui'
 
 // Same rules as the API (backend auth.schemas): checked here first, for quick feedback.
 const PASSWORD_MIN = 8
@@ -91,10 +91,9 @@ export function RegisterPage() {
           onChange={set('phone')}
           error={fieldErrors.phone}
         />
-        <TextField
+        <PasswordField
           label="Mật khẩu"
           name="password"
-          type="password"
           autoComplete="new-password"
           required
           value={form.password}
@@ -102,10 +101,9 @@ export function RegisterPage() {
           error={fieldErrors.password}
           hint="Ít nhất 8 ký tự, có cả chữ và số."
         />
-        <TextField
+        <PasswordField
           label="Nhập lại mật khẩu"
           name="confirm"
-          type="password"
           autoComplete="new-password"
           required
           value={form.confirm}

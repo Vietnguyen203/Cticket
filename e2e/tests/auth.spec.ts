@@ -18,7 +18,7 @@ test('register → email code (Mailpit) → signed in; log out; log in again', a
 
   // Signed in straight away: the name is in the header.
   await expect(page.getByRole('link', { name: 'Lan' })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Vé của tôi' })).toBeVisible()
+  await expect(page.getByRole('banner').getByRole('link', { name: 'Vé của tôi' })).toBeVisible()
 
   // The refresh token is an httpOnly cookie: page scripts cannot read it, and nothing is in localStorage.
   expect(await page.evaluate(() => document.cookie)).not.toContain('etp_refresh')
