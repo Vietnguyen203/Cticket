@@ -17,6 +17,8 @@ export const searchTerms = load('terms', (d) => d.searchTerms)
 export const hotSeatIds = load('hot seats', (d) => d.big.hotSeatIds)
 export const seatIds = load('seats', (d) => d.big.seatIds)
 export const big = load('big', (d) => [{ eventId: d.big.eventId, slug: d.big.slug, scheduleId: d.big.scheduleId, gaTicketTypeId: d.big.gaTicketTypeId }])[0]
+// Phase 22: the event with the purchase queue on (undefined with data seeded before Phase 22)
+export const queueEvent = load('queue', (d) => (d.queue ? [d.queue] : []))[0]
 
 /** 409 (seat taken, cart exists) and 422 are answers, not failures: they do not count in http_req_failed. */
 http.setResponseCallback(http.expectedStatuses({ min: 200, max: 299 }, 409, 422))

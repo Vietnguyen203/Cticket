@@ -3,9 +3,22 @@
 // fight goes on. Afterwards `node loadtest/verify.mjs` checks that no seat was
 // ever held or sold twice and that the inventory adds up.
 //   k6 run loadtest/k6/contention.js
+//   k6 run -e VUS=1000 -e SHAPE=spike -e DURATION=1m loadtest/k6/contention.js   (Phase 22: see profile.js)
 import { check, sleep } from 'k6'
 import { Counter } from 'k6/metrics'
 import { big, errorCode, hotSeatIds, pick, post, refusals, tokens } from './common.js'
+import { assertAccounts, loadProfile } from './profile.js'
+
+const profile = loadProfile(__ENV, {
+  vus: 500,
+  ramp: '5s',
+  duration: '1m',
+  stages: [
+    { duration: '5s', target: 500 },
+    { duration: '1m', target: 500 },
+  ],
+})
+assertAccounts(profile.vus, tokens.length) // one customer (one cart) per VU
 
 const won = new Counter('holds_won')
 
@@ -16,10 +29,7 @@ export const options = {
     contention: {
       executor: 'ramping-vus',
       startVUs: 0,
-      stages: [
-        { duration: '5s', target: 500 },
-        { duration: '1m', target: 500 },
-      ],
+      stages: profile.stages,
       exec: 'run',
     },
   },

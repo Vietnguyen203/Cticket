@@ -1,0 +1,5 @@
+{
+  "//": "Phase 22: lets node --test import the k6 helpers as ES modules (k6 itself ignores this file).",
+  "type": "module",
+  "private": true
+}
