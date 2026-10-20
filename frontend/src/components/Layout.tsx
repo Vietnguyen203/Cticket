@@ -28,6 +28,14 @@ export function Layout() {
   // The phone menu is open for the page it was opened on: moving to another page closes it.
   const [menuOpenOn, setMenuOpenOn] = useState<string | null>(null)
   const menuOpen = menuOpenOn === pathname
+  // A hairline shadow under the bar once the page scrolls (it floats above the content).
+  const [scrolled, setScrolled] = useState(false)
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 4)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
   const closeMenu = () => setMenuOpenOn(null)
   const signedIn = status === 'authenticated'
   const links: Array<[string, string]> = [
@@ -58,7 +66,7 @@ export function Layout() {
       <a href="#noi-dung" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-50 focus:rounded-control focus:bg-white focus:px-4 focus:py-2 focus:shadow-raised">
         Bỏ qua menu
       </a>
-      <header className="sticky top-0 z-30 border-b border-line bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85">
+      <header className={`sticky top-0 z-30 border-b bg-white/95 backdrop-blur transition-shadow duration-200 supports-[backdrop-filter]:bg-white/85 ${scrolled ? 'border-transparent shadow-raised' : 'border-line'}`}>
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
           <Link to="/" className="mr-3 rounded-control" aria-label="ETP Tickets, trang chủ">
             <Logo compact />
@@ -116,11 +124,11 @@ export function Layout() {
         </div>
         {menuOpen && (
           <>
-            <button type="button" aria-label="Đóng menu" onClick={closeMenu} className="fixed inset-0 top-16 z-10 cursor-default bg-ink/30 lg:hidden" />
+            <button type="button" aria-label="Đóng menu" onClick={closeMenu} className="fixed inset-0 top-16 z-10 animate-fade-in cursor-default bg-ink/30 lg:hidden" />
             <nav
               id="menu-dien-thoai"
               aria-label="Chính"
-              className="absolute inset-x-0 top-16 z-20 border-b border-line bg-white px-4 pb-4 pt-2 shadow-raised lg:hidden"
+              className="absolute inset-x-0 top-16 z-20 animate-slide-down border-b border-line bg-white px-4 pb-4 pt-2 shadow-raised lg:hidden"
             >
               {links.map(([to, label]) => (
                 <NavLink key={to} to={to} onClick={closeMenu} className={(state) => `block ${navClass(state)} !py-3 !text-base`}>
@@ -161,7 +169,10 @@ export function Layout() {
             </Button>
           </div>
         ) : (
-          <Outlet />
+          // A new page eases in (keyed by path: the same page with other filters does not flash).
+          <div key={pathname} className="animate-page-in">
+            <Outlet />
+          </div>
         )}
       </main>
 
@@ -193,9 +204,6 @@ export function Layout() {
           </nav>
         </div>
         <div className="border-t border-white/10">
-          <p className="mx-auto max-w-6xl px-4 py-4 text-xs text-slate-500 sm:px-6">
-            Event Ticket Platform — dự án học tập, thanh toán qua VNPay sandbox.
-          </p>
         </div>
       </footer>
     </div>

@@ -15,7 +15,7 @@ type Variant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'dark'
 type Size = 'sm' | 'md' | 'lg'
 
 const VARIANTS: Record<Variant, string> = {
-  primary: 'bg-brand-700 text-white shadow-card hover:bg-brand-800 active:bg-brand-900 disabled:bg-brand-700/45 disabled:shadow-none',
+  primary: 'bg-brand-700 text-white shadow-card hover:-translate-y-px hover:bg-brand-800 hover:shadow-raised active:translate-y-0 active:bg-brand-900 disabled:bg-brand-700/45 disabled:shadow-none',
   secondary: 'border border-line bg-white text-ink shadow-card hover:border-slate-300 hover:bg-slate-50 disabled:text-slate-400',
   danger: 'bg-red-600 text-white shadow-card hover:bg-red-700 disabled:bg-red-600/45',
   ghost: 'text-brand-700 hover:bg-brand-50 disabled:text-slate-400',
@@ -42,7 +42,7 @@ export function Button({ variant = 'primary', size = 'md', loading = false, disa
       {...rest}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
-      className={`inline-flex items-center justify-center gap-2 rounded-control text-center font-semibold leading-snug transition duration-150 ease-standard disabled:cursor-not-allowed ${SIZES[size]} ${VARIANTS[variant]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-control text-center font-semibold leading-snug transition duration-150 ease-standard active:scale-[0.98] disabled:cursor-not-allowed disabled:active:scale-100 ${SIZES[size]} ${VARIANTS[variant]} ${className}`}
     >
       {loading && <Spinner small />}
       {children}
@@ -179,7 +179,7 @@ const ALERT_TONES = {
 
 export function Alert({ tone = 'error', children }: { tone?: keyof typeof ALERT_TONES; children: ReactNode }) {
   return (
-    <div role={tone === 'error' ? 'alert' : 'status'} className={`flex gap-3 rounded-card border px-4 py-3 text-sm leading-relaxed ${ALERT_TONES[tone].box}`}>
+    <div role={tone === 'error' ? 'alert' : 'status'} className={`flex animate-fade-in gap-3 rounded-card border px-4 py-3 text-sm leading-relaxed ${ALERT_TONES[tone].box}`}>
       <span className="mt-px shrink-0">{ALERT_TONES[tone].icon}</span>
       <div className="min-w-0 flex-1">{children}</div>
     </div>
@@ -204,7 +204,7 @@ export function Badge({ tone = 'neutral', children, className = '' }: { tone?: B
 /** Nothing to show: a calm panel with what to do next. */
 export function EmptyState({ icon, title, children, action }: { icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center rounded-panel border border-dashed border-line bg-white px-6 py-12 text-center">
+    <div className="flex animate-fade-up flex-col items-center rounded-panel border border-dashed border-line bg-white px-6 py-12 text-center">
       {icon && <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-brand-700">{icon}</div>}
       <p className="font-semibold text-ink">{title}</p>
       {children && <div className="mt-1 max-w-md text-sm text-slate-600">{children}</div>}
@@ -229,7 +229,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
 
 /** A grey block while something loads (keeps the layout from jumping). */
 export function Skeleton({ className = '' }: { className?: string }) {
-  return <div aria-hidden="true" className={`animate-pulse rounded-control bg-slate-200/70 ${className}`} />
+  return <div aria-hidden="true" className={`skeleton animate-shimmer rounded-control ${className}`} />
 }
 
 // ---------------------------------------------------------------------------
@@ -274,7 +274,7 @@ export function FullPageSpinner() {
 export function FormPage({ title, subtitle, children }: { title: string; subtitle?: ReactNode; children: ReactNode }) {
   return (
     <div className="mx-auto w-full max-w-md px-4 py-10 sm:py-16">
-      <div className="rounded-panel border border-line bg-white p-6 shadow-card sm:p-8">
+      <div className="animate-fade-up rounded-panel border border-line bg-white p-6 shadow-card sm:p-8">
         <h1 className="text-2xl font-bold text-ink">{title}</h1>
         {subtitle && <p className="mt-1.5 text-sm text-slate-600">{subtitle}</p>}
         <div className="mt-7">{children}</div>

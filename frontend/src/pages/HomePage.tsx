@@ -5,6 +5,8 @@ import type { EventSummary } from '../api/types'
 import { useAuth } from '../auth/AuthContext'
 import { CategoryChips } from '../components/CategoryChips'
 import { EventCard, EventGridSkeleton } from '../components/EventCard'
+import { Reveal } from '../components/Reveal'
+import { stagger } from '../utils/motion'
 import { EventImage } from '../components/EventImage'
 import { ArrowRightIcon, CalendarIcon, MapPinIcon, QrIcon, ShieldIcon, TicketIcon } from '../components/icons'
 import { SearchBar } from '../components/SearchBar'
@@ -31,17 +33,22 @@ export function HomePage() {
 
   return (
     <>
-      <section className="bg-ink text-white">
-        <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-12 sm:px-6 lg:grid-cols-[1.1fr_1fr] lg:py-16">
+      <section className="relative overflow-hidden bg-ink text-white">
+        {/* A slow, faint glow behind the hero (decorative, still with reduced motion). */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+          <div className="absolute -left-32 -top-40 h-[28rem] w-[28rem] animate-glow rounded-full bg-brand-500/25 blur-3xl" />
+          <div className="absolute -bottom-48 right-0 h-[26rem] w-[26rem] animate-glow rounded-full bg-brand-300/10 blur-3xl [animation-delay:-9s]" />
+        </div>
+        <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-4 py-12 sm:px-6 lg:grid-cols-[1.1fr_1fr] lg:py-16">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-wider text-brand-300">
+            <p className="animate-fade-up text-sm font-semibold uppercase tracking-wider text-brand-300">
               {status === 'authenticated' && user ? `Chào ${user.firstName}` : 'Vé sự kiện trực tuyến'}
             </p>
-            <h1 className="mt-3 text-3xl font-bold leading-tight sm:text-5xl">Hôm nay bạn muốn xem gì?</h1>
-            <p className="mt-4 max-w-lg text-base leading-relaxed text-slate-300 sm:text-lg">
+            <h1 className="mt-3 animate-fade-up text-3xl font-bold leading-tight [animation-delay:80ms] sm:text-5xl">Hôm nay bạn muốn xem gì?</h1>
+            <p className="mt-4 max-w-lg animate-fade-up text-base leading-relaxed text-slate-300 [animation-delay:160ms] sm:text-lg">
               Chọn ghế trên sơ đồ cập nhật trực tiếp, thanh toán an toàn và nhận vé có mã QR ngay trong email.
             </p>
-            <div className="mt-8 max-w-xl text-ink">
+            <div className="mt-8 max-w-xl animate-fade-up text-ink [animation-delay:240ms]">
               <SearchBar value={q} onChange={setQ} onSubmit={search} size="lg" />
             </div>
           </div>
@@ -49,7 +56,9 @@ export function HomePage() {
             {upcoming.error ? null : !upcoming.data ? (
               <Skeleton className="aspect-[4/3] w-full !rounded-panel !bg-white/10" />
             ) : featured ? (
-              <FeaturedEvent event={featured} />
+              <div className="animate-scale-in [animation-delay:200ms]">
+                <FeaturedEvent event={featured} />
+              </div>
             ) : null}
           </div>
         </div>
@@ -84,8 +93,10 @@ export function HomePage() {
             </EmptyState>
           ) : (
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {events.map((event) => (
-                <EventCard key={event.id} event={event} />
+              {events.map((event, index) => (
+                <Reveal key={event.id} delay={stagger(index % 3, 90)} className="h-full [&>a]:h-full">
+                  <EventCard event={event} />
+                </Reveal>
               ))}
             </div>
           )}
@@ -96,14 +107,14 @@ export function HomePage() {
             { icon: <TicketIcon />, title: 'Chọn chỗ trực tiếp', text: 'Sơ đồ ghế cập nhật ngay khi có người giữ, không bao giờ bán trùng ghế.' },
             { icon: <ShieldIcon />, title: 'Thanh toán an toàn', text: 'Thanh toán qua VNPay; đơn chỉ thành công khi cổng thanh toán xác nhận.' },
             { icon: <QrIcon />, title: 'Vé QR tức thì', text: 'Vé có mã QR trong email và trong tài khoản, tải được bản PDF để in.' },
-          ].map((item) => (
-            <div key={item.title} className="flex gap-4 rounded-card border border-line bg-white p-5">
+          ].map((item, index) => (
+            <Reveal key={item.title} delay={stagger(index, 90)} className="flex gap-4 rounded-card border border-line bg-white p-5">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-brand-50 text-brand-700">{item.icon}</span>
               <div>
                 <p className="font-semibold text-ink">{item.title}</p>
                 <p className="mt-1 text-sm leading-relaxed text-slate-600">{item.text}</p>
               </div>
-            </div>
+            </Reveal>
           ))}
         </section>
       </div>
@@ -117,7 +128,7 @@ function FeaturedEvent({ event }: { event: EventSummary }) {
   return (
     <Link to={`/events/${event.slug}`} className="group block overflow-hidden rounded-panel bg-ink-soft ring-1 ring-white/10">
       <div className="aspect-video overflow-hidden">
-        <EventImage src={event.thumbnailUrl} title={event.title} className="transition duration-300 group-hover:opacity-90" />
+        <EventImage src={event.thumbnailUrl} title={event.title} className="transition duration-700 ease-out-soft group-hover:scale-[1.03]" />
       </div>
       <div className="space-y-2 p-5">
         <p className="text-xs font-semibold uppercase tracking-wider text-brand-300">Nổi bật</p>

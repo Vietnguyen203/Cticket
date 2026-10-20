@@ -9,7 +9,7 @@ export function CategoryChips({ categories, activeId, allHref = '/events', hrefO
   hrefOf: (category: Category) => string
 }) {
   const chip = (active: boolean) =>
-    `shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition duration-150 ${
+    `shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition duration-150 active:scale-95 ${
       active ? 'border-ink bg-ink text-white' : 'border-line bg-white text-slate-700 hover:border-slate-300 hover:text-ink'
     }`
   return (

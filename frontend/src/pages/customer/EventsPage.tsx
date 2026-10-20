@@ -4,6 +4,8 @@ import { listCategories, listEvents } from '../../api/events'
 import { Pagination } from '../../admin/components'
 import { CategoryChips } from '../../components/CategoryChips'
 import { EventCard, EventGridSkeleton } from '../../components/EventCard'
+import { Reveal } from '../../components/Reveal'
+import { stagger } from '../../utils/motion'
 import { CloseIcon, MapPinIcon, SearchIcon } from '../../components/icons'
 import { Button, EmptyState, ErrorState, PageHeader } from '../../components/ui'
 import { useAsync } from '../../utils/useAsync'
@@ -129,8 +131,10 @@ export function EventsPage() {
         </EmptyState>
       ) : (
         <div className={`grid gap-5 transition-opacity sm:grid-cols-2 lg:grid-cols-3 ${events.loading ? 'opacity-60' : ''}`}>
-          {events.data.events.map((event) => (
-            <EventCard key={event.id} event={event} />
+          {events.data.events.map((event, index) => (
+            <Reveal key={event.id} delay={stagger(index % 3, 90)} className="h-full [&>a]:h-full">
+              <EventCard event={event} />
+            </Reveal>
           ))}
         </div>
       )}

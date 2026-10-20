@@ -163,7 +163,7 @@ export function OrderPage() {
           <aside className="space-y-4 lg:sticky lg:top-24 lg:col-start-2 lg:row-start-1 lg:self-start">
             {payable && secondsLeft !== null && (
               <div
-                className={`flex items-center justify-between gap-3 rounded-card border px-4 py-3 ${
+                className={`flex items-center justify-between gap-3 rounded-card border px-4 py-3 transition-colors duration-300 ${
                   secondsLeft < 120 ? 'border-red-200 bg-red-50 text-red-800' : 'border-amber-200 bg-amber-50 text-amber-950'
                 }`}
                 role="timer"
@@ -172,7 +172,8 @@ export function OrderPage() {
                   <ClockIcon size={18} />
                   {o.status === 'HELD' ? 'Ghế được giữ cho bạn trong' : 'Thời gian còn lại để thanh toán'}
                 </span>
-                <strong className="font-mono text-xl tabular-nums">{mmss(secondsLeft)}</strong>
+                {/* The last minute blinks softly: time is nearly up. */}
+                <strong className={`font-mono text-xl tabular-nums ${secondsLeft < 60 ? 'animate-urgent' : ''}`}>{mmss(secondsLeft)}</strong>
               </div>
             )}
 
@@ -361,7 +362,7 @@ export function OrderPage() {
                 <Link
                   key={ticket.id}
                   to={`/tickets/${ticket.id}`}
-                  className="flex items-center justify-between gap-3 rounded-control border border-line px-4 py-3 text-sm transition hover:border-brand-600 hover:bg-brand-50/40"
+                  className="group flex items-center justify-between gap-3 rounded-control border border-line px-4 py-3 text-sm transition hover:border-brand-600 hover:bg-brand-50/40"
                 >
                   <span className="flex min-w-0 items-center gap-3">
                     <TicketIcon size={20} className="shrink-0 text-brand-700" />
@@ -371,7 +372,7 @@ export function OrderPage() {
                     </span>
                   </span>
                   <span className="flex shrink-0 items-center gap-1 font-semibold text-brand-700">
-                    Xem QR <ChevronRightIcon size={16} />
+                    Xem QR <ChevronRightIcon size={16} className="transition-transform group-hover:translate-x-0.5" />
                   </span>
                 </Link>
               ))}

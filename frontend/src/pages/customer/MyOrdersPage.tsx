@@ -46,7 +46,7 @@ export function MyOrdersPage() {
             <Link
               key={order.id}
               to={`/orders/${order.id}`}
-              className="group flex items-center gap-4 rounded-card border border-line bg-white p-4 shadow-card transition hover:border-slate-300 hover:shadow-raised"
+              className="group flex animate-fade-up items-center gap-4 rounded-card border border-line bg-white p-4 shadow-card transition hover:-translate-y-px hover:border-slate-300 hover:shadow-raised"
             >
               <DateBlock iso={order.schedule.startAt} muted={!LIVE.includes(order.status)} />
               <div className="min-w-0 flex-1">
@@ -64,7 +64,7 @@ export function MyOrdersPage() {
               </div>
               <div className="hidden shrink-0 flex-col items-end gap-2 sm:flex">
                 <OrderStatusBadge status={order.status} />
-                <ChevronRightIcon size={18} className="text-slate-400" />
+                <ChevronRightIcon size={18} className="text-slate-400 transition-transform group-hover:translate-x-0.5" />
               </div>
             </Link>
           ))}

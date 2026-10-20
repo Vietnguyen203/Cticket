@@ -45,7 +45,10 @@ export function WaitingRoom({
         )}
 
         <div className="h-2 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
-          <div className="h-full rounded-full bg-brand-600 transition-all duration-700" style={{ width: `${Math.max(progress, 4)}%` }} />
+          <div className="relative h-full overflow-hidden rounded-full bg-brand-600 transition-all duration-700" style={{ width: `${Math.max(progress, 4)}%` }}>
+            {/* A light sweep: the line is moving even when the place has not changed yet. */}
+            <span className="absolute inset-0 animate-shimmer bg-[linear-gradient(90deg,transparent_25%,rgb(255_255_255/0.35)_50%,transparent_75%)] bg-[length:200%_100%]" />
+          </div>
         </div>
 
         <ul className="space-y-1 text-left text-sm text-slate-600">
