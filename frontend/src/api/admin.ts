@@ -129,7 +129,7 @@ export async function updateVenue(id: string, input: Partial<VenueInput>): Promi
   return (await api.patch(`/venues/${id}`, input)).data.data.venue
 }
 
-export async function getVenueLayout(id: string): Promise<{ venue: { id: string; name: string }; zones: LayoutZone[] }> {
+export async function getVenueLayout(id: string): Promise<{ venue: { id: string; name: string; status: VenueStatus; capacity?: number | null }; zones: LayoutZone[] }> {
   return (await api.get(`/venues/${id}/layout`)).data.data
 }
 

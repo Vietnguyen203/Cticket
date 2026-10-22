@@ -50,9 +50,25 @@ function assertCanBuild(venue, viewer) {
   }
 }
 
+/**
+ * A venue's zones never hold more places (seats + standing capacity) than the
+ * venue itself ("Sức chứa"; not checked when not set). `adding`: the places
+ * the change brings on top of what stays.
+ */
+async function assertFitsVenue(db, venue, adding, keep = {}) {
+  if (!venue?.capacity || adding <= 0) return;
+  const used = await layoutRepository.countPlaces(db, venue.id, keep);
+  if (used + adding > venue.capacity) {
+    throw new AppError('VENUE_CAPACITY_EXCEEDED', undefined, {
+      details: [{ field: 'body', message: `${used + adding} places for a venue of ${venue.capacity}`, capacity: venue.capacity, used, adding }],
+    });
+  }
+}
+
 async function createZone(venueId, body, viewer) {
   const venue = await venuesRepository.findById(pool, venueId);
   assertCanBuild(venue, viewer);
+  if (body.kind === ZONE_KIND.STANDING) await assertFitsVenue(pool, venue, body.capacity ?? 0);
   // A duplicate code is rejected by UNIQUE(venue_id, code) → 409 ZONE_CODE_TAKEN.
   return toPublicZone(await layoutRepository.insertZone(pool, { venueId, ...body }));
 }
@@ -66,6 +82,9 @@ async function updateZone(zoneId, changes) {
     throw new AppError('VALIDATION_ERROR', undefined, {
       details: [{ field: 'body.capacity', message: 'a STANDING zone needs a capacity' }],
     });
+  }
+  if (zone.kind === ZONE_KIND.STANDING && changes.capacity) {
+    await assertFitsVenue(pool, await venuesRepository.findById(pool, zone.venue_id), changes.capacity, { excludeZoneId: zoneId });
   }
   return toPublicZone(await layoutRepository.updateZone(pool, zoneId, changes));
 }
@@ -101,11 +120,13 @@ async function createSeats(zoneId, { rows, layout }, viewer) {
     if (!zone) {
       throw new AppError('NOT_FOUND', 'Zone not found.');
     }
-    assertCanBuild(await venuesRepository.findById(client, zone.venue_id), viewer);
+    const venue = await venuesRepository.findById(client, zone.venue_id);
+    assertCanBuild(venue, viewer);
     if (zone.kind !== ZONE_KIND.SEATED) {
       throw new AppError('ZONE_NOT_SEATED');
     }
     const seats = buildSeats(rows, layout);
+    await assertFitsVenue(client, venue, seats.length);
     const created = await layoutRepository.insertSeats(client, zoneId, seats);
     return { zoneId, created };
   });
@@ -134,7 +155,8 @@ async function deleteSeat(seatId) {
 /** Physical layout: zones with their seats and coordinates (for drawing a seat map). */
 async function getLayout(venueId, viewer) {
   // An ACTIVE venue's layout comes from the cache (1 hour, refreshed on change).
-  const cached = await remember(NAMESPACE.VENUES, `layout:${venueId}`, TTL.VENUE_LAYOUT, () => loadLayout(venueId, null));
+  // "v2": the layout now carries the venue status and capacity; older cached copies (without them) are not read.
+  const cached = await remember(NAMESPACE.VENUES, `layout:v2:${venueId}`, TTL.VENUE_LAYOUT, () => loadLayout(venueId, null));
   if (cached) return cached;
 
   const layout = await loadLayout(venueId, viewer);
@@ -156,7 +178,8 @@ async function loadLayout(venueId, viewer) {
     layoutRepository.listSeats(pool, venueId),
   ]);
   return {
-    venue: { id: venue.id, name: venue.name },
+    // status: an organizer may still add zones / seats to their own PENDING proposal (assertCanBuild).
+    venue: { id: venue.id, name: venue.name, status: venue.status, capacity: venue.capacity == null ? null : Number(venue.capacity) },
     zones: zones.map((zone) => ({
       ...toPublicZone(zone),
       seats: seats.filter((seat) => seat.venue_zone_id === zone.id).map(toPublicSeat),

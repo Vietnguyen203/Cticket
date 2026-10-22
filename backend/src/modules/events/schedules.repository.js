@@ -1,7 +1,7 @@
 const { buildSetClause } = require('../../utils/sql');
 
 const SCHEDULE_COLUMNS = `es.id, es.event_id, es.venue_id, es.start_at, es.end_at, es.sales_start_at, es.sales_end_at,
-  es.status, es.inventory_generated_at, es.created_at, es.updated_at`;
+  es.status, es.capacity, es.inventory_generated_at, es.created_at, es.updated_at`;
 
 // Venue summary for display (read model join).
 const WITH_VENUE = `${SCHEDULE_COLUMNS}, v.name AS venue_name, v.city AS venue_city, v.address_line AS venue_address`;
@@ -12,6 +12,7 @@ const UPDATABLE = {
   endAt: 'end_at',
   salesStartAt: 'sales_start_at',
   salesEndAt: 'sales_end_at',
+  capacity: 'capacity', // total attendance planned
   status: 'status',
 };
 
@@ -44,12 +45,12 @@ async function findWithVenue(db, id) {
 }
 
 /** An overlapping schedule at the same venue fails the exclusion constraint → 409 SCHEDULE_CONFLICT. */
-async function insert(db, { eventId, venueId, startAt, endAt, salesStartAt, salesEndAt }) {
+async function insert(db, { eventId, venueId, startAt, endAt, salesStartAt, salesEndAt, capacity = null }) {
   const { rows } = await db.query(
-    `INSERT INTO event_schedules (event_id, venue_id, start_at, end_at, sales_start_at, sales_end_at)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO event_schedules (event_id, venue_id, start_at, end_at, sales_start_at, sales_end_at, capacity)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING id`,
-    [eventId, venueId, startAt, endAt, salesStartAt, salesEndAt],
+    [eventId, venueId, startAt, endAt, salesStartAt, salesEndAt, capacity],
   );
   return rows[0].id;
 }
@@ -84,7 +85,28 @@ async function countUpcoming(db, eventId) {
   return rows[0].count;
 }
 
+/** How many active (not cancelled) shows the event has. */
+async function countActive(db, eventId) {
+  const { rows } = await db.query(`SELECT count(*)::int AS n FROM event_schedules WHERE event_id = $1 AND status <> 'CANCELLED'`, [eventId]);
+  return rows[0].n;
+}
+
+/** An active schedule at the venue overlapping [startAt, endAt) (the rule of the exclusion constraint). */
+async function findOverlap(db, { venueId, startAt, endAt, excludeScheduleId = null }) {
+  const { rows } = await db.query(
+    `SELECT id, event_id, start_at, end_at FROM event_schedules
+     WHERE venue_id = $1 AND status <> 'CANCELLED'
+       AND tstzrange(start_at, end_at, '[)') && tstzrange($2::timestamptz, $3::timestamptz, '[)')
+       AND ($4::uuid IS NULL OR id <> $4)
+     ORDER BY start_at LIMIT 1`,
+    [venueId, startAt, endAt, excludeScheduleId],
+  );
+  return rows[0] ?? null;
+}
+
 module.exports = {
+  countActive,
+  findOverlap,
   listByEvent,
   findById,
   findWithVenue,

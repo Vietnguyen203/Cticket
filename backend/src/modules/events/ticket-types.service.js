@@ -42,8 +42,9 @@ function assertDraft(event) {
 }
 
 /**
- * A GA ticket type may be shown on a STANDING zone of the schedule's venue.
- * All GA ticket types sold through that zone together must fit its capacity.
+ * A GA ticket type is sold through a STANDING zone of the schedule's venue
+ * (required for new ones; some older ones have none). All GA ticket types
+ * sold through that zone together must fit its capacity.
  */
 async function assertValidGaZone(client, schedule, { zoneId, capacity, excludeTicketTypeId }) {
   const zone = await venues.findZone(client, zoneId);
@@ -51,7 +52,7 @@ async function assertValidGaZone(client, schedule, { zoneId, capacity, excludeTi
     throw invalid('venueZoneId', 'must be a zone of the schedule venue');
   }
   if (zone.kind !== ZONE_KIND.STANDING) {
-    throw invalid('venueZoneId', 'general admission tickets need a STANDING zone (or no zone)');
+    throw invalid('venueZoneId', 'general admission tickets need a STANDING zone');
   }
   const alreadyAllocated = await ticketTypesRepository.sumGaCapacityForZone(client, {
     scheduleId: schedule.id,
@@ -71,12 +72,30 @@ async function listTicketTypes(actor, scheduleId) {
   return (await ticketTypesRepository.listBySchedule(pool, scheduleId)).map(toPublicTicketType);
 }
 
+/**
+ * The seated and standing tiers of a show fit in its total attendance
+ * ("Tổng số người tham dự", schedule.capacity; not checked when not set).
+ * `adding`: the places the change brings, on top of what stays.
+ */
+async function assertWithinCapacity(client, schedule, adding, keep = {}) {
+  if (!schedule.capacity) return;
+  const allocated = (await ticketTypesRepository.allocatedPlaces(client, schedule.id, keep)) + adding;
+  if (allocated > schedule.capacity) {
+    throw new AppError('CAPACITY_EXCEEDED', undefined, {
+      details: [{ field: 'body', message: `${allocated} places for a show of ${schedule.capacity}`, capacity: schedule.capacity, allocated }],
+    });
+  }
+}
+
 async function createTicketType(context, actor, scheduleId, body) {
   return withTransaction(async (client) => {
     const { event, schedule } = await lockScheduleOfManageableEvent(client, actor, scheduleId);
     assertDraft(event);
     if (body.inventoryMode === INVENTORY_MODE.GENERAL_ADMISSION && body.venueZoneId) {
       await assertValidGaZone(client, schedule, { zoneId: body.venueZoneId, capacity: body.capacity });
+    }
+    if (body.inventoryMode === INVENTORY_MODE.GENERAL_ADMISSION) {
+      await assertWithinCapacity(client, schedule, body.capacity);
     }
     // A duplicate code in the schedule fails UNIQUE(schedule_id, code) → 409.
     const row = await ticketTypesRepository.insert(client, {
@@ -116,6 +135,12 @@ async function updateTicketType(context, actor, ticketTypeId, changes) {
     }
     if (isGa && changes.capacity === null) {
       throw invalid('capacity', 'general admission needs a capacity');
+    }
+    if (isGa && changes.venueZoneId === null) {
+      throw invalid('venueZoneId', 'general admission needs a STANDING zone of the venue');
+    }
+    if (isGa && changes.capacity) {
+      await assertWithinCapacity(client, schedule, changes.capacity, { excludeTicketTypeId: ticketTypeId });
     }
     const zoneId = changes.venueZoneId !== undefined ? changes.venueZoneId : ticketType.venue_zone_id;
     if (isGa && zoneId && (changes.venueZoneId !== undefined || changes.capacity !== undefined)) {
@@ -210,6 +235,7 @@ async function replaceSeatPlan(context, actor, scheduleId, { assignments }) {
         rows.push({ seatId, ticketTypeId: assignment.ticketTypeId });
       }
     }
+    await assertWithinCapacity(client, schedule, rows.length, { withoutPlan: true });
     // PK (schedule_id, seat_id) is the database backstop against double assignment.
     await inventoryRepository.replacePlan(client, scheduleId, rows);
   });

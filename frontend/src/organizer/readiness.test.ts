@@ -45,4 +45,16 @@ describe('submitChecklist', () => {
     expect(problems[0]).toMatch(/chưa có hạng vé/)
     expect(problems[1]).toMatch(/"VIP" chưa được gán ghế/)
   })
+
+  test('places of the total not given to a tier: a warning (it can still be submitted)', () => {
+    const show = { ...schedule('2026-11-02T12:00:00Z'), capacity: 100 }
+    const result = submitChecklist([setup({ schedule: show, ticketTypes: [ticketType('GA', 'GENERAL_ADMISSION')] })], NOW)
+    expect(result.problems).toEqual([])
+    expect(result.warnings).toEqual([expect.stringMatching(/còn 50 \/ 100 người chưa xếp vào hạng nào\.$/)])
+  })
+
+  test('a seated ticket type at a venue without seats says so (assigning seats there is impossible)', () => {
+    const { problems } = submitChecklist([setup({ ticketTypes: [ticketType('VIP', 'RESERVED')], venueSeats: 0 })], NOW)
+    expect(problems).toEqual([expect.stringMatching(/hạng "VIP" là ghế ngồi nhưng địa điểm Nhà hát chưa có ghế nào\.$/)])
+  })
 })

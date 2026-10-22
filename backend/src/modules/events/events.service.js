@@ -32,6 +32,8 @@ const EDITABLE_WHEN_PUBLISHED = [
   'queueEnabled',
   'queueCapacity',
   'queueSessionMinutes',
+  // The performance programme: information for buyers, it may be completed until the show.
+  'lineup',
 ];
 const QUEUE_FIELDS = ['queueEnabled', 'queueCapacity', 'queueSessionMinutes'];
 
@@ -75,6 +77,8 @@ function toEventDetail(row, schedules) {
     ageRestriction: row.age_restriction,
     refundPolicy: row.refund_policy, // Phase 18.3
     queue: queueOf(row), // Phase 21
+    // The performance programme. jsonb reorders object keys: give them back in a fixed order.
+    lineup: (row.lineup ?? []).map(({ artist, time, note }) => ({ artist, time: time ?? null, note: note ?? null })),
     rating: ratingOf(row), // Phase 19
     status: row.status,
     publishedAt: row.published_at,

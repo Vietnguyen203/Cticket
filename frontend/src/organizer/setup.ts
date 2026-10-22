@@ -1,4 +1,5 @@
-import { getVenueLayout, listTicketTypes, type LayoutZone } from '../api/admin'
+import { getVenueLayout, listTicketTypes, type LayoutZone, type ScheduleTicketType } from '../api/admin'
+import { toApiError } from '../api/errors'
 import { getSeatPlanDetail, type SeatPlanAssignment, type SeatPlanDetail } from '../api/organizer'
 import type { EventDetail, Schedule } from '../api/types'
 import type { ScheduleSetup } from './readiness'
@@ -6,26 +7,83 @@ import type { ScheduleSetup } from './readiness'
 /** Everything the editor shows for one schedule. */
 export interface LoadedSchedule extends ScheduleSetup {
   plan: SeatPlanDetail
-  /** Zones of the venue (null if the venue is no longer active) */
+  /** Zones of the venue (null: the layout could not be loaded, see layoutError) */
   zones: LayoutZone[] | null
+  /** Why the layout could not be loaded: shown, never silently hiding the seat plan */
+  layoutError: string | null
+  /** The venue is still PENDING: the organizer who proposed it can add zones and seats */
+  venuePending: boolean
+  /** The venue's capacity: the ceiling of the show's total attendance (null: not set / unknown) */
+  venueCapacity: number | null
 }
 
+/** Seats in the seated zones of a layout. */
+export const seatedSeatCount = (zones: LayoutZone[]) =>
+  zones.filter((z) => z.kind === 'SEATED').reduce((sum, z) => sum + z.seats.length, 0)
+
+/**
+ * Can a schedule sell anything at this venue? A seated zone counts only once
+ * it has seats ("Sinh ghế"); a standing zone counts as soon as it exists.
+ */
+export const venueUsable = (zones: LayoutZone[]) => seatedSeatCount(zones) > 0 || zones.some((z) => z.kind === 'STANDING')
+
+/**
+ * What the venue of a schedule cannot sell yet, in words: seated tickets need
+ * generated seats, standing tickets need a standing zone. null: nothing
+ * missing. blocking: the event cannot be submitted as it is.
+ */
+export function venueGaps(
+  venueName: string,
+  zones: LayoutZone[],
+  ticketTypes: ScheduleTicketType[],
+): { blocking: boolean; message: string } | null {
+  const noSeats = seatedSeatCount(zones) === 0
+  const noStanding = !zones.some((z) => z.kind === 'STANDING')
+  const seated = ticketTypes.filter((tt) => tt.inventoryMode === 'RESERVED' && tt.status === 'ACTIVE').map((tt) => `"${tt.name}"`)
+  if (noSeats && noStanding) {
+    return { blocking: true, message: `Địa điểm ${venueName} chưa có ghế nào và chưa có khu đứng: suất này chưa bán được vé nào.` }
+  }
+  if (noSeats && seated.length > 0) {
+    return {
+      blocking: true,
+      message: `Địa điểm ${venueName} chưa có ghế nào, nên hạng ghế ngồi ${seated.join(', ')} không gán ghế được và sự kiện chưa gửi duyệt được.`,
+    }
+  }
+  if (noSeats) return { blocking: false, message: `Địa điểm ${venueName} chưa có ghế nào: suất này chỉ bán được vé đứng.` }
+  if (noStanding) {
+    return { blocking: false, message: `Địa điểm ${venueName} chưa có khu đứng: suất này chỉ bán được vé ghế ngồi (vé đứng phải gắn với một khu đứng).` }
+  }
+  return null
+}
+
+/** What in a layout matters to the schedule editor (seats to assign, standing zones to pick). */
+export const layoutSignature = (zones: LayoutZone[]) =>
+  `${seatedSeatCount(zones)}:${zones.filter((z) => z.kind === 'STANDING').map((z) => z.id).join()}`
+
 export async function loadSchedule(schedule: Schedule): Promise<LoadedSchedule> {
+  let layoutError: string | null = null
   const [ticketTypes, plan, layout] = await Promise.all([
     listTicketTypes(schedule.id),
     getSeatPlanDetail(schedule.id),
-    getVenueLayout(schedule.venue.id).catch(() => null),
+    getVenueLayout(schedule.venue.id).catch((err) => {
+      layoutError = toApiError(err).message
+      return null
+    }),
   ])
   const seatsByTicketType: Record<string, number> = {}
   for (const { ticketTypeId } of plan.assignments) seatsByTicketType[ticketTypeId] = (seatsByTicketType[ticketTypeId] ?? 0) + 1
-  const seatedSeats = layout?.zones.filter((z) => z.kind === 'SEATED').reduce((sum, z) => sum + z.seats.length, 0) ?? 0
+  const seatedSeats = layout ? seatedSeatCount(layout.zones) : null
   return {
     schedule,
     ticketTypes,
     plan,
     zones: layout?.zones ?? null,
+    layoutError,
+    venuePending: layout?.venue.status === 'PENDING',
+    venueCapacity: layout?.venue.capacity ?? null,
     seatsByTicketType,
-    unassignedSeats: Math.max(0, seatedSeats - plan.totalAssignedSeats),
+    venueSeats: seatedSeats,
+    unassignedSeats: Math.max(0, (seatedSeats ?? 0) - plan.totalAssignedSeats),
   }
 }
 

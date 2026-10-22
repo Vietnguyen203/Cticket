@@ -23,35 +23,38 @@ test('organizer builds an event in the pages, submits it; the admin approves; it
   await expect(page).toHaveURL(/\/organizer\/events\/[0-9a-f-]{36}\?tab=schedules/)
   const eventId = new URL(page.url()).pathname.split('/').at(-1)!
 
-  // 2. A schedule, 30 days ahead, 19:00 → 21:00 Vietnam time
+  // 2. The show (one per event), 30 days ahead, 19:00 → 21:00 Vietnam time
   await page.getByRole('combobox').first().selectOption({ label: `${venue.name} — ${venue.city}` })
-  for (const [label, hour] of [['Bắt đầu (giờ VN)', '19'], ['Kết thúc (giờ VN)', '21']] as const) {
-    await page.getByLabel(`${label}: ngày`).fill(vnDate(30))
-    await page.getByLabel(`${label}: giờ`).selectOption(hour)
-    await page.getByLabel(`${label}: phút`).selectOption('00')
-  }
-  await page.getByRole('button', { name: 'Thêm suất' }).click()
-  await expect(page.getByRole('heading', { name: 'Thêm hạng vé' })).toBeVisible()
+  await page.getByLabel('Ngày diễn').fill(vnDate(30))
+  await page.getByLabel('Giờ bắt đầu').fill('1900') // typed digits, 24-hour clock: the box shows 19:00
+  await page.getByLabel('Giờ kết thúc').fill('21:00')
+  await page.getByRole('button', { name: 'Lưu buổi diễn' }).click()
+  await expect(page.getByText(`Địa điểm: ${venue.name} — ${venue.city}`)).toBeVisible()
 
-  // 3. Ticket types: seated VIP, 50 standing
-  await page.getByLabel('Mã', { exact: true }).fill('VIP')
-  await page.getByLabel('Tên', { exact: true }).fill('Hạng VIP')
-  await page.getByLabel('Giá (VND)').fill('1500000')
-  await page.getByRole('button', { name: 'Thêm hạng vé' }).click()
-  await expect(page.getByRole('cell', { name: 'Hạng VIP' }).first()).toBeVisible()
+  // 3. The total attendance, then the tiers: 20 seated VIP (the seats follow), 50 standing
+  await page.getByLabel('Tổng số người tham dự').fill('70')
+  await page.getByRole('button', { name: 'Lưu tổng' }).click()
+  await expect(page.getByTestId('allocation')).toContainText('Đã xếp 0 / 70 người')
 
-  await page.getByLabel('Mã', { exact: true }).fill('GA')
-  await page.getByLabel('Tên', { exact: true }).fill('Vé đứng')
-  await page.getByLabel('Giá (VND)').fill('300000')
-  await page.getByLabel('Loại').selectOption('GENERAL_ADMISSION')
-  await page.getByLabel('Số vé').fill('50')
-  await page.getByLabel('Khu đứng').selectOption({ label: 'Khu đứng (100 chỗ)' })
-  await page.getByRole('button', { name: 'Thêm hạng vé' }).click()
-  await expect(page.getByRole('cell', { name: 'Vé đứng' }).first()).toBeVisible()
+  const seatedForm = page.locator('form', { has: page.getByRole('heading', { name: 'Thêm hạng ghế ngồi' }) })
+  await seatedForm.getByLabel('Mã', { exact: true }).fill('VIP')
+  await seatedForm.getByLabel('Tên', { exact: true }).fill('Hạng VIP')
+  await seatedForm.getByLabel('Giá (VND)').fill('1500000')
+  await seatedForm.getByLabel('Số ghế').fill('20')
+  await seatedForm.getByRole('button', { name: 'Thêm hạng ghế' }).click()
+  await expect(page.getByRole('cell', { name: /Ghế ngồi · Khu A: hàng A–B/ })).toBeVisible()
 
-  // 4. Seat plan: the whole seated zone sells as VIP
-  await page.getByLabel('Cả khu:').selectOption({ label: 'Hạng VIP' })
-  await page.getByRole('button', { name: 'Lưu gán ghế' }).click()
+  const standingForm = page.locator('form', { has: page.getByRole('heading', { name: 'Thêm hạng đứng' }) })
+  await standingForm.getByLabel('Mã', { exact: true }).fill('GA')
+  await standingForm.getByLabel('Tên', { exact: true }).fill('Vé đứng')
+  await standingForm.getByLabel('Giá (VND)').fill('300000')
+  await standingForm.getByLabel('Số vé đứng').fill('51')
+  await expect(standingForm.getByText('Chỉ còn 50 người chưa xếp.')).toBeVisible()
+  await standingForm.getByLabel('Số vé đứng').fill('50')
+  await expect(standingForm.getByLabel('Khu đứng')).toHaveValue(/.+/)
+  await standingForm.getByRole('button', { name: 'Thêm hạng đứng' }).click()
+  await expect(page.getByTestId('allocation')).toContainText('Đã xếp 70 / 70 người')
+  await expect(page.getByText('Đã xếp đủ tổng số người tham dự.').first()).toBeVisible()
 
   // 5. Submit
   const submit = page.getByRole('button', { name: 'Gửi duyệt' })

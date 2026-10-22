@@ -1,6 +1,7 @@
 const { randomUUID } = require('node:crypto');
 const request = require('supertest');
 const { seedAdmin } = require('../../src/scripts/seedAdmin');
+const { query } = require('../../src/database/pool');
 const { uniqueEmail, createLoggedInUser, loginWithTwoFactor, ADMIN_TOTP_SECRET } = require('./auth');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -89,15 +90,35 @@ function addTicketType(app, token, scheduleId, body) {
   return request(app).post(`/api/v1/schedules/${scheduleId}/ticket-types`).set(bearer(token)).send(body);
 }
 
-/** The simplest sellable configuration: one general admission ticket type. */
-function addGaTicketType(app, token, scheduleId, { code = 'GA', capacity = 100, price = 500_000 } = {}) {
+/**
+ * The STANDING zone of the schedule's venue that general admission tickets
+ * are sold through (required); one is added (large) if the venue has none.
+ */
+async function standingZoneOf(scheduleId) {
+  const found = await query(
+    `SELECT z.id FROM event_schedules s JOIN venue_zones z ON z.venue_id = s.venue_id AND z.kind = 'STANDING'
+     WHERE s.id = $1 ORDER BY z.created_at LIMIT 1`,
+    [scheduleId],
+  );
+  if (found.rows[0]) return found.rows[0].id;
+  const created = await query(
+    `INSERT INTO venue_zones (venue_id, code, name, kind, capacity)
+     SELECT venue_id, 'GA', 'Khu đứng', 'STANDING', 100000 FROM event_schedules WHERE id = $1 RETURNING id`,
+    [scheduleId],
+  );
+  return created.rows[0].id;
+}
+
+/** The simplest sellable configuration: one general admission ticket type (asserts 201, returns the response). */
+async function addGaTicketType(app, token, scheduleId, { code = 'GA', capacity = 100, price = 500_000 } = {}) {
   return addTicketType(app, token, scheduleId, {
     code,
     name: `Ticket ${code}`,
     price,
     inventoryMode: 'GENERAL_ADMISSION',
     capacity,
-  });
+    venueZoneId: await standingZoneOf(scheduleId),
+  }).expect(201);
 }
 
 /** DRAFT with one schedule (+ one GA ticket type) → submitted → approved. */
@@ -108,7 +129,7 @@ async function createPublishedEvent(app, { organizer, adminToken, categoryIds, v
     startAt: at(daysFromNow, 12),
     endAt: at(daysFromNow, 14),
   }).expect(201);
-  await addGaTicketType(app, organizer.token, schedule.body.data.schedule.id).expect(201);
+  await addGaTicketType(app, organizer.token, schedule.body.data.schedule.id);
   await changeStatus(app, organizer.token, event.id, 'PENDING_APPROVAL').expect(200);
   const published = await changeStatus(app, adminToken, event.id, 'PUBLISHED').expect(200);
   return published.body.data.event;
@@ -127,5 +148,6 @@ module.exports = {
   changeStatus,
   addTicketType,
   addGaTicketType,
+  standingZoneOf,
   createPublishedEvent,
 };

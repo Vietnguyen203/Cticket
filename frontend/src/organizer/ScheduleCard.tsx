@@ -1,24 +1,26 @@
-import { useState, type FormEvent } from 'react'
-import type { LayoutZone } from '../api/admin'
-import { ApiError, toApiError } from '../api/errors'
-import { createTicketType, deleteSchedule, deleteTicketType, getCheckInStats, updateSchedule, type TicketTypeInput } from '../api/organizer'
-import { ConfirmDialog, StatusBadge } from '../admin/components'
-import { DateTimeField } from '../components/DateTimeField'
-import { Alert, Button, Card, TextField } from '../components/ui'
+import { useState } from 'react'
+import { toApiError } from '../api/errors'
+import { deleteTicketType, getCheckInStats } from '../api/organizer'
+import { StatusBadge } from '../admin/components'
+import { hasAny } from '../admin/permissions'
+import { VenueZonesEditor } from '../admin/VenueZonesEditor'
+import { useAuth } from '../auth/AuthContext'
+import { Alert, Button, Card } from '../components/ui'
 import { formatDateTime, formatVnd } from '../utils/format'
 import { useAsync } from '../utils/useAsync'
-import { fromVnInput, toVnInput } from '../utils/vnTime'
 import { SeatBlocker } from './SeatBlocker'
+import { seatRangeLabel } from './allocation'
 import { SeatPlanEditor } from './SeatPlanEditor'
-import type { LoadedSchedule } from './setup'
+import { TierPlanner } from './TierPlanner'
+import { layoutSignature, venueGaps, type LoadedSchedule } from './setup'
 
-/** One schedule in the event editor: times, ticket types, seat plan; after publishing: seat blocks, check-ins. */
+/**
+ * The ticket types and seats of one show (its date and times are edited in
+ * the list above, ScheduleList); after publishing: seat blocks, check-ins.
+ */
 export function ScheduleCard({ setup, eventStatus, onChanged }: { setup: LoadedSchedule; eventStatus: string; onChanged: () => void }) {
-  const { schedule, ticketTypes, plan, zones, seatsByTicketType } = setup
+  const { schedule, zones, layoutError } = setup
   const draft = eventStatus === 'DRAFT'
-  const live = eventStatus === 'PUBLISHED' && schedule.status === 'SCHEDULED'
-  const [editing, setEditing] = useState(false)
-  const [confirm, setConfirm] = useState<'delete' | 'cancel' | null>(null)
 
   return (
     <Card className="space-y-4">
@@ -32,40 +34,22 @@ export function ScheduleCard({ setup, eventStatus, onChanged }: { setup: LoadedS
             Kết thúc {formatDateTime(schedule.endAt)} · mở bán {formatDateTime(schedule.salesStartAt)} → {formatDateTime(schedule.salesEndAt)}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge status={schedule.status} />
-          {draft && (
-            <>
-              <Button variant="ghost" onClick={() => setEditing((e) => !e)}>
-                Sửa giờ
-              </Button>
-              <Button variant="ghost" className="text-red-600 hover:bg-red-50" onClick={() => setConfirm('delete')}>
-                Xóa suất
-              </Button>
-            </>
-          )}
-          {live && (
-            <Button variant="ghost" className="text-red-600 hover:bg-red-50" onClick={() => setConfirm('cancel')}>
-              Hủy suất
-            </Button>
-          )}
-        </div>
+        <StatusBadge status={schedule.status} />
       </div>
 
-      {editing && <ScheduleTimesForm setup={setup} onSaved={() => { setEditing(false); onChanged() }} />}
-
+      {/* The organizer's order: the total, then the seated tiers, then the standing ones; the tiers so far below. */}
+      {draft && <TierPlanner setup={setup} onChanged={onChanged} />}
       <TicketTypesTable setup={setup} draft={draft} onChanged={onChanged} />
-      {draft && <NewTicketType scheduleId={schedule.id} zones={zones} onCreated={onChanged} />}
-      {draft && zones && (
-        <SeatPlanEditor
-          key={`${plan.totalAssignedSeats}:${ticketTypes.length}:${Object.values(seatsByTicketType).join()}`}
-          scheduleId={schedule.id}
-          zones={zones}
-          plan={plan}
-          ticketTypes={ticketTypes}
-          onSaved={onChanged}
-        />
+      {draft && layoutError && (
+        <Alert>
+          Không tải được khu và ghế của địa điểm ({layoutError}), nên chưa gán ghế được.{' '}
+          <button type="button" onClick={onChanged} className="font-semibold underline">
+            Thử lại
+          </button>
+        </Alert>
       )}
+      {draft && zones && <VenueGapsNotice setup={setup} onChanged={onChanged} />}
+      {draft && zones && <AdvancedSeatPlan setup={setup} onChanged={onChanged} />}
       {schedule.inventoryGeneratedAt && schedule.status === 'SCHEDULED' && (
         <>
           <SeatBlocker scheduleId={schedule.id} />
@@ -73,90 +57,13 @@ export function ScheduleCard({ setup, eventStatus, onChanged }: { setup: LoadedS
         </>
       )}
 
-      {confirm && (
-        <ConfirmDialog
-          open
-          title={confirm === 'delete' ? 'Xóa suất diễn này?' : 'Hủy suất diễn này?'}
-          message={
-            confirm === 'cancel'
-              ? 'Không thể hoàn tác. Đơn đang giữ chỗ bị hủy, đơn đã thanh toán được hoàn tiền.'
-              : 'Suất diễn cùng hạng vé và sơ đồ ghế của nó bị xóa.'
-          }
-          confirmLabel={confirm === 'delete' ? 'Xóa' : 'Hủy suất'}
-          danger
-          onClose={() => setConfirm(null)}
-          onConfirm={async () => {
-            try {
-              if (confirm === 'delete') await deleteSchedule(schedule.id)
-              else await updateSchedule(schedule.id, { status: 'CANCELLED' })
-            } catch (err) {
-              throw toApiError(err)
-            }
-            onChanged()
-          }}
-        />
-      )}
     </Card>
   )
 }
 
-function ScheduleTimesForm({ setup, onSaved }: { setup: LoadedSchedule; onSaved: () => void }) {
-  const { schedule } = setup
-  const [form, setForm] = useState({
-    startAt: toVnInput(schedule.startAt),
-    endAt: toVnInput(schedule.endAt),
-    salesStartAt: toVnInput(schedule.salesStartAt),
-    salesEndAt: toVnInput(schedule.salesEndAt),
-  })
-  const [error, setError] = useState<ApiError | null>(null)
-  const [busy, setBusy] = useState(false)
-
-  async function submit(e: FormEvent) {
-    e.preventDefault()
-    setBusy(true)
-    setError(null)
-    try {
-      const body = Object.fromEntries(
-        (Object.entries(form) as Array<[keyof typeof form, string]>)
-          .filter(([key, value]) => value !== toVnInput(schedule[key]))
-          .map(([key, value]) => [key, fromVnInput(value)]),
-      )
-      if (Object.keys(body).length > 0) await updateSchedule(schedule.id, body)
-      onSaved()
-    } catch (err) {
-      setError(toApiError(err))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <form onSubmit={submit} className="grid gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-2" noValidate>
-      {error && (
-        <div className="sm:col-span-2">
-          <Alert>{error.message}</Alert>
-        </div>
-      )}
-      {(['startAt', 'endAt', 'salesStartAt', 'salesEndAt'] as const).map((key) => (
-        <DateTimeField
-          key={key}
-          label={{ startAt: 'Bắt đầu', endAt: 'Kết thúc', salesStartAt: 'Mở bán', salesEndAt: 'Đóng bán' }[key] + ' (giờ VN)'}
-          name={key}
-          value={form[key]}
-          onChange={(value) => setForm((f) => ({ ...f, [key]: value }))}
-        />
-      ))}
-      <div className="sm:col-span-2">
-        <Button type="submit" loading={busy}>
-          Lưu giờ
-        </Button>
-      </div>
-    </form>
-  )
-}
-
 function TicketTypesTable({ setup, draft, onChanged }: { setup: LoadedSchedule; draft: boolean; onChanged: () => void }) {
-  const { ticketTypes, seatsByTicketType, unassignedSeats, zones } = setup
+  const { ticketTypes, seatsByTicketType, unassignedSeats, zones, plan } = setup
+  const seatsOf = (id: string) => plan.assignments.filter((a) => a.ticketTypeId === id).map((a) => a.seatId)
   const [error, setError] = useState<string | null>(null)
   const zoneName = (id: string | null | undefined) => zones?.find((z) => z.id === id)?.name
 
@@ -195,7 +102,9 @@ function TicketTypesTable({ setup, draft, onChanged }: { setup: LoadedSchedule; 
                   <td className="py-1.5 pr-4 font-medium">
                     {tt.name} <span className="text-xs text-slate-400">{tt.code}</span>
                   </td>
-                  <td className="py-1.5 pr-4 text-slate-600">{tt.inventoryMode === 'RESERVED' ? 'Ghế ngồi' : `Vé đứng${zoneName(tt.venueZoneId) ? ` · ${zoneName(tt.venueZoneId)}` : ''}`}</td>
+                  <td className="py-1.5 pr-4 text-slate-600">{tt.inventoryMode === 'RESERVED'
+                      ? `Ghế ngồi${zones && seatsOf(tt.id).length ? ` · ${seatRangeLabel(zones, seatsOf(tt.id))}` : ''}`
+                      : `Vé đứng${zoneName(tt.venueZoneId) ? ` · ${zoneName(tt.venueZoneId)}` : ''}`}</td>
                   <td className="py-1.5 pr-4">{formatVnd(tt.price)}</td>
                   <td className={`py-1.5 pr-4 ${tt.inventoryMode === 'RESERVED' && !seatsByTicketType[tt.id] ? 'text-amber-700' : 'text-slate-600'}`}>
                     {tt.inventoryMode === 'RESERVED' ? `${seatsByTicketType[tt.id] ?? 0} ghế` : `${tt.capacity} vé`}
@@ -219,85 +128,74 @@ function TicketTypesTable({ setup, draft, onChanged }: { setup: LoadedSchedule; 
   )
 }
 
-const EMPTY_TICKET = { code: '', name: '', price: '', inventoryMode: 'RESERVED' as TicketTypeInput['inventoryMode'], capacity: '', venueZoneId: '', maxPerOrder: '' }
+/**
+ * Seats by row ("Gán ghế theo hàng"), for what the automatic split does not
+ * cover: moving rows between tiers. Folded away, open when a seated tier has
+ * no seats yet (older tiers, or a venue that just got its seats).
+ */
+function AdvancedSeatPlan({ setup, onChanged }: { setup: LoadedSchedule; onChanged: () => void }) {
+  const { schedule, ticketTypes, plan, zones, seatsByTicketType } = setup
+  const waiting = ticketTypes.some((tt) => tt.inventoryMode === 'RESERVED' && tt.status === 'ACTIVE' && !seatsByTicketType[tt.id])
+  const [open, setOpen] = useState(waiting)
+  if (!zones || !ticketTypes.some((tt) => tt.inventoryMode === 'RESERVED')) return null
+  return (
+    <div className="space-y-2">
+      <button type="button" onClick={() => setOpen((o) => !o)} className="text-sm font-semibold text-brand-700 hover:underline" aria-expanded={open}>
+        {open ? '− Ẩn gán ghế theo hàng' : '+ Gán ghế theo hàng (nâng cao)'}
+      </button>
+      {open && (
+        <SeatPlanEditor
+          key={`${plan.totalAssignedSeats}:${ticketTypes.length}:${Object.values(seatsByTicketType).join()}`}
+          scheduleId={schedule.id}
+          zones={zones}
+          plan={plan}
+          ticketTypes={ticketTypes}
+          onSaved={onChanged}
+        />
+      )}
+    </div>
+  )
+}
 
-function NewTicketType({ scheduleId, zones, onCreated }: { scheduleId: string; zones: LayoutZone[] | null; onCreated: () => void }) {
-  const [form, setForm] = useState(EMPTY_TICKET)
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
-  const [error, setError] = useState<ApiError | null>(null)
-  const [busy, setBusy] = useState(false)
-  const standing = zones?.filter((z) => z.kind === 'STANDING') ?? []
-  const ga = form.inventoryMode === 'GENERAL_ADMISSION'
-
-  async function submit(e: FormEvent) {
-    e.preventDefault()
-    setBusy(true)
-    setError(null)
-    setFieldErrors({})
-    try {
-      await createTicketType(scheduleId, {
-        code: form.code.trim(),
-        name: form.name.trim(),
-        price: Number(form.price),
-        inventoryMode: form.inventoryMode,
-        ...(ga ? { capacity: Number(form.capacity), venueZoneId: form.venueZoneId || null } : {}),
-        ...(form.maxPerOrder ? { maxPerOrder: Number(form.maxPerOrder) } : {}),
-      })
-      setForm({ ...EMPTY_TICKET, inventoryMode: form.inventoryMode })
-      onCreated()
-    } catch (err) {
-      const apiError = toApiError(err)
-      setFieldErrors(apiError.fieldErrors())
-      setError(apiError)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const set = (key: keyof typeof EMPTY_TICKET) => (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value })
+/**
+ * What the schedule's venue cannot sell yet: seats never generated, no
+ * standing zone. Without this, the seat plan simply did not show: a "Ghế
+ * ngồi" ticket type could never get seats and the event could never be
+ * submitted, with nothing on the page saying why.
+ */
+function VenueGapsNotice({ setup, onChanged }: { setup: LoadedSchedule; onChanged: () => void }) {
+  const { schedule, ticketTypes, zones, venuePending } = setup
+  const [open, setOpen] = useState(false)
+  // Venue managers (admins) change any venue; an organizer only their own proposal, while it is PENDING.
+  const { user } = useAuth()
+  const canBuild = venuePending || hasAny(user, ['venue:manage'])
+  const gaps = venueGaps(schedule.venue.name, zones ?? [], ticketTypes)
+  if (!gaps) return null
+  const before = layoutSignature(zones ?? [])
 
   return (
-    <form onSubmit={submit} className="space-y-3 rounded-lg border border-dashed border-slate-300 p-3" noValidate>
-      <h4 className="text-sm font-semibold">Thêm hạng vé</h4>
-      {error && <Alert>{error.message}</Alert>}
-      <div className="grid gap-3 sm:grid-cols-3">
-        <TextField label="Mã" name="ttCode" placeholder="VIP" value={form.code} onChange={set('code')} error={fieldErrors.code} />
-        <TextField label="Tên" name="ttName" placeholder="Hạng VIP" value={form.name} onChange={set('name')} error={fieldErrors.name} />
-        <TextField label="Giá (VND)" name="ttPrice" type="number" min={0} step={1000} value={form.price} onChange={set('price')} error={fieldErrors.price} />
-        <label className="text-sm">
-          <span className="mb-1 block font-medium text-slate-700">Loại</span>
-          <select value={form.inventoryMode} onChange={set('inventoryMode')} className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5">
-            <option value="RESERVED">Ghế ngồi (chọn ghế)</option>
-            <option value="GENERAL_ADMISSION">Vé đứng (theo số lượng)</option>
-          </select>
-          <span className="mt-1 block text-xs text-slate-500">
-            {ga
-              ? 'Bán theo số lượng, không gắn ghế: không hiện trong phần "Gán hàng ghế".'
-              : 'Gắn với ghế: sau khi thêm, chọn hàng ghế cho hạng này ở phần "Gán hàng ghế" bên dưới.'}
-          </span>
-        </label>
-        {ga && (
-          <>
-            <TextField label="Số vé" name="ttCapacity" type="number" min={1} value={form.capacity} onChange={set('capacity')} error={fieldErrors.capacity} />
-            <label className="text-sm">
-              <span className="mb-1 block font-medium text-slate-700">Khu đứng</span>
-              <select value={form.venueZoneId} onChange={set('venueZoneId')} className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5">
-                <option value="">(không gắn khu)</option>
-                {standing.map((z) => (
-                  <option key={z.id} value={z.id}>
-                    {z.name} ({z.capacity} chỗ)
-                  </option>
-                ))}
-              </select>
-            </label>
-          </>
-        )}
-        <TextField label="Tối đa / đơn (mặc định 10)" name="ttMax" type="number" min={1} max={50} value={form.maxPerOrder} onChange={set('maxPerOrder')} error={fieldErrors.maxPerOrder} />
-      </div>
-      <Button type="submit" loading={busy} disabled={!form.code || !form.name || form.price === '' || (ga && !form.capacity)}>
-        Thêm hạng vé
-      </Button>
-    </form>
+    <div className={`space-y-3 rounded-lg border p-3 text-sm ${gaps.blocking ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-slate-50'}`}>
+      <p className={gaps.blocking ? 'text-amber-800' : 'text-slate-600'}>{gaps.message}</p>
+      {canBuild ? (
+        <>
+          <Button type="button" variant="secondary" onClick={() => setOpen((o) => !o)}>
+            {open ? 'Đóng phần khu và ghế' : 'Thêm khu / ghế cho địa điểm này'}
+          </Button>
+          {open && (
+            <VenueZonesEditor
+              venueId={schedule.venue.id}
+              // Seats or standing zones added: reload the schedule (the seat plan / the zone choice appears).
+              onLayout={(next) => layoutSignature(next) !== before && onChanged()}
+            />
+          )}
+        </>
+      ) : (
+        <p className="text-slate-600">
+          Địa điểm đã được duyệt nên chỉ quản trị viên thêm khu / ghế được. Cách khác: dùng loại vé địa điểm đang bán được, hoặc "Xóa suất" rồi thêm
+          lại với địa điểm khác.
+        </p>
+      )}
+    </div>
   )
 }
 

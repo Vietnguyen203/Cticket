@@ -151,15 +151,17 @@ console.log(`big event: ${bigPublished.slug} (${seats.length} seats + 5000 stand
 const WORDS = ['Mùa thu', 'Hà Nội', 'Sài Gòn', 'Jazz', 'Acoustic', 'Bolero', 'Rock', 'Giao hưởng', 'Hài kịch', 'Ballet']
 const events = [{ id: bigPublished.id, slug: bigPublished.slug, title: bigPublished.title }]
 let smallVenue = null
+let smallPit = null // standing tickets are sold through a standing zone (required)
 for (let i = 0; i < SMALL_EVENTS; i++) {
   if (i % 10 === 0) {
     smallVenue = (await asAdmin('POST', '/venues', { name: `Nhà hát tải ${run}-${i / 10}`, addressLine: '2 Tràng Tiền', city: 'Hồ Chí Minh', capacity: 300 })).venue
+    smallPit = (await asAdmin('POST', `/venues/${smallVenue.id}/zones`, { code: 'PIT', name: 'Khu đứng', kind: 'STANDING', capacity: 300 })).zone
   }
   const title = `${WORDS[i % WORDS.length]} đêm ${i + 1} (${run})`
   const { event } = await asOrganizer('POST', '/events', { title, categoryIds: [category.id] })
   const day = 5 + (i % 10) * 7 + Math.floor(i / 10) // distinct days per venue
   const { schedule: s } = await asOrganizer('POST', `/events/${event.id}/schedules`, { venueId: smallVenue.id, startAt: at(day, 12), endAt: at(day, 14) })
-  await asOrganizer('POST', `/schedules/${s.id}/ticket-types`, { code: 'GA', name: 'Vé thường', price: 300_000, inventoryMode: 'GENERAL_ADMISSION', capacity: 200 })
+  await asOrganizer('POST', `/schedules/${s.id}/ticket-types`, { code: 'GA', name: 'Vé thường', price: 300_000, inventoryMode: 'GENERAL_ADMISSION', capacity: 200, venueZoneId: smallPit.id })
   const published = await publish(event.id)
   events.push({ id: published.id, slug: published.slug, title })
 }

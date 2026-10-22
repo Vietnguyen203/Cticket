@@ -1,17 +1,21 @@
 import { useState } from 'react'
-import { createVenue, type VenueRecord } from '../api/admin'
+import { createVenue, type LayoutZone, type VenueRecord } from '../api/admin'
 import { ApiError, toApiError } from '../api/errors'
 import { VenueZonesEditor } from '../admin/VenueZonesEditor'
 import { Alert, Button, TextField } from '../components/ui'
+import { venueUsable } from './setup'
 
 /**
  * A venue the organizer enters right in the schedule form. It is PENDING:
  * usable by their own draft events, approved together with the event.
- * Step 1: name and address. Step 2: zones and seats, then use it.
+ * Step 1: name and address. Step 2: zones and seats, then use it: only once
+ * it can sell something (seats generated, or a standing zone), or the
+ * schedule would be stuck with ticket types that can never get seats.
  */
 export function NewVenuePanel({ onReady, onCancel }: { onReady: (venue: VenueRecord) => void; onCancel: () => void }) {
   const [form, setForm] = useState({ name: '', addressLine: '', city: '' })
   const [venue, setVenue] = useState<VenueRecord | null>(null)
+  const [zones, setZones] = useState<LayoutZone[]>([])
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [error, setError] = useState<ApiError | null>(null)
   const [busy, setBusy] = useState(false)
@@ -65,10 +69,15 @@ export function NewVenuePanel({ onReady, onCancel }: { onReady: (venue: VenueRec
         </div>
       ) : (
         <>
-          <VenueZonesEditor venueId={venue.id} />
-          <Button type="button" onClick={() => onReady(venue)}>
-            Xong, dùng địa điểm này
-          </Button>
+          <VenueZonesEditor venueId={venue.id} onLayout={setZones} />
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="button" disabled={!venueUsable(zones)} onClick={() => onReady(venue)}>
+              Xong, dùng địa điểm này
+            </Button>
+            {!venueUsable(zones) && (
+              <span className="text-sm text-amber-700">Thêm ít nhất một khu đứng, hoặc một khu ngồi rồi bấm "Sinh ghế".</span>
+            )}
+          </div>
         </>
       )}
     </div>

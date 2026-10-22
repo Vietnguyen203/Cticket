@@ -5,6 +5,7 @@ const AppError = require('../../utils/AppError');
 const { toLimitOffset, toPageMeta } = require('../../utils/pagination');
 const { invalidatesAfter, NAMESPACE } = require('../../redis/cache');
 const venuesRepository = require('./venues.repository');
+const layoutRepository = require('./venue-layout.repository');
 
 // NUMERIC columns arrive as strings. Coordinates are not money, so a JS
 // number is fine here (unlike prices, which stay integers).
@@ -79,6 +80,15 @@ async function createVenue(body, viewer) {
  * instead, which hides the venue and stops new schedules from using it.
  */
 async function updateVenue(id, changes) {
+  if (changes.capacity) {
+    // The capacity cannot go below what the zones already hold.
+    const used = await layoutRepository.countPlaces(pool, id);
+    if (used > changes.capacity) {
+      throw new AppError('VENUE_CAPACITY_EXCEEDED', undefined, {
+        details: [{ field: 'body.capacity', message: `the zones already hold ${used}`, capacity: changes.capacity, used, adding: 0 }],
+      });
+    }
+  }
   const row = await venuesRepository.update(pool, id, changes);
   if (!row) {
     throw new AppError('NOT_FOUND', 'Venue not found.');

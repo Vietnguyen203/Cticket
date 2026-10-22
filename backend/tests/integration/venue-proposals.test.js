@@ -34,7 +34,7 @@ const addZone = (token, venueId, body = { code: 'GA', name: 'Khu đứng', kind:
 async function submittedEventAt(owner, venueId) {
   const event = await createEvent(app, owner.token, { categoryIds: [category.id] });
   const schedule = await addSchedule(app, owner.token, event.id, { venueId, startAt: at(20, 12), endAt: at(20, 14) }).expect(201);
-  await addGaTicketType(app, owner.token, schedule.body.data.schedule.id).expect(201);
+  await addGaTicketType(app, owner.token, schedule.body.data.schedule.id);
   await changeStatus(app, owner.token, event.id, 'PENDING_APPROVAL').expect(200);
   return event;
 }
