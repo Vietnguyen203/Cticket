@@ -68,6 +68,7 @@ describe('venue layout (admin)', () => {
 
     const layout = await request(app).get(`/api/v1/venues/${venue.id}/layout`);
     expect(layout.body.data.zones.find((z) => z.code === 'A').seats).toHaveLength(20); // row C was rolled back too
+    expect(layout.body.data.venue.status).toBe('ACTIVE'); // the editor tells an organizer's own PENDING proposal apart
   });
 
   test('zone rules: standing zones need a capacity and cannot hold seats; customers cannot edit layouts', async () => {
@@ -127,6 +128,19 @@ describe('ticket types and seat plan (DRAFT configuration)', () => {
     });
     expect(res.status).toBe(422);
     expect(res.body.error.details[0].field).toBe('body.capacity');
+  });
+
+  test('standing tickets are sold through a standing zone: required, and cannot be taken off', async () => {
+    const { schedule, standing } = await createConfiguredEvent();
+    const noZone = await addTicketType(app, organizerA.token, schedule.id, {
+      code: 'NOZONE', name: 'Không khu', price: 300_000, inventoryMode: 'GENERAL_ADMISSION', capacity: 10,
+    });
+    expect(noZone.status).toBe(400);
+    expect(noZone.body.error.details.map((d) => d.field)).toContain('body.venueZoneId');
+
+    const takeOff = await request(app).patch(`/api/v1/ticket-types/${standing.id}`).set(bearer(organizerA.token)).send({ venueZoneId: null });
+    expect(takeOff.status).toBe(422);
+    expect(takeOff.body.error.details[0].field).toBe('body.venueZoneId');
   });
 
   test('the seat plan rejects foreign seats, double assignment and GA ticket types', async () => {

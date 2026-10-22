@@ -40,6 +40,53 @@ function assertValidTimes({ startAt, endAt, salesStartAt, salesEndAt }, now = ne
   }
 }
 
+/**
+ * One event, one show: an event is one performance at one venue (its many
+ * programmes and acts are in it, its guest artists are listed on the event).
+ * A cancelled show does not count: the event can get a new date.
+ */
+async function assertNoOtherShow(client, eventId) {
+  if ((await schedulesRepository.countActive(client, eventId)) > 0) {
+    throw new AppError('EVENT_HAS_SCHEDULE');
+  }
+}
+
+/**
+ * A show's total attendance never exceeds the venue's capacity ("Sức chứa";
+ * not checked when the venue has none). Returns the venue's capacity.
+ */
+async function assertFitsVenue(client, venueId, capacity) {
+  const venue = await venues.findVenue(client, venueId);
+  const venueCapacity = venue?.capacity ? Number(venue.capacity) : null;
+  if (capacity && venueCapacity && capacity > venueCapacity) {
+    throw new AppError('VENUE_CAPACITY_EXCEEDED', undefined, {
+      details: [{ field: 'body.capacity', message: `the venue holds ${venueCapacity}`, capacity: venueCapacity, used: 0, adding: capacity }],
+    });
+  }
+  return venueCapacity;
+}
+
+/**
+ * Two shows cannot overlap at one venue. The exclusion constraint is the real
+ * guard (also against two requests at the same instant); this check first
+ * says WHICH show is in the way, so the organizer knows what to change.
+ * Another organizer's event is not named, only its times.
+ */
+async function assertNoOverlap(client, { eventId, venueId, startAt, endAt, excludeScheduleId }) {
+  const other = await schedulesRepository.findOverlap(client, { venueId, startAt, endAt, excludeScheduleId });
+  if (other) {
+    throw new AppError('SCHEDULE_CONFLICT', undefined, {
+      details: [
+        {
+          field: 'body.startAt',
+          message: 'overlaps another schedule at this venue',
+          conflict: { startAt: other.start_at, endAt: other.end_at, sameEvent: other.event_id === eventId },
+        },
+      ],
+    });
+  }
+}
+
 /** ACTIVE venues, or a PENDING venue proposed by the event's own organizer (Phase 12.2). */
 async function assertUsableVenue(client, venueId, event) {
   if (!(await venues.findUsableVenue(client, venueId, event.organizer_id))) {
@@ -83,8 +130,13 @@ async function createSchedule(context, actor, eventId, body) {
     };
     assertValidTimes(times);
     await assertUsableVenue(client, body.venueId, event);
+    await assertNoOtherShow(client, eventId);
+    // In step with the venue: without a total given, the show is planned for the venue's capacity.
+    const venueCapacity = await assertFitsVenue(client, body.venueId, body.capacity);
+    await assertNoOverlap(client, { eventId, venueId: body.venueId, startAt: times.startAt, endAt: times.endAt });
 
-    const scheduleId = await schedulesRepository.insert(client, { eventId, venueId: body.venueId, ...times });
+    const capacity = body.capacity ?? venueCapacity;
+    const scheduleId = await schedulesRepository.insert(client, { eventId, venueId: body.venueId, ...times, capacity });
     return toPublicSchedule(await schedulesRepository.findWithVenue(client, scheduleId));
   });
 }
@@ -107,8 +159,19 @@ async function updateSchedule(context, actor, scheduleId, body) {
       throw scheduleNotFound();
     }
 
-    const { status, ...changes } = body;
+    const { status, capacity, ...changes } = body;
     const changesTime = Object.keys(changes).length > 0;
+    if (capacity !== undefined) {
+      // The total attendance is planned before publishing; it cannot go below what the tiers already hold.
+      if (event.status !== EVENT_STATUS.DRAFT) throw new AppError('EVENT_NOT_EDITABLE', 'The total attendance is set while the event is a DRAFT.');
+      const allocated = await ticketTypesRepository.allocatedPlaces(client, scheduleId);
+      if (capacity !== null) await assertFitsVenue(client, changes.venueId ?? schedule.venue_id, capacity);
+      if (capacity !== null && allocated > capacity) {
+        throw new AppError('CAPACITY_EXCEEDED', undefined, {
+          details: [{ field: 'body.capacity', message: `the tiers already hold ${allocated}`, capacity, allocated }],
+        });
+      }
+    }
     if (event.status === EVENT_STATUS.PUBLISHED && changesTime) {
       throw new AppError('EVENT_NOT_EDITABLE', 'After publishing, a schedule can only be cancelled.');
     }
@@ -131,9 +194,16 @@ async function updateSchedule(context, actor, scheduleId, body) {
         }
         await assertUsableVenue(client, changes.venueId, event);
       }
+      await assertNoOverlap(client, {
+        eventId: event.id,
+        venueId: changes.venueId ?? schedule.venue_id,
+        startAt: merged.startAt,
+        endAt: merged.endAt,
+        excludeScheduleId: scheduleId,
+      });
     }
 
-    await schedulesRepository.update(client, scheduleId, { ...changes, status });
+    await schedulesRepository.update(client, scheduleId, { ...changes, ...(capacity !== undefined ? { capacity } : {}), status });
     if (status === SCHEDULE_STATUS.CANCELLED) {
       const heldOrdersCancelled = await orders.cancelHeldOrdersOfSchedule(client, scheduleId);
       const paidOrdersRefunded = await payments.refundPaidOrdersOfSchedule(client, scheduleId, {

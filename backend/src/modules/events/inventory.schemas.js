@@ -39,6 +39,11 @@ const createTicketType = z
     if (isGa && !body.capacity) {
       ctx.addIssue({ code: 'custom', path: ['capacity'], message: 'general admission needs a capacity' });
     }
+    // Standing tickets are sold through a STANDING zone of the venue: where the people stand, and the
+    // zone's capacity caps what all its ticket types sell together (ticket-types.service.js).
+    if (isGa && !body.venueZoneId) {
+      ctx.addIssue({ code: 'custom', path: ['venueZoneId'], message: 'general admission needs a STANDING zone of the venue' });
+    }
     if (!isGa && body.capacity !== undefined) {
       ctx.addIssue({ code: 'custom', path: ['capacity'], message: 'reserved tickets get their size from the seat plan' });
     }

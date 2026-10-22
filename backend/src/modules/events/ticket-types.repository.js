@@ -83,4 +83,20 @@ async function sumGaCapacityForZone(db, { scheduleId, zoneId, excludeTicketTypeI
   return rows[0].total;
 }
 
-module.exports = { listBySchedule, findById, insert, update, remove, countBySchedule, sumGaCapacityForZone };
+/**
+ * Places a show already sells: the capacity of its standing ticket types and
+ * the seats of its seat plan (optionally leaving one ticket type / the plan out).
+ */
+async function allocatedPlaces(db, scheduleId, { excludeTicketTypeId = null, withoutPlan = false } = {}) {
+  const { rows } = await db.query(
+    `SELECT
+       (SELECT coalesce(sum(capacity), 0) FROM ticket_types
+        WHERE schedule_id = $1 AND inventory_mode = 'GENERAL_ADMISSION' AND status = 'ACTIVE'
+          AND ($2::uuid IS NULL OR id <> $2))::int AS standing,
+       (SELECT count(*) FROM schedule_seat_plan WHERE schedule_id = $1 AND NOT $3)::int AS seats`,
+    [scheduleId, excludeTicketTypeId, withoutPlan],
+  );
+  return rows[0].standing + rows[0].seats;
+}
+
+module.exports = { listBySchedule, findById, insert, update, remove, countBySchedule, sumGaCapacityForZone, allocatedPlaces };

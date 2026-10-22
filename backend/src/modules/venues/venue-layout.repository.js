@@ -102,7 +102,23 @@ async function findPlannableSeats(db, { venueId, seatIds, zoneId, rows }) {
   return result.rows.map((row) => row.id);
 }
 
+/**
+ * The places a venue's zones hold: its seats, plus the capacity of its
+ * standing zones (optionally leaving one zone's capacity out, when it changes).
+ */
+async function countPlaces(db, venueId, { excludeZoneId = null } = {}) {
+  const { rows } = await db.query(
+    `SELECT
+       (SELECT count(*) FROM seats s JOIN venue_zones z ON z.id = s.venue_zone_id WHERE z.venue_id = $1)::int AS seats,
+       (SELECT coalesce(sum(capacity), 0) FROM venue_zones
+        WHERE venue_id = $1 AND kind = 'STANDING' AND ($2::uuid IS NULL OR id <> $2))::int AS standing`,
+    [venueId, excludeZoneId],
+  );
+  return rows[0].seats + rows[0].standing;
+}
+
 module.exports = {
+  countPlaces,
   insertZone,
   findZoneById,
   updateZone,

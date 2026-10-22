@@ -2,7 +2,7 @@ const { buildSetClause } = require('../../utils/sql');
 const { escapeLike } = require('../../utils/pagination');
 
 const EVENT_COLUMNS = `e.id, e.organizer_id, e.title, e.slug, e.description, e.banner_url, e.thumbnail_url,
-  e.status, e.age_restriction, e.refund_policy, e.queue_enabled, e.queue_capacity, e.queue_session_minutes, e.rating_count, e.rating_sum, e.published_at, e.created_at, e.updated_at`;
+  e.status, e.age_restriction, e.refund_policy, e.queue_enabled, e.queue_capacity, e.queue_session_minutes, e.lineup, e.rating_count, e.rating_sum, e.published_at, e.created_at, e.updated_at`;
 
 const UPDATABLE = {
   title: 'title',
@@ -15,6 +15,7 @@ const UPDATABLE = {
   queueEnabled: 'queue_enabled',
   queueCapacity: 'queue_capacity',
   queueSessionMinutes: 'queue_session_minutes',
+  lineup: 'lineup', // the performance programme (jsonb)
 };
 
 // The categories of event `e`, as a JSON array (read model; see listEvents).
@@ -85,7 +86,9 @@ async function replaceCategories(db, eventId, categoryIds) {
 }
 
 async function updateEvent(db, id, changes) {
-  const { clause, params } = buildSetClause(changes, UPDATABLE, 2);
+  // node-postgres sends a JS array as a PostgreSQL array: jsonb needs the JSON text.
+  const values = 'lineup' in changes ? { ...changes, lineup: JSON.stringify(changes.lineup) } : changes;
+  const { clause, params } = buildSetClause(values, UPDATABLE, 2);
   if (!clause) return;
   await db.query(`UPDATE events SET ${clause} WHERE id = $1`, [id, ...params]);
 }

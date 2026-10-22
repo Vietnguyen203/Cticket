@@ -11,6 +11,7 @@ const createSchedule = z.object({
   endAt: isoDateTime,
   salesStartAt: isoDateTime.optional(),
   salesEndAt: isoDateTime.optional(),
+  capacity: z.number().int().min(1).max(1_000_000).optional(),
 });
 
 const updateSchedule = nonEmptyPatch(
@@ -20,6 +21,8 @@ const updateSchedule = nonEmptyPatch(
     endAt: isoDateTime.optional(),
     salesStartAt: isoDateTime.optional(),
     salesEndAt: isoDateTime.optional(),
+    // Total attendance planned: the seated and standing tiers must fit in it.
+    capacity: z.number().int().min(1).max(1_000_000).nullable().optional(),
     status: z.literal(SCHEDULE_STATUS.CANCELLED).optional(),
   }),
 );

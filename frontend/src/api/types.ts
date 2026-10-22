@@ -109,7 +109,16 @@ export interface Schedule {
   status: ScheduleStatus
   /** Set once the event is approved: tickets exist and can be sold. */
   inventoryGeneratedAt: string | null
+  /** Total attendance planned ("Tổng số người tham dự"), split into seated and standing tiers; null: not set */
+  capacity?: number | null
   venue: Venue
+}
+
+/** One line of an event's performance programme. time: planned, 24-hour "HH:mm" (optional). */
+export interface LineupItem {
+  artist: string
+  time: string | null
+  note: string | null
 }
 
 export interface EventDetail {
@@ -126,6 +135,8 @@ export interface EventDetail {
   rating?: { average: number | null; count: number }
   /** Phase 21: purchase queue (at most `capacity` people buy at once) */
   queue?: { enabled: boolean; capacity: number; sessionMinutes: number }
+  /** The performance programme, in order (information only: the schedules keep the real times) */
+  lineup?: LineupItem[]
   status: string
   organizer: Organizer
   categories: Category[]

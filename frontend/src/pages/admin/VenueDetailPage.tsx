@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router'
 import { getVenue, updateVenue, type VenueRecord } from '../../api/admin'
 import { ApiError, toApiError } from '../../api/errors'
 import { PageHeader, StatusBadge } from '../../admin/components'
+import { venueCapacityMessage } from '../../admin/venueCapacity'
 import { VenueZonesEditor } from '../../admin/VenueZonesEditor'
 import { Alert, Button, Card, FullPageSpinner, TextField } from '../../components/ui'
 import { useAsync } from '../../utils/useAsync'
@@ -91,7 +92,7 @@ function VenueInfo({ venue, onSaved }: { venue: VenueRecord; onSaved: () => void
         )}
         {error && (
           <div className="sm:col-span-2">
-            <Alert>{error.message}</Alert>
+            <Alert>{venueCapacityMessage(error) ?? error.message}</Alert>
           </div>
         )}
         {saved && Object.keys(changes).length === 0 && (

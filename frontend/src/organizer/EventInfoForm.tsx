@@ -9,6 +9,7 @@ import { hasAny } from '../admin/permissions'
 import { useAuth } from '../auth/AuthContext'
 import { useAsync } from '../utils/useAsync'
 import { REFUND_POLICIES, refundPolicyOf, type RefundPolicy } from '../payments/refundPolicy'
+import { missingForEvent } from './missing'
 
 /** Once PUBLISHED, only these may still change (backend EDITABLE_WHEN_PUBLISHED). */
 const EDITABLE_WHEN_PUBLISHED = new Set(['description', 'bannerUrl', 'thumbnailUrl', 'refundPolicy'])
@@ -82,6 +83,7 @@ export function EventInfoForm({ event, onSubmit, submitLabel }: { event?: EventD
   }
 
   const nothingToSave = event !== undefined && Object.keys(input()).length === 0
+  const missing = missingForEvent(form, { title: locked('title'), categoryIds: locked('categoryIds') })
   const toggleCategory = (id: string) =>
     setForm((f) => ({ ...f, categoryIds: f.categoryIds.includes(id) ? f.categoryIds.filter((c) => c !== id) : [...f.categoryIds, id] }))
 
@@ -167,6 +169,14 @@ export function EventInfoForm({ event, onSubmit, submitLabel }: { event?: EventD
           )}
         </legend>
         <div className="flex flex-wrap gap-2">
+          {categories.data?.length === 0 && (
+            <p className="text-sm text-amber-700">
+              {canManageCategories
+                ? 'Chưa có danh mục nào: tạo ở "Quản lý danh mục", rồi "Tải lại danh sách".'
+                : 'Chưa có danh mục nào để chọn: nhờ quản trị viên tạo danh mục trước.'}
+            </p>
+          )}
+          {categories.error && <p className="text-sm text-red-600">Không tải được danh mục: {categories.error.message}</p>}
           {categories.data?.map((category) => (
             <label
               key={category.id}
@@ -186,10 +196,11 @@ export function EventInfoForm({ event, onSubmit, submitLabel }: { event?: EventD
         <Button
           type="submit"
           loading={busy}
-          disabled={(!locked('title') && !form.title.trim()) || (!locked('categoryIds') && form.categoryIds.length === 0) || nothingToSave}
+          disabled={missing.length > 0 || nothingToSave}
         >
           {submitLabel}
         </Button>
+        {missing.length > 0 && !busy && <span className="text-sm text-amber-700">Còn thiếu: {missing.join(', ')}.</span>}
         {event && !nothingToSave && !busy && <span className="text-sm font-medium text-amber-700">Có thay đổi chưa lưu.</span>}
       </div>
     </form>

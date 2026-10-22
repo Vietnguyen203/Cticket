@@ -174,6 +174,20 @@ export function EventDetailPage() {
               Giới thiệu
             </h2>
             <div className="mt-3 whitespace-pre-line leading-relaxed text-slate-700">{e.description || 'Ban tổ chức chưa thêm mô tả.'}</div>
+            {e.lineup && e.lineup.length > 0 && (
+              <div className="mt-8">
+                <h2 id="nghe-si" className="text-xl font-bold text-ink">
+                  Nghệ sĩ khách mời
+                </h2>
+                <ul aria-labelledby="nghe-si" className="mt-3 flex flex-wrap gap-2">
+                  {e.lineup.map((item) => (
+                    <li key={item.artist} className="rounded-full border border-line bg-white px-3.5 py-1.5 text-sm font-semibold text-ink">
+                      {item.artist}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </section>
 
           <div className="lg:col-start-1 lg:row-start-2">

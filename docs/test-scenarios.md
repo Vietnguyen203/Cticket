@@ -1,6 +1,7 @@
 # Kịch bản test
 
-> Nhận xét phát triển: *"Chuẩn bị kịch bản test"*. Bản 20/10/2026, ứng với `main` = `4bec1cd`.
+> Nhận xét phát triển: *"Chuẩn bị kịch bản test"*. Bản 20/10/2026, ứng với `main` = `4bec1cd`; cập nhật 22/10/2026 (TC-ORG-11 → 15).
+> Muốn làm từng bước trên giao diện theo thứ tự: [`ui-test-guide.md`](ui-test-guide.md).
 > Dùng để **test tay trước khi demo / bàn giao**, và để biết mỗi chức năng đã có **test tự động** nào bảo vệ.
 
 ## 1. Cách dùng tài liệu
@@ -176,6 +177,11 @@ Ký hiệu file test tự động:
 | TC-ORG-08 | Báo cáo bán hàng | Có đơn | Tab "Doanh thu" | Số vé, doanh thu, hoàn tiền, phí hủy đúng | P2 | E2E:refund-report, BE:reports, WEB:reports |
 | TC-ORG-09 | Xóa sự kiện | Sự kiện có đơn | "Xóa" → gõ lại đúng tên | Chỉ xóa khi gõ đúng tên; có audit | P3 | BE:event-deletion |
 | TC-ORG-10 | Đề xuất địa điểm mới | — | Đề xuất địa điểm khi tạo suất | Admin duyệt sự kiện thì địa điểm được duyệt theo | P3 | BE:venue-proposals |
+| TC-ORG-11 | Nghệ sĩ khách mời | Sự kiện nháp hoặc đang bán | Thẻ "Nghệ sĩ khách mời": "+ Thêm nghệ sĩ", nhập tên, xóa một ô; "Lưu danh sách nghệ sĩ" | Trang sự kiện có mục "Nghệ sĩ khách mời" (các thẻ tên, đúng thứ tự nhập, tên trùng chỉ một lần); không sửa được khi đang chờ duyệt | P2 | E2E:lineup, BE:event-lineup, WEB:lineup |
+| TC-ORG-12 | Địa điểm chưa có ghế | Suất ở địa điểm có khu ngồi nhưng chưa "Sinh ghế" | Mở thẻ "Suất diễn & vé" | Báo rõ địa điểm chưa có ghế và cách xử lý; địa điểm mình đề xuất thì thêm ghế ngay tại chỗ; hạng "Ghế ngồi" không chọn được; **vé đứng bắt buộc chọn khu đứng** (không còn "không gắn khu"; địa điểm chưa có khu đứng thì không thêm được vé đứng, API cũng từ chối); "Xong, dùng địa điểm này" chỉ bấm được khi địa điểm đã có ghế hoặc khu đứng | P2 | E2E:event-setup, WEB:setup, WEB:readiness |
+| TC-ORG-13 | Nút bị khóa nói lý do; giờ 24 giờ | Đang tạo sự kiện / suất | Bỏ trống danh mục; gõ giờ `25`, rồi `1930` | "Còn thiếu: …" cạnh nút; giờ sai báo "Giờ theo 24 giờ…", `1930` thành `19:30` | P2 | E2E:event-setup, WEB:missing, WEB:dateTimeParts |
+| TC-ORG-14 | Một sự kiện, một buổi diễn | Sự kiện đã có buổi diễn | Tìm cách thêm buổi thứ hai; gọi API thêm suất | Không có nút thêm; API trả 422 `EVENT_HAS_SCHEDULE`; muốn đổi ngày thì sửa ngày giờ của buổi diễn | P2 | BE:events, E2E:event-setup |
+| TC-ORG-15 | Tổng người tham dự → hạng ghế → hạng đứng | Buổi diễn đã có | Nhập tổng; thêm hạng ghế (số ghế), rồi hạng đứng (số vé, khu đứng) | Ghế tự xếp từ hàng đầu, bảng ghi "Khu A: hàng A–B"; "Đã xếp X / Y · còn lại Z"; vượt tổng hoặc vượt số ghế trống bị báo ngay, API trả 422 `CAPACITY_EXCEEDED` | P1 | E2E:organizer, BE:schedule-capacity, WEB:allocation |
 
 ## 14. Quản trị (ADM)
 
@@ -187,6 +193,7 @@ Ký hiệu file test tự động:
 | TC-ADM-04 | Danh mục, địa điểm, sơ đồ ghế | Admin | Tạo / sửa danh mục, địa điểm, khu, ghế | Hiện đúng ở form ban tổ chức | P2 | BE:catalog, BE:inventory |
 | TC-ADM-05 | Mã giảm giá | Admin | Tạo mã % và mã số tiền, giới hạn lượt | Áp dụng đúng (TC-PAY-01); hết lượt thì báo | P2 | BE:payments |
 | TC-ADM-06 | Nhật ký (audit) và báo cáo | Admin | Mở Nhật ký, Báo cáo | Có các hành động quan trọng (duyệt, hoàn tiền, đổi cấu hình hàng chờ…); số liệu báo cáo khớp | P3 | BE:reports, BE:admin |
+| TC-ADM-07 | Sức chứa địa điểm là giới hạn | Địa điểm có sức chứa | Thêm khu đứng / sinh ghế vượt sức chứa; hạ sức chứa dưới tổng các khu; ban tổ chức nhập tổng người tham dự lớn hơn sức chứa | Dòng "Các khu: X chỗ / sức chứa Y · còn thêm được Z"; vượt thì bị từ chối kèm số liệu (422 `VENUE_CAPACITY_EXCEEDED`) | P2 | E2E:venue-capacity, BE:venue-capacity, WEB:venueCapacity |
 
 ## 15. Phân quyền và bảo mật (SEC)
 
@@ -257,11 +264,11 @@ cd e2e && npm test
 | TKT | 6 | 6 | 0 |
 | CHK | 6 | 6 | 0 |
 | REV | 4 | 4 | 0 |
-| ORG | 10 | 10 | 0 |
-| ADM | 6 | 6 | 0 |
+| ORG | 15 | 15 | 0 |
+| ADM | 7 | 7 | 0 |
 | SEC | 6 | 6 | 0 |
 | UI | 6 | 2 | 4 |
 | LOAD | 3 | 3 | 0 |
-| **Tổng** | **105** | **97** | **8** |
+| **Tổng** | **111** | **103** | **8** |
 
-Test tự động hiện có: backend 403 test, web 81 test, E2E 20 kịch bản, k6 5 kịch bản (chi tiết `docs/testing.md`). Những ca "chỉ test tay" cần thiết bị hoặc dịch vụ thật (điện thoại, đồng hồ máy, cài đặt hệ điều hành) hoặc là cảm nhận giao diện.
+Test tự động hiện có: backend 415 test, web 121 test, E2E 26 kịch bản, k6 5 kịch bản (chi tiết `docs/testing.md`). Những ca "chỉ test tay" cần thiết bị hoặc dịch vụ thật (điện thoại, đồng hồ máy, cài đặt hệ điều hành) hoặc là cảm nhận giao diện.

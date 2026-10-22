@@ -8,8 +8,9 @@ import { useAuth } from '../../auth/AuthContext'
 import { Alert, Button, Card, FullPageSpinner } from '../../components/ui'
 import { DeleteEventDialog } from '../../organizer/DeleteEventDialog'
 import { EventInfoForm } from '../../organizer/EventInfoForm'
-import { NewScheduleForm } from '../../organizer/NewScheduleForm'
+import { ScheduleList } from '../../organizer/ScheduleList'
 import { PurchaseQueueCard, QueueStatsLine } from '../../organizer/PurchaseQueueCard'
+import { LineupCard } from '../../organizer/LineupCard'
 import { submitChecklist } from '../../organizer/readiness'
 import { ScheduleCard } from '../../organizer/ScheduleCard'
 import { loadSchedules } from '../../organizer/setup'
@@ -113,7 +114,7 @@ export function EventEditorPage() {
         onChange={(value) => setParams({ tab: value }, { replace: true })}
         options={[
           ['info', 'Thông tin'],
-          ['schedules', `Suất diễn & vé (${e.schedules.length})`],
+          ['schedules', 'Buổi diễn & vé'],
           ['staff', 'Nhân viên soát vé'],
           ...(hasSales ? ([['sales', 'Doanh thu']] as Array<[Tab, string]>) : []),
         ]}
@@ -146,12 +147,21 @@ export function EventEditorPage() {
 
       {tab === 'schedules' && (
         <div className="space-y-4">
+          <ScheduleList key={`schedules:${e.status}`} event={e} onChanged={reload} />
+          <LineupCard
+            // Not keyed on the lineup itself: after saving, the rows stay and compare equal to what was saved ("Đã lưu").
+            key={`lineup:${e.id}:${e.status}`}
+            event={e}
+            onSave={async (input) => {
+              await updateEvent(e.id, input)
+              reload()
+            }}
+          />
           {setups.error && <Alert>{setups.error.message}</Alert>}
           {setups.data?.map((setup) => (
             <ScheduleCard key={setup.schedule.id} setup={setup} eventStatus={e.status} onChanged={reload} />
           ))}
           {!setups.data && <p className="text-sm text-slate-500">Đang tải…</p>}
-          {e.status === 'DRAFT' && <NewScheduleForm eventId={e.id} onCreated={reload} />}
         </div>
       )}
 

@@ -1,7 +1,7 @@
 import type { OrganizerProfile, ScheduleTicketType } from './admin'
 import { api } from './client'
 import { ApiError, messageFor } from './errors'
-import type { EventDetail, EventSummary, PageMeta, Schedule, SeatMap } from './types'
+import type { EventDetail, EventSummary, LineupItem, PageMeta, Schedule, SeatMap } from './types'
 
 /** API calls of the organizer pages (Phase 12.2). "Own event" rules are checked by the API. */
 
@@ -42,6 +42,8 @@ export interface EventInput {
   queueEnabled?: boolean
   queueCapacity?: number
   queueSessionMinutes?: number
+  /** The performance programme (PATCH only; also while on sale) */
+  lineup?: LineupItem[]
 }
 
 export async function listMyEvents(params: { status?: string; page?: number; pageSize?: number }) {
@@ -105,6 +107,8 @@ export interface ScheduleInput {
   endAt: string
   salesStartAt?: string
   salesEndAt?: string
+  /** Total attendance planned (the tiers must fit in it) */
+  capacity?: number | null
 }
 
 export async function createSchedule(eventId: string, input: ScheduleInput): Promise<Schedule> {

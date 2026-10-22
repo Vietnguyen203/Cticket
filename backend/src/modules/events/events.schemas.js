@@ -5,6 +5,18 @@ const { isoDateTime, imageUrl, nonEmptyPatch } = require('../../utils/schemas');
 const { SORT_ORDERS } = require('./events.repository');
 
 const MAX_DESCRIPTION_LENGTH = 20_000;
+const MAX_LINEUP_ITEMS = 50; // also a CHECK in the database
+const TIME_24 = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** One line of the performance programme: who, an optional planned time (24-hour), a note. */
+const lineupItem = z
+  .object({
+    artist: z.string().trim().min(1).max(120),
+    time: z.string().trim().regex(TIME_24, 'must be a 24-hour time HH:mm (00:00 to 23:59)').nullable().optional(),
+    note: z.string().trim().max(300).nullable().optional(),
+  })
+  .strict()
+  .transform(({ artist, time, note }) => ({ artist, time: time || null, note: note || null }));
 
 const fields = {
   title: z.string().trim().min(3).max(255),
@@ -17,6 +29,8 @@ const fields = {
   queueEnabled: z.boolean(),
   queueCapacity: z.number().int().min(1).max(PURCHASE_QUEUE.MAX_CAPACITY),
   queueSessionMinutes: z.number().int().min(PURCHASE_QUEUE.MIN_SESSION_MINUTES).max(PURCHASE_QUEUE.MAX_SESSION_MINUTES),
+  // The performance programme, in order (changed with PATCH only, also while on sale).
+  lineup: z.array(lineupItem).max(MAX_LINEUP_ITEMS),
   categoryIds: z
     .array(z.uuid())
     .min(1)

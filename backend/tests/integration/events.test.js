@@ -105,9 +105,33 @@ describe('schedules', () => {
     });
     expect(overlap.status).toBe(409);
     expect(overlap.body.error.code).toBe('SCHEDULE_CONFLICT');
+    // It says which show is in the way (times only: another organizer's event is not named).
+    expect(overlap.body.error.details[0].conflict).toEqual({
+      startAt: at(40, 18).toISOString(),
+      endAt: at(40, 21).toISOString(),
+      sameEvent: false,
+    });
 
     // Back-to-back is fine: the range end is exclusive.
     await addSchedule(app, organizerB.token, second.id, { venueId: venue.id, startAt: at(40, 21), endAt: at(40, 23) }).expect(201);
+  });
+
+  test('a show in the way is named, also when moving a show into it', async () => {
+    const venue = await createVenue(app, admin.token);
+    const [first, second] = [
+      await createEvent(app, organizerA.token, { categoryIds: [category.id] }),
+      await createEvent(app, organizerA.token, { categoryIds: [category.id] }),
+    ];
+    // A show entered by mistake over 26 hours (22:00 → 23:55 the next day).
+    await addSchedule(app, organizerA.token, first.id, { venueId: venue.id, startAt: at(60, 15), endAt: at(61, 16) }).expect(201);
+    const later = await addSchedule(app, organizerA.token, second.id, { venueId: venue.id, startAt: at(62, 12), endAt: at(62, 14) }).expect(201);
+
+    const moved = await request(app)
+      .patch(`/api/v1/schedules/${later.body.data.schedule.id}`)
+      .set(bearer(organizerA.token))
+      .send({ startAt: at(61, 12), endAt: at(61, 14), salesEndAt: at(61, 12) });
+    expect(moved.status).toBe(409);
+    expect(moved.body.error.details[0].conflict).toMatchObject({ endAt: at(61, 16).toISOString(), sameEvent: false });
   });
 
   test('two organizers booking the same slot at the same instant: exactly one wins', async () => {
@@ -135,6 +159,25 @@ describe('schedules', () => {
     expect(backwards.body.error.details[0].field).toBe('body.endAt');
   });
 
+  test('one event, one show: a second is refused; after cancelling or deleting it, a new date can be set', async () => {
+    const venue = await createVenue(app, admin.token);
+    const event = await createEvent(app, organizerA.token, { categoryIds: [category.id] });
+    const first = await addSchedule(app, organizerA.token, event.id, { venueId: venue.id, startAt: at(50, 12), endAt: at(50, 14) }).expect(201);
+
+    const second = await addSchedule(app, organizerA.token, event.id, { venueId: venue.id, startAt: at(51, 12), endAt: at(51, 14) });
+    expect(second.status).toBe(422);
+    expect(second.body.error.code).toBe('EVENT_HAS_SCHEDULE');
+
+    // Changing its date is the way; or delete it (a draft) and add another.
+    await request(app)
+      .patch(`/api/v1/schedules/${first.body.data.schedule.id}`)
+      .set(bearer(organizerA.token))
+      .send({ startAt: at(52, 12), endAt: at(52, 14), salesEndAt: at(52, 12) })
+      .expect(200);
+    await request(app).delete(`/api/v1/schedules/${first.body.data.schedule.id}`).set(bearer(organizerA.token)).expect(204);
+    await addSchedule(app, organizerA.token, event.id, { venueId: venue.id, startAt: at(53, 12), endAt: at(53, 14) }).expect(201);
+  });
+
   test('an inactive venue cannot be booked', async () => {
     const venue = await createVenue(app, admin.token);
     await request(app).patch(`/api/v1/venues/${venue.id}`).set(bearer(admin.token)).send({ status: 'INACTIVE' }).expect(200);
@@ -160,7 +203,7 @@ describe('event status machine', () => {
     const noTickets = await changeStatus(app, organizerA.token, event.id, 'PENDING_APPROVAL');
     expect(noTickets.body.error.code).toBe('TICKET_TYPES_REQUIRED');
 
-    await addGaTicketType(app, organizerA.token, schedule.body.data.schedule.id).expect(201);
+    await addGaTicketType(app, organizerA.token, schedule.body.data.schedule.id);
     await changeStatus(app, organizerA.token, event.id, 'PENDING_APPROVAL').expect(200);
 
     // Frozen while under review; the owner cannot approve their own event.
@@ -194,7 +237,7 @@ describe('event status machine', () => {
     const venue = await createVenue(app, admin.token);
     const event = await createEvent(app, organizerA.token, { categoryIds: [category.id] });
     const schedule = await addSchedule(app, organizerA.token, event.id, { venueId: venue.id, startAt: at(21), endAt: at(21, 14) }).expect(201);
-    await addGaTicketType(app, organizerA.token, schedule.body.data.schedule.id).expect(201);
+    await addGaTicketType(app, organizerA.token, schedule.body.data.schedule.id);
     await changeStatus(app, organizerA.token, event.id, 'PENDING_APPROVAL').expect(200);
 
     const results = await Promise.all([
