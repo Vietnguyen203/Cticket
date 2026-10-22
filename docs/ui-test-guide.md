@@ -66,7 +66,7 @@ Mật khẩu của các tài khoản test do người test tự đặt và tự 
 | Thứ | Giá trị | Tạo ở |
 |---|---|---|
 | Danh mục | `Hòa nhạc test` | 2.1 |
-| Địa điểm | `Nhà hát Test`, TP. Hồ Chí Minh: **Khu A** ghế ngồi, hàng A–E, ghế 1–10 (50 ghế); **Khu đứng** 100 chỗ | 2.2–2.4 |
+| Địa điểm | `Nhà hát Test`, TP. Hồ Chí Minh, **sức chứa 150**: **Khu A** ghế ngồi, hàng A–E, ghế 1–10 (50 ghế); **Khu đứng** 100 chỗ | 2.2–2.4 |
 | Mã giảm giá | `TEST10`: giảm 10% | 2.5 |
 | Sự kiện 1 | `Đêm nhạc Test <ngày>`: 1 suất **30 ngày sau**, hạng `VIP` 1.500.000 (ghế) và `Vé đứng` 300.000; chính sách hủy **Tiêu chuẩn** | 3.4–3.12 |
 | Sự kiện 2 | `Đêm soát vé <ngày>`: 1 suất bắt đầu **2 giờ sau lúc tạo**, chỉ `Vé đứng` **2 vé** | 3.13–3.15 |
@@ -103,9 +103,9 @@ Hồ sơ trình duyệt "Admin": đăng nhập `admin@etp.local`. Menu "Quản t
 | Bước | Thao tác | Kết quả mong đợi | KQ |
 |---|---|---|---|
 | 2.1 · ADM-04 ★ | "Danh mục" → "Tên danh mục mới": `Hòa nhạc test` → thêm | Danh mục có trong bảng, "Số sự kiện" = 0 | |
-| 2.2 · ADM-04 ★ | "Địa điểm" → "Thêm địa điểm": "Tên địa điểm" `Nhà hát Test`, "Địa chỉ", "Thành phố" `TP. Hồ Chí Minh` → "Tạo và thêm khu / ghế" | Mở trang chi tiết địa điểm, phần "Khu và ghế" chưa có khu nào | |
+| 2.2 · ADM-04 ★ | "Địa điểm" → "Thêm địa điểm": "Tên địa điểm" `Nhà hát Test`, "Địa chỉ", "Thành phố" `TP. Hồ Chí Minh`, "Sức chứa (không bắt buộc)" `150` → "Tạo và thêm khu / ghế" | Mở trang chi tiết địa điểm, phần "Khu và ghế" chưa có khu nào; dòng "Các khu: 0 chỗ … / sức chứa 150" | |
 | 2.3 · ADM-04 ★ | Phần thêm khu: "Tên khu" `Khu A`, "Mã khu" `A`, "Loại" "Khu ngồi (có ghế)" → "Thêm". Ở khu vừa tạo: "Thêm hàng ghế" `A-E`, "Từ ghế số" `1`, "Đến ghế số" `10` → "Sinh ghế" | Khu A có 5 hàng × 10 ghế = 50 ghế | |
-| 2.4 · ADM-04 ★ | Thêm khu: "Tên khu" `Khu đứng`, "Mã khu" `GA`, "Loại" "Khu đứng", "Sức chứa" `100` → "Thêm" | Có khu đứng 100 chỗ | |
+| 2.4 · ADM-04 ★ | Thêm khu: "Tên khu" `Khu đứng`, "Mã khu" `GA`, "Loại" "Khu đứng", "Sức chứa" `100` → "Thêm". Thử thêm một khu đứng nữa `10` chỗ | Có khu đứng 100 chỗ; "Các khu: 150 chỗ (50 ghế + 100 đứng) / sức chứa 150 · còn thêm được 0"; khu 10 chỗ bị từ chối "Vượt sức chứa 150 của địa điểm…" | |
 | 2.5 · ADM-05 ★ | "Mã giảm giá" → "Tạo mã giảm giá": "Mã (khách nhập)" `TEST10`, "Tên", "Kiểu giảm" "Phần trăm (%)", giảm `10`, "Bắt đầu (giờ VN)" hôm nay, "Hết hạn (giờ VN)" 2 tháng sau → "Tạo mã" | Mã ở trạng thái "Đang dùng", "Đã dùng" 0 | |
 
 ### Phiên 3. Ban tổ chức tạo và đưa sự kiện lên bán
@@ -115,7 +115,7 @@ Hồ sơ trình duyệt "Admin": đăng nhập `admin@etp.local`. Menu "Quản t
 | 3.1 · ORG-01 ★ | Hồ sơ trình duyệt "Ban tổ chức": đăng ký `ten+btc@…` (như 1.1–1.2) → chân trang hoặc trang tài khoản: "Trở thành ban tổ chức" → "Tên tổ chức / công ty" → "Gửi đăng ký" | "Đơn đã gửi, đang chờ quản trị viên duyệt." | |
 | 3.2 · ORG-01 ★ | Admin: "Nhà tổ chức" → lọc "Chờ duyệt" → dòng của tổ chức vừa gửi → "Duyệt" | Trạng thái "Hoạt động" | |
 | 3.3 · ORG-01 ★ | Ban tổ chức: tải lại trang đăng ký → "Cập nhật quyền ngay" | "Đã được duyệt: bạn có thể tạo sự kiện."; đầu trang có menu "Ban tổ chức" | |
-| 3.4 · ORG-02 ★ | "Ban tổ chức" → "Tạo sự kiện": "Tên sự kiện" `Đêm nhạc Test <ngày>`, "Mô tả", chọn danh mục `Hòa nhạc test`, "Chính sách hủy đơn của khách": **Tiêu chuẩn** → "Tạo và tiếp tục" | Sang thẻ "Suất diễn & vé (0)"; sự kiện ở trạng thái nháp | |
+| 3.4 · ORG-02 ★ | "Ban tổ chức" → "Tạo sự kiện": "Tên sự kiện" `Đêm nhạc Test <ngày>`, "Mô tả", chọn danh mục `Hòa nhạc test`, "Chính sách hủy đơn của khách": **Tiêu chuẩn** → "Tạo và tiếp tục" | Sang thẻ "Buổi diễn & vé"; sự kiện ở trạng thái nháp | |
 | 3.5 · ORG-03 | Thẻ "Thông tin" → "Ảnh bìa": tải một ảnh **dọc** từ máy | Hộp thoại căn ảnh mở: kéo để dịch, thu phóng; "Hiện trọn ảnh" thì thấy cả ảnh trong khung 16:9 | |
 | 3.6 · ORG-03 | "Dùng ảnh này" → "Lưu thông tin" | Ảnh mới hiện ở ô xem trước; "Đã lưu." | |
 | 3.7 · ORG-04 | Đổi tên một file `.txt` thành `.png` rồi tải làm ảnh | Bị từ chối, báo file không phải ảnh | |
