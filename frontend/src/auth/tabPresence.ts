@@ -22,7 +22,22 @@ function reloadedTab(): boolean {
   }
 }
 
-export async function isFreshOpen(channel: BroadcastChannel | null): Promise<boolean> {
+/**
+ * Coming back from the payment gateway (VNPay's return page) is never "the
+ * site opened afresh": the buyer left in the middle of paying. Treating it as
+ * one logged buyers out right after paying (when the gateway brought them to
+ * another tab or another of the site's addresses).
+ */
+export const isGatewayReturn = (pathname: string) => pathname.startsWith('/payments/')
+
+export async function isFreshOpen(
+  channel: BroadcastChannel | null,
+  pathname = typeof location === 'undefined' ? '/' : location.pathname,
+): Promise<boolean> {
+  if (isGatewayReturn(pathname)) {
+    reloadedTab() // this tab is open now
+    return false
+  }
   if (reloadedTab() || !channel) return false
   return new Promise((resolve) => {
     const onMessage = (event: MessageEvent<PresenceMessage>) => {

@@ -17,6 +17,14 @@ beforeEach(() => stubSessionStorage())
 afterEach(() => vi.unstubAllGlobals())
 
 describe('isFreshOpen', () => {
+  test("back from the payment gateway is never a fresh open (it logged buyers out right after paying)", async () => {
+    const me = new BroadcastChannel(NAME)
+    await expect(isFreshOpen(me, '/payments/vnpay/return')).resolves.toBe(false)
+    // …and the tab now counts as open: a reload later is not fresh either.
+    await expect(isFreshOpen(me, '/orders')).resolves.toBe(false)
+    me.close()
+  })
+
   test('the first load with no other tab of the site open is a fresh open', async () => {
     const me = new BroadcastChannel(NAME)
     await expect(isFreshOpen(me)).resolves.toBe(true)

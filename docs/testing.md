@@ -4,8 +4,8 @@ Dự án có 4 tầng kiểm thử, từ nhanh / hẹp tới chậm / rộng:
 
 | Tầng | Công cụ | Số lượng | Chạy ở đâu | Thời gian |
 |---|---|---|---|---|
-| Unit + integration (backend) | Jest + Supertest, PostgreSQL và Redis thật | **415 test**, 46 file | máy dev, CI | ≈ 1–2 phút |
-| Unit (web) | Vitest | **121 test**, 24 file | máy dev, CI | ≈ 2 giây |
+| Unit + integration (backend) | Jest + Supertest, PostgreSQL và Redis thật | **416 test**, 46 file | máy dev, CI | ≈ 1–2 phút |
+| Unit (web) | Vitest | **124 test**, 24 file | máy dev, CI | ≈ 2 giây |
 | End-to-end (trình duyệt) | Playwright (Chromium, desktop + điện thoại) | **26 kịch bản** | máy dev, CI | ≈ 1 phút |
 | Tải (load) | k6 | **5 kịch bản**, số người dùng chọn khi chạy | chạy tay | 1–5 phút / kịch bản |
 
