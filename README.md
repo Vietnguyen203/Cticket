@@ -23,7 +23,7 @@ Nền tảng bán vé sự kiện (concert, sân khấu…), làm như một d�
 - **Danh sách chờ** khi hạng vé hết: có vé trả lại thì người chờ sớm nhất được báo và được giữ vé 30 phút để đặt.
 
 **Ban tổ chức**
-- Tạo sự kiện, suất diễn, hạng vé, gán ghế theo hàng; khóa / mở ghế; đề xuất địa điểm mới; tải ảnh lên; chọn chính sách hủy đơn; bật **hàng chờ mua vé** và xem số người đang mua / đang chờ; trả lời công khai các đánh giá.
+- Tạo sự kiện (một buổi diễn, giờ gõ theo 24 giờ), nghệ sĩ khách mời; tổng số người tham dự theo sức chứa địa điểm, gán hạng vé cho từng khu có sẵn (khu ngồi / khu đứng); khóa / mở ghế; đề xuất địa điểm mới; tải ảnh lên; chọn chính sách hủy đơn; bật **hàng chờ mua vé** và xem số người đang mua / đang chờ; trả lời công khai các đánh giá.
 - Thêm nhân viên soát vé; **báo cáo doanh thu** theo suất / hạng vé, tỷ lệ lấp đầy, số người đã vào cổng, xuất CSV.
 
 **Nhân viên soát vé**
@@ -40,9 +40,9 @@ Nền tảng bán vé sự kiện (concert, sân khấu…), làm như một d�
 |---|---|---|---|
 | ![Chọn ghế](docs/images/02-seat-map.png) | ![Đơn hàng](docs/images/03-order.png) | ![Vé](docs/images/04-ticket.png) | ![Soát vé](docs/images/08-gate-phone.png) |
 
-| Dashboard quản trị | Doanh thu của ban tổ chức | Suất diễn, hạng vé, khóa ghế |
+| Dashboard quản trị | Doanh thu của ban tổ chức | Buổi diễn, nghệ sĩ khách mời, hạng vé |
 |---|---|---|
-| ![Dashboard](docs/images/05-admin-dashboard.png) | ![Doanh thu](docs/images/06-organizer-sales.png) | ![Suất diễn](docs/images/07-organizer-schedules.png) |
+| ![Dashboard](docs/images/05-admin-dashboard.png) | ![Doanh thu](docs/images/06-organizer-sales.png) | ![Buổi diễn](docs/images/07-organizer-schedules.png) |
 
 ## Kiến trúc
 

@@ -171,7 +171,7 @@ Ký hiệu file test tự động:
 | TC-ORG-02 | Tạo sự kiện | Ban tổ chức | Tạo sự kiện (tên, mô tả, danh mục, ảnh) | Sự kiện nháp | P1 | E2E:organizer, BE:events |
 | TC-ORG-03 | Ảnh sự kiện: xem trước và căn chỉnh | Đang sửa sự kiện | "Tải ảnh từ máy" → kéo / thu phóng → "Hiện trọn ảnh" → "Dùng ảnh này" → "Lưu thông tin" | Thẻ xem trước giống kết quả; ảnh lưu 1600 × 900; "Căn chỉnh lại" làm được với ảnh đã tải | P2 | WEB:imageCrop, BE:uploads |
 | TC-ORG-04 | Tải file không phải ảnh | — | Đổi tên file .html thành .png rồi tải | Bị từ chối | P2 | BE:uploads |
-| TC-ORG-05 | Suất diễn, hạng vé, sơ đồ ghế | Sự kiện nháp | Thêm suất, hạng vé ngồi + vé đứng, gán hàng ghế cho hạng | Danh sách kiểm tra "sẵn sàng gửi duyệt" đủ dấu xanh | P1 | E2E:organizer, BE:inventory, WEB:readiness |
+| TC-ORG-05 | Buổi diễn, hạng vé theo khu | Sự kiện nháp | Tab "Buổi diễn & vé": lưu buổi diễn (địa điểm, ngày, giờ 24 giờ); lưu tổng số người tham dự; gán hạng cho từng khu có sẵn (khu ngồi: toàn bộ ghế; khu đứng: số vé) | Danh sách kiểm tra "sẵn sàng gửi duyệt" ở đầu trang không còn mục đỏ | P1 | E2E:organizer, BE:inventory, WEB:readiness, WEB:allocation |
 | TC-ORG-06 | Gửi duyệt → admin duyệt → mở bán | Đủ điều kiện | "Gửi duyệt"; admin "Duyệt và mở bán" | Sự kiện xuất hiện công khai, chọn chỗ được | P1 | E2E:organizer, BE:events |
 | TC-ORG-07 | Sửa khi đang bán | Sự kiện đang bán | Sửa mô tả / ảnh / chính sách hủy / hàng chờ | Lưu được, kể cả sự kiện không có danh mục; tên, giờ, danh mục bị khóa; "Có thay đổi chưa lưu" khi chưa lưu | P2 | BE:events |
 | TC-ORG-08 | Báo cáo bán hàng | Có đơn | Tab "Doanh thu" | Số vé, doanh thu, hoàn tiền, phí hủy đúng | P2 | E2E:refund-report, BE:reports, WEB:reports |

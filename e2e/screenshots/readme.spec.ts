@@ -48,6 +48,11 @@ test('README screenshots', async ({ browser, api, admin }) => {
       show.category,
     ])
     await sql(`UPDATE venues SET name = $2, city = $3 WHERE id = $1`, [world.venue.id, show.venue, show.city])
+    // Guest artists ("Nghệ sĩ khách mời"), as the organizer enters them.
+    await sql(`UPDATE events SET lineup = $2::jsonb WHERE id = $1`, [
+      world.event.id,
+      JSON.stringify(['Hà Anh Tuấn', 'Phương Linh', 'Dàn nhạc Giao hưởng Việt Nam'].map((artist) => ({ artist, time: null, note: null }))),
+    ])
     worlds.push(world)
   }
   const main = worlds[0]
