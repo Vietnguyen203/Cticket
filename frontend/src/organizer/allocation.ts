@@ -2,11 +2,10 @@ import type { LayoutZone, ScheduleTicketType } from '../api/admin'
 import type { SeatPlanDetail } from '../api/organizer'
 
 /**
- * Splitting a show's total attendance ("Tổng số người tham dự") into seated
- * tiers and standing tiers. A seated tier of N seats takes the venue's next N
- * free seats, front rows first (zone order, then row, then seat number):
- * the organizer gives a number, the seats follow; buyers still pick seats on
- * the map.
+ * Splitting a show's total attendance ("Tổng số người tham dự") into tiers
+ * given to the zones the venue already has: a seated zone sells its seats
+ * (buyers pick them on the map, front rows first in every listing), a
+ * standing zone a number of tickets.
  */
 
 const byRow = new Intl.Collator('vi', { numeric: true })
@@ -28,10 +27,66 @@ export function freeSeats(zones: LayoutZone[], plan: SeatPlanDetail) {
   return orderedSeats(zones).filter((seat) => !taken.has(seat.id))
 }
 
-/** The next n free seats, or null if the venue does not have that many left. */
-export function takeSeats(zones: LayoutZone[], plan: SeatPlanDetail, n: number): string[] | null {
-  const free = freeSeats(zones, plan)
-  return n > 0 && free.length >= n ? free.slice(0, n).map((seat) => seat.id) : null
+/** The free seats of the chosen zones, in order (a zone partly taken gives what is left of it). */
+export function freeSeatsOfZones(zones: LayoutZone[], plan: SeatPlanDetail, zoneIds: string[]): string[] {
+  const chosen = new Set(zoneIds)
+  return freeSeats(zones, plan)
+    .filter((seat) => chosen.has(seat.zoneId))
+    .map((seat) => seat.id)
+}
+
+/** A tier already given to a zone of the venue. */
+export interface ZoneTier {
+  id: string
+  name: string
+  price: number
+  places: number
+}
+
+/** One zone of the venue as a line of "Hạng vé theo khu": what it holds, and the tiers it sells. */
+export interface ZoneLine {
+  zone: LayoutZone
+  seated: boolean
+  /** Seats of a seated zone / capacity of a standing zone */
+  places: number
+  /** Seats of a seated zone still in no tier (standing: places minus what its tiers sell) */
+  free: number
+  tiers: ZoneTier[]
+}
+
+/** The venue's zones (seated ones with seats, every standing one) with the tiers given to them. */
+export function zoneLines(zones: LayoutZone[], plan: SeatPlanDetail, ticketTypes: ScheduleTicketType[]): ZoneLine[] {
+  const typeOfSeat = new Map(plan.assignments.map((a) => [a.seatId, a.ticketTypeId]))
+  const active = ticketTypes.filter((tt) => tt.status === 'ACTIVE')
+  return zones
+    .filter((z) => z.kind === 'STANDING' || z.seats.length > 0)
+    .map((zone) => {
+      if (zone.kind === 'SEATED') {
+        const count = new Map<string, number>()
+        for (const seat of zone.seats) {
+          const type = typeOfSeat.get(seat.id)
+          if (type) count.set(type, (count.get(type) ?? 0) + 1)
+        }
+        const tiers = active.filter((tt) => count.has(tt.id)).map((tt) => ({ id: tt.id, name: tt.name, price: tt.price, places: count.get(tt.id)! }))
+        const taken = [...count.values()].reduce((a, b) => a + b, 0)
+        return { zone, seated: true, places: zone.seats.length, free: zone.seats.length - taken, tiers }
+      }
+      const tiers = active
+        .filter((tt) => tt.inventoryMode === 'GENERAL_ADMISSION' && tt.venueZoneId === zone.id)
+        .map((tt) => ({ id: tt.id, name: tt.name, price: tt.price, places: tt.capacity ?? 0 }))
+      const sold = tiers.reduce((sum, tt) => sum + tt.places, 0)
+      return { zone, seated: false, places: zone.capacity ?? 0, free: Math.max(0, (zone.capacity ?? 0) - sold), tiers }
+    })
+}
+
+/** A ticket type code from the zone's code ("Khu A" → "A"), unique in the show ("A-2" if taken). */
+export function tierCode(zoneCode: string, taken: string[]): string {
+  const base = (zoneCode.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/Đ/g, 'D').replace(/[^A-Z0-9_-]/g, '') || 'HANG').slice(0, 40)
+  const used = new Set(taken.map((c) => c.toUpperCase()))
+  if (!used.has(base)) return base
+  let n = 2
+  while (used.has(`${base}-${n}`)) n++
+  return `${base}-${n}`
 }
 
 /** The whole seat plan with `seatIds` added for a tier (the API replaces the plan). */

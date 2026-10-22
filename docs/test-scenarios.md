@@ -103,7 +103,7 @@ Ký hiệu file test tự động:
 | TC-PAY-02 | Thanh toán giả lập thành công | Đơn đang giữ | "Tiếp tục thanh toán" → "Giả lập thanh toán thành công" | "Thanh toán thành công!"; đơn "Đã thanh toán"; vé có QR xuất hiện; email xác nhận kèm vé PDF | P1 | E2E:booking, BE:payments, BE:ticket-pdf |
 | TC-PAY-03 | Thẻ bị từ chối | Đơn chờ thanh toán | "Giả lập thẻ bị từ chối" rồi thanh toán lại | Báo "Thanh toán bị từ chối. Ghế vẫn được giữ"; thanh toán lại được | P1 | E2E:booking, BE:payments |
 | TC-PAY-04 | Bấm thanh toán hai lần | Đơn chờ thanh toán | Bấm nhanh 2 lần / mạng chập chờn | Chỉ trừ tiền 1 lần (Idempotency-Key) | P1 | BE:payments |
-| TC-PAY-05 | VNPay thành công | VNPay sandbox đã cấu hình | "Thanh toán … qua VNPay" → thẻ NCB test → OTP | Quay về trang đơn, đơn đã thanh toán, có vé | P1 | E2E:vnpay, BE:payments-vnpay |
+| TC-PAY-05 | VNPay thành công | VNPay sandbox đã cấu hình | "Thanh toán … qua VNPay" → thẻ NCB test → OTP | Quay về trang đơn **của đúng web đã bắt đầu thanh toán**, vẫn đăng nhập (không bị đăng xuất), đơn đã thanh toán, có vé | P1 | E2E:vnpay, BE:payments-vnpay |
 | TC-PAY-06 | Hủy ở trang VNPay | — | Vào VNPay rồi bấm hủy | Trang kết quả: "Thanh toán chưa thành công: Bạn đã hủy giao dịch trên VNPay."; thanh toán lại được | P1 | E2E:vnpay, BE:payments-vnpay |
 | TC-PAY-07 | IPN (VNPay gọi server) | Tunnel public tới API, IPN URL đã khai báo ở VNPay | Thanh toán, đóng tab trước khi VNPay chuyển về | Đơn vẫn thành đã thanh toán nhờ IPN; IPN lặp lại không phát vé trùng | P2 | BE:payments-vnpay |
 | TC-PAY-08 | Tiền đến muộn | Lượt VNPay đang mở | Đơn hết hạn / bị hủy rồi VNPay mới báo đã trả | Tiền được **hoàn tự động**, email báo khách; ghế không bị bán cho đơn cũ | P2 | BE:payments-vnpay |
@@ -181,7 +181,7 @@ Ký hiệu file test tự động:
 | TC-ORG-12 | Địa điểm chưa có ghế | Suất ở địa điểm có khu ngồi nhưng chưa "Sinh ghế" | Mở thẻ "Suất diễn & vé" | Báo rõ địa điểm chưa có ghế và cách xử lý; địa điểm mình đề xuất thì thêm ghế ngay tại chỗ; hạng "Ghế ngồi" không chọn được; **vé đứng bắt buộc chọn khu đứng** (không còn "không gắn khu"; địa điểm chưa có khu đứng thì không thêm được vé đứng, API cũng từ chối); "Xong, dùng địa điểm này" chỉ bấm được khi địa điểm đã có ghế hoặc khu đứng | P2 | E2E:event-setup, WEB:setup, WEB:readiness |
 | TC-ORG-13 | Nút bị khóa nói lý do; giờ 24 giờ | Đang tạo sự kiện / suất | Bỏ trống danh mục; gõ giờ `25`, rồi `1930` | "Còn thiếu: …" cạnh nút; giờ sai báo "Giờ theo 24 giờ…", `1930` thành `19:30` | P2 | E2E:event-setup, WEB:missing, WEB:dateTimeParts |
 | TC-ORG-14 | Một sự kiện, một buổi diễn | Sự kiện đã có buổi diễn | Tìm cách thêm buổi thứ hai; gọi API thêm suất | Không có nút thêm; API trả 422 `EVENT_HAS_SCHEDULE`; muốn đổi ngày thì sửa ngày giờ của buổi diễn | P2 | BE:events, E2E:event-setup |
-| TC-ORG-15 | Tổng người tham dự → hạng ghế → hạng đứng | Buổi diễn đã có | Nhập tổng; thêm hạng ghế (số ghế), rồi hạng đứng (số vé, khu đứng) | Ghế tự xếp từ hàng đầu, bảng ghi "Khu A: hàng A–B"; "Đã xếp X / Y · còn lại Z"; vượt tổng hoặc vượt số ghế trống bị báo ngay, API trả 422 `CAPACITY_EXCEEDED` | P1 | E2E:organizer, BE:schedule-capacity, WEB:allocation |
+| TC-ORG-15 | Tổng người tham dự → gán hạng cho các khu có sẵn | Buổi diễn đã có | Tổng (mặc định = sức chứa địa điểm); ở bảng "Hạng vé theo khu": gán hạng + giá cho khu ngồi ("Gán N ghế") và khu đứng (số vé ≤ sức chứa khu); "Bỏ gán" | Khu ngồi nhận toàn bộ ghế trống của khu, bảng ghi "Khu A: hàng A–E"; "Đã xếp X / Y · còn lại Z"; vượt tổng hoặc vượt chỗ của khu bị báo ngay, API trả 422 `CAPACITY_EXCEEDED` | P1 | E2E:organizer, E2E:event-setup, BE:schedule-capacity, WEB:allocation |
 
 ## 14. Quản trị (ADM)
 
@@ -271,4 +271,4 @@ cd e2e && npm test
 | LOAD | 3 | 3 | 0 |
 | **Tổng** | **111** | **103** | **8** |
 
-Test tự động hiện có: backend 415 test, web 121 test, E2E 26 kịch bản, k6 5 kịch bản (chi tiết `docs/testing.md`). Những ca "chỉ test tay" cần thiết bị hoặc dịch vụ thật (điện thoại, đồng hồ máy, cài đặt hệ điều hành) hoặc là cảm nhận giao diện.
+Test tự động hiện có: backend 416 test, web 124 test, E2E 26 kịch bản, k6 5 kịch bản (chi tiết `docs/testing.md`). Những ca "chỉ test tay" cần thiết bị hoặc dịch vụ thật (điện thoại, đồng hồ máy, cài đặt hệ điều hành) hoặc là cảm nhận giao diện.
