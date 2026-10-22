@@ -41,7 +41,7 @@ function methods(req, res) {
 
 /** A new VNPay attempt: the web sends the customer to paymentUrl. */
 async function startVnpay(req, res) {
-  const result = await vnpayService.startPayment(await resolveActor(req.user), req.valid.body, { ip: req.ip });
+  const result = await vnpayService.startPayment(await resolveActor(req.user), req.valid.body, { ip: req.ip, origin: req.get('origin') });
   return sendSuccess(res, result, { status: HTTP_CREATED });
 }
 

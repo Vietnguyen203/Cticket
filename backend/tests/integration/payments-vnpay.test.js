@@ -144,6 +144,21 @@ describe('starting a VNPay payment', () => {
     expect(await orderStatus(order.id)).toBe('PAYMENT_PENDING');
   });
 
+  test('VNPay sends the customer back to the web app they paid from (an allowed origin only)', async () => {
+    const returnUrlFrom = async (origin) => {
+      const { buyer, order } = await checkedOutOrder();
+      const req = startVnpay(buyer.token, order.id);
+      if (origin) req.set('Origin', origin);
+      const { paymentUrl } = (await req.expect(201)).body.data;
+      return new URL(paymentUrl).searchParams.get('vnp_ReturnUrl');
+    };
+    // Paid from the Docker web app (:8080) while VNPAY_RETURN_URL says :5173: back to :8080, not to another app
+    // (that looked like opening the site afresh and logged the buyer out).
+    expect(await returnUrlFrom('http://localhost:8080')).toBe('http://localhost:8080/payments/vnpay/return');
+    expect(await returnUrlFrom('https://evil.example')).toBe('http://localhost:5173/payments/vnpay/return');
+    expect(await returnUrlFrom(undefined)).toBe('http://localhost:5173/payments/vnpay/return');
+  });
+
   test('refused: another customer’s order, an order not checked out, less than 3 minutes left', async () => {
     const { buyer, order, schedule, seat } = await checkedOutOrder();
     const [stranger] = await createCustomers(1);

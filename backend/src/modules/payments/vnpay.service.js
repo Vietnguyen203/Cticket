@@ -152,7 +152,7 @@ async function reconcileAttempt(attempt, { reason } = {}) {
  * is paid; otherwise it is replaced (if it gets paid anyway, the money is
  * refunded). VNPay stops taking money EXPIRE_MARGIN before the order's deadline.
  */
-async function startPayment(actor, { orderId }, { ip }) {
+async function startPayment(actor, { orderId }, { ip, origin }) {
   assertEnabled();
   const previous = await paymentsRepository.findPendingGatewayAttempt(pool, orderId);
   if (previous) {
@@ -204,6 +204,7 @@ async function startPayment(actor, { orderId }, { ip }) {
       ipAddr: customerIp(ip),
       createDate,
       expireDate: vnpay.vnTime(new Date(deadline)),
+      returnUrl: vnpay.returnUrlFor(origin),
     }),
   };
 }

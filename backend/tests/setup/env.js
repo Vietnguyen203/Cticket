@@ -39,6 +39,8 @@ process.env.VNPAY_HASH_SECRET = 'test-only-vnpay-hash-secret';
 process.env.VNPAY_PAY_URL = 'https://sandbox.vnpayment.vn/paymentv2/vpcpay.html';
 process.env.VNPAY_API_URL = 'http://127.0.0.1:39180/merchant_webapi/api/transaction';
 process.env.VNPAY_RETURN_URL = 'http://localhost:5173/payments/vnpay/return';
+// The web apps allowed to call the API (and to get the VNPay customer back), whatever backend/.env says.
+process.env.CORS_ORIGINS = 'http://localhost:5173,http://localhost:8080';
 process.env.VNPAY_TIMEOUT_MS = '2000';
 process.env.PAYMENT_SIMULATOR = 'true';
 // Jobs run inline, inside the request, so tests see emails and tickets at

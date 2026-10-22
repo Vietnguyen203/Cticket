@@ -57,12 +57,25 @@ function plainText(text) {
     .slice(0, 255);
 }
 
+const RETURN_PATH = '/payments/vnpay/return';
+
+/**
+ * Where VNPay sends the customer back: the web app the payment was started
+ * from (one of CORS_ORIGINS, never any other address: no open redirect), or
+ * VNPAY_RETURN_URL. Coming back to ANOTHER web app (localhost:8080 after
+ * paying from the dev server on :5173) looked like opening the site afresh,
+ * which ends a session without "remember me": the buyer was logged out.
+ */
+function returnUrlFor(origin) {
+  return origin && env.CORS_ORIGINS.includes(origin) ? `${origin}${RETURN_PATH}` : env.VNPAY_RETURN_URL;
+}
+
 /**
  * The URL that sends the customer to VNPay.
  * @param {{ txnRef: string, amount: number, orderInfo: string, ipAddr: string,
- *   createDate: string, expireDate: string }} payment  amount in đồng
+ *   createDate: string, expireDate: string, returnUrl?: string }} payment  amount in đồng
  */
-function paymentUrl({ txnRef, amount, orderInfo, ipAddr, createDate, expireDate }) {
+function paymentUrl({ txnRef, amount, orderInfo, ipAddr, createDate, expireDate, returnUrl = env.VNPAY_RETURN_URL }) {
   const params = {
     vnp_Version: VERSION,
     vnp_Command: 'pay',
@@ -73,7 +86,7 @@ function paymentUrl({ txnRef, amount, orderInfo, ipAddr, createDate, expireDate 
     vnp_OrderInfo: plainText(orderInfo),
     vnp_OrderType: ORDER_TYPE,
     vnp_Locale: LOCALE,
-    vnp_ReturnUrl: env.VNPAY_RETURN_URL,
+    vnp_ReturnUrl: returnUrl,
     vnp_IpAddr: ipAddr,
     vnp_CreateDate: createDate,
     vnp_ExpireDate: expireDate,
@@ -241,6 +254,7 @@ module.exports = {
   signedQuery,
   plainText,
   paymentUrl,
+  returnUrlFor,
   verifyCallback,
   outcomeOf,
   queryTransaction,
