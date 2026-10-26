@@ -1,4 +1,5 @@
 const { pool } = require('../../database/pool');
+const { withTransaction } = require('../../database/transaction');
 const { recordAudit } = require('../audit');
 const { VENUE_STATUS } = require('../../config/constants');
 const AppError = require('../../utils/AppError');
@@ -80,16 +81,25 @@ async function createVenue(body, viewer) {
  * instead, which hides the venue and stops new schedules from using it.
  */
 async function updateVenue(id, changes) {
-  if (changes.capacity) {
-    // The capacity cannot go below what the zones already hold.
-    const used = await layoutRepository.countPlaces(pool, id);
-    if (used > changes.capacity) {
-      throw new AppError('VENUE_CAPACITY_EXCEEDED', undefined, {
-        details: [{ field: 'body.capacity', message: `the zones already hold ${used}`, capacity: changes.capacity, used, adding: 0 }],
-      });
+  const row = await withTransaction(async (client) => {
+    if (changes.capacity) {
+      await venuesRepository.lockById(client, id);
+      // The capacity cannot go below what the zones hold, nor below a show already planned there.
+      const used = await layoutRepository.countPlaces(client, id);
+      if (used > changes.capacity) {
+        throw new AppError('VENUE_CAPACITY_EXCEEDED', undefined, {
+          details: [{ field: 'body.capacity', message: `the zones already hold ${used}`, capacity: changes.capacity, used, adding: 0 }],
+        });
+      }
+      const show = await venuesRepository.maxShowCapacity(client, id);
+      if (show > changes.capacity) {
+        throw new AppError('VENUE_CAPACITY_EXCEEDED', undefined, {
+          details: [{ field: 'body.capacity', message: `a show is planned for ${show}`, capacity: changes.capacity, used, adding: 0, show }],
+        });
+      }
     }
-  }
-  const row = await venuesRepository.update(pool, id, changes);
+    return venuesRepository.update(client, id, changes);
+  });
   if (!row) {
     throw new AppError('NOT_FOUND', 'Venue not found.');
   }

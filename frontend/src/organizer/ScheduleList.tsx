@@ -29,10 +29,10 @@ export function ScheduleList({ event, onChanged }: { event: EventDetail; onChang
   const venues = useAsync(() => listVenues({ pageSize: 50 }), 'active-venues')
   const [venueId, setVenueId] = useState('')
   const [newVenue, setNewVenue] = useState(false)
-  // One event, one show: the line to set it, while the event has no active show.
-  const active = shows.filter((s) => s.status !== 'CANCELLED')
-  const [extra, setExtra] = useState<number[]>(() => (active.length === 0 ? [1] : []))
-  const several = shows.length + extra.length > 1
+  // One event, one show: the line to set it whenever the draft has no active show
+  // (derived, not kept in state: deleting the only show brings the line back at once).
+  const needsShow = draft && !shows.some((s) => s.status !== 'CANCELLED')
+  const several = shows.length + (needsShow ? 1 : 0) > 1
 
   return (
     <Card className="space-y-4">
@@ -96,23 +96,20 @@ export function ScheduleList({ event, onChanged }: { event: EventDetail; onChang
             onChanged={onChanged}
           />
         ))}
-        {draft &&
-          extra.map((key, index) => (
-            <ScheduleLine
-              key={`new:${key}`}
-              number={several ? shows.length + index + 1 : 0}
-              eventId={event.id}
-              eventStatus={event.status}
-              venueId={eventVenue?.id ?? (newVenue ? '' : venueId)}
-              newVenueOpen={!eventVenue && newVenue}
-              onChanged={() => {
-                setExtra((keys) => keys.filter((k) => k !== key))
-                onChanged()
-              }}
-            />
-          ))}
+        {needsShow && (
+          <ScheduleLine
+            // A fresh line (empty fields) each time the event is left without a show.
+            key={`new:${shows.length}`}
+            number={several ? shows.length + 1 : 0}
+            eventId={event.id}
+            eventStatus={event.status}
+            venueId={eventVenue?.id ?? (newVenue ? '' : venueId)}
+            newVenueOpen={!eventVenue && newVenue}
+            onChanged={onChanged}
+          />
+        )}
       </ol>
-      {shows.length === 0 && extra.length === 0 && <p className="text-sm text-slate-500">Chưa có buổi diễn.</p>}
+      {shows.length === 0 && !needsShow && <p className="text-sm text-slate-500">Chưa có buổi diễn.</p>}
       {!draft && <p className="text-xs text-slate-500">Sự kiện không còn là nháp: không đổi được ngày giờ, chỉ hủy buổi diễn.</p>}
     </Card>
   )

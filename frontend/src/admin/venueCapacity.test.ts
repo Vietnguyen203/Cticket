@@ -19,6 +19,9 @@ describe('venue capacity: the ceiling of the zones and of a show', () => {
     )
     expect(venueCapacityMessage(error({ capacity: 900, used: 980, adding: 0 }))).toBe('Các khu đã có 980 chỗ: sức chứa không thể nhỏ hơn 980.')
     expect(venueCapacityMessage(error({ capacity: 300, used: 0, adding: 301 }))).toBe('Địa điểm chỉ chứa 300 người: không xếp được 301.')
+    expect(venueCapacityMessage(error({ capacity: 900, used: 800, adding: 0, show: 1000 }))).toBe(
+      'Đã có buổi diễn dự kiến 1.000 người ở địa điểm này: sức chứa không thể nhỏ hơn 1.000.',
+    )
     expect(venueCapacityMessage(new ApiError(422, 'OTHER', 'x'))).toBeNull()
   })
 })

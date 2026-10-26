@@ -109,10 +109,22 @@ export function seatRangeLabel(zones: LayoutZone[], seatIds: string[]): string {
   return parts.join('; ')
 }
 
-/** How the total is split so far. remaining < 0: over the total (the API refuses it). */
+/** The whole seat plan with `seatIds` taken off a tier (the other tiers and seats stay). */
+export function planWithout(plan: SeatPlanDetail, ticketTypeId: string, seatIds: string[]) {
+  const off = new Set(seatIds)
+  return planWith({ ...plan, assignments: plan.assignments.filter((a) => !(a.ticketTypeId === ticketTypeId && off.has(a.seatId))) }, ticketTypeId, []).filter(
+    (entry) => entry.seatIds.length > 0,
+  )
+}
+
+/**
+ * How the total is split so far, counted as the API counts it (allocatedPlaces):
+ * every seat in the seat plan (a paused tier keeps its seats), and the
+ * standing tickets of the active standing tiers. remaining < 0: over the total.
+ */
 export function allocation(capacity: number | null | undefined, ticketTypes: ScheduleTicketType[], seatsByTicketType: Record<string, number>) {
   const active = ticketTypes.filter((tt) => tt.status === 'ACTIVE')
-  const seated = active.filter((tt) => tt.inventoryMode === 'RESERVED').reduce((sum, tt) => sum + (seatsByTicketType[tt.id] ?? 0), 0)
+  const seated = Object.values(seatsByTicketType).reduce((sum, n) => sum + n, 0)
   const standing = active.filter((tt) => tt.inventoryMode === 'GENERAL_ADMISSION').reduce((sum, tt) => sum + (tt.capacity ?? 0), 0)
   const allocated = seated + standing
   return { seated, standing, allocated, remaining: capacity ? capacity - allocated : null }

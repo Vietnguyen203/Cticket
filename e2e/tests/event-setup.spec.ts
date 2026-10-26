@@ -1,4 +1,4 @@
-import { at, createCategory, createOrganizer, unique } from '../support/api'
+import { at, createCategory, createOrganizer, createSeatedVenue, unique } from '../support/api'
 import { expect, signIn, test } from '../support/fixtures'
 
 /** "YYYY-MM-DD" in Vietnam, N days from now. */
@@ -125,7 +125,9 @@ test('an approved venue without seats: the organizer is told who can fix it', as
   // Only the standing zone has places (the seated one has no seats): it gets the tier, within the total of 200.
   await expect(page.getByRole('form', { name: 'Gán hạng cho Vip' })).toHaveCount(0)
   const pitForm = page.getByRole('form', { name: 'Gán hạng cho Khu đứng sân' })
-  await expect(pitForm.getByLabel('Số vé')).toHaveValue('300')
+  // The default stays within the total (200 of the zone's 300); more is refused at once.
+  await expect(pitForm.getByLabel('Số vé')).toHaveValue('200')
+  await pitForm.getByLabel('Số vé').fill('300')
   await expect(pitForm.getByText('Chỉ còn 200 người chưa xếp (tổng số người tham dự).')).toBeVisible()
   await pitForm.getByLabel('Tên hạng').fill('Vé đứng')
   await pitForm.getByLabel('Giá (VND)').fill('300000')
@@ -162,4 +164,40 @@ test('a show in the way is named: a 26-hour show entered by mistake is pointed o
   await list.getByRole('button', { name: 'Lưu', exact: true }).click()
   await expect(list.getByText(/Suất đang lưu kéo dài/)).toHaveCount(0)
   await expect(list.getByText(/Kết thúc: 23:55 ngày/)).toBeVisible()
+})
+
+test('a seated zone larger than the total is assigned in part; "Bỏ gán" frees it; deleting the only show brings its line back', async ({ page, api, admin }) => {
+  const organizer = await createOrganizer(api, admin)
+  const category = await createCategory(api, admin)
+  const { venue } = await createSeatedVenue(api, admin) // Khu A: 20 seats, Khu đứng: 100
+  const as = { headers: { Authorization: `Bearer ${organizer.token}` } }
+  const data = async (res: Promise<import('@playwright/test').APIResponse>) => (await (await res).json()).data
+  const { event } = await data(api.post('events', { ...as, data: { title: `Một phần ${unique()}`, categoryIds: [category.id] } }))
+  await data(
+    api.post(`events/${event.id}/schedules`, {
+      ...as,
+      data: { venueId: venue.id, startAt: at(30, 12).toISOString(), endAt: at(30, 14).toISOString(), capacity: 15 },
+    }),
+  )
+
+  await signIn(page, organizer.email, undefined, `/organizer/events/${event.id}?tab=schedules`)
+  // 20 seats, 15 people in total: the zone line proposes 15 of its seats (front rows first).
+  const zoneA = page.getByRole('form', { name: 'Gán hạng cho Khu A' })
+  await expect(zoneA.getByLabel('Số ghế')).toHaveValue('15')
+  await zoneA.getByLabel('Tên hạng').fill('Hạng VIP')
+  await zoneA.getByLabel('Giá (VND)').fill('1000000')
+  await zoneA.getByRole('button', { name: 'Gán 15 ghế' }).click()
+  await expect(page.getByRole('cell', { name: /Ghế ngồi · Khu A: hàng A–B/ })).toBeVisible()
+  await expect(page.getByTestId('allocation')).toContainText('Đã xếp 15 / 15 người')
+
+  await page.getByRole('button', { name: 'Bỏ gán' }).click()
+  await expect(page.getByTestId('allocation')).toContainText('Đã xếp 0 / 15 người')
+  await expect(zoneA.getByLabel('Số ghế')).toHaveValue('15')
+
+  // The only show deleted: the line to set one is there again (no reload).
+  const showLine = page.locator('li', { has: page.getByLabel('Ngày diễn') })
+  await showLine.getByRole('button', { name: 'Xóa', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Xóa' }).click()
+  await expect(page.getByRole('button', { name: 'Lưu buổi diễn' })).toBeVisible()
+  await expect(page.getByLabel('Ngày diễn')).toHaveValue('')
 })

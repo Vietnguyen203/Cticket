@@ -70,3 +70,36 @@ test("a show's total attendance fits in its venue", async () => {
   const raised = await request(app).patch(`/api/v1/schedules/${show.id}`).set(bearer(organizer.token)).send({ capacity: 301 });
   expect(raised.body.error.code).toBe('VENUE_CAPACITY_EXCEEDED');
 });
+
+test('the venue capacity cannot drop below a show planned there; a show moved to a smaller venue is checked too', async () => {
+  const venue = await createVenue(app, admin.token, { capacity: 1000 });
+  const small = await createVenue(app, admin.token, { capacity: 300 });
+  const event = await createEvent(app, organizer.token, { categoryIds: [category.id] });
+  const show = (
+    await request(app)
+      .post(`/api/v1/events/${event.id}/schedules`)
+      .set(bearer(organizer.token))
+      .send({ venueId: venue.id, startAt: at(80, 12), endAt: at(80, 14) })
+      .expect(201)
+  ).body.data.schedule;
+  expect(show.capacity).toBe(1000);
+
+  const lower = await asAdmin(request(app).patch(`/api/v1/venues/${venue.id}`)).send({ capacity: 900 });
+  expect(lower.status).toBe(422);
+  expect(lower.body.error.details[0]).toMatchObject({ capacity: 900, show: 1000 });
+
+  const moved = await request(app).patch(`/api/v1/schedules/${show.id}`).set(bearer(organizer.token)).send({ venueId: small.id });
+  expect(moved.body.error.code).toBe('VENUE_CAPACITY_EXCEEDED');
+  // Moved with a total that fits the new venue: fine.
+  await request(app).patch(`/api/v1/schedules/${show.id}`).set(bearer(organizer.token)).send({ venueId: small.id, capacity: 300 }).expect(200);
+});
+
+test('two zones added at the same instant are checked one after the other (the venue row is locked)', async () => {
+  const venue = await createVenue(app, admin.token, { capacity: 100 });
+  await addZone(venue.id, { code: 'P0', name: 'Đứng', kind: 'STANDING', capacity: 80 }).expect(201);
+  const results = await Promise.all([
+    addZone(venue.id, { code: 'P1', name: 'Đứng 1', kind: 'STANDING', capacity: 20 }),
+    addZone(venue.id, { code: 'P2', name: 'Đứng 2', kind: 'STANDING', capacity: 20 }),
+  ]);
+  expect(results.map((r) => r.status).sort()).toEqual([201, 422]);
+});

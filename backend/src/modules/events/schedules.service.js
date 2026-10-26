@@ -193,6 +193,8 @@ async function updateSchedule(context, actor, scheduleId, body) {
           throw new AppError('VENUE_CHANGE_BLOCKED');
         }
         await assertUsableVenue(client, changes.venueId, event);
+        // The show's total stays within the capacity of its new venue.
+        if (capacity === undefined) await assertFitsVenue(client, changes.venueId, schedule.capacity);
       }
       await assertNoOverlap(client, {
         eventId: event.id,

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { LayoutZone, ScheduleTicketType } from '../api/admin'
-import { allocation, freeSeats, freeSeatsOfZones, planWith, seatRangeLabel, tierCode, zoneLines } from './allocation'
+import { allocation, freeSeats, freeSeatsOfZones, planWith, planWithout, seatRangeLabel, tierCode, zoneLines } from './allocation'
 
 const seat = (zoneId: string, rowLabel: string, n: number) => ({ id: `${zoneId}-${rowLabel}${n}`, zoneId, code: `${rowLabel}${n}`, rowLabel, seatNumber: n, seatType: 'STANDARD' })
 const rows = (zoneId: string, labels: string[], perRow: number) => labels.flatMap((r) => Array.from({ length: perRow }, (_, i) => seat(zoneId, r, i + 1)))
@@ -38,6 +38,26 @@ test('allocation: seated seats + standing tickets against the total', () => {
   const types = [tt('vip', 'RESERVED', null), tt('ga', 'GENERAL_ADMISSION', 750), tt('old', 'GENERAL_ADMISSION', 99, 'INACTIVE')]
   expect(allocation(1000, types, { vip: 50 })).toEqual({ seated: 50, standing: 750, allocated: 800, remaining: 200 })
   expect(allocation(null, types, { vip: 50 }).remaining).toBeNull()
+  // A paused seated tier keeps its seats in the plan, and the API counts them: so does the page.
+  const paused = [tt('vip', 'RESERVED', null), tt('old-vip', 'RESERVED', null, 'INACTIVE'), tt('ga', 'GENERAL_ADMISSION', 60)]
+  expect(allocation(100, paused, { vip: 10, 'old-vip': 30 })).toEqual({ seated: 40, standing: 60, allocated: 100, remaining: 0 })
+})
+
+test('planWithout: one zone taken off a tier; the tier keeps its other seats, the other tiers stay', () => {
+  const plan = {
+    totalAssignedSeats: 4,
+    assignments: [
+      { seatId: 'A-A1', ticketTypeId: 'vip' },
+      { seatId: 'B-C1', ticketTypeId: 'vip' },
+      { seatId: 'B-C2', ticketTypeId: 'vip' },
+      { seatId: 'A-A2', ticketTypeId: 'std' },
+    ],
+  }
+  expect(planWithout(plan, 'vip', ['B-C1', 'B-C2', 'B-C3'])).toEqual([
+    { ticketTypeId: 'vip', seatIds: ['A-A1'] },
+    { ticketTypeId: 'std', seatIds: ['A-A2'] },
+  ])
+  expect(planWithout(plan, 'std', ['A-A2'])).toEqual([{ ticketTypeId: 'vip', seatIds: ['A-A1', 'B-C1', 'B-C2'] }])
 })
 
 test('freeSeatsOfZones: every free seat of the zone, front rows first (a partly taken zone gives what is left)', () => {
