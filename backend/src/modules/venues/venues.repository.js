@@ -99,4 +99,24 @@ async function activate(db, ids) {
   await db.query(`UPDATE venues SET status = 'ACTIVE' WHERE id = ANY($1::uuid[]) AND status = 'PENDING'`, [ids]);
 }
 
-module.exports = { list, findById, insert, update, lockVenuesOfEvent, activate };
+/**
+ * The venue row, locked: changes of its zones / seats / capacity are checked
+ * against its capacity one at a time (two at once could each fit and together not).
+ */
+async function lockById(db, id) {
+  const { rows } = await db.query(`SELECT ${COLUMNS} FROM venues WHERE id = $1 FOR UPDATE`, [id]);
+  return rows[0] ?? null;
+}
+
+/** The largest total attendance planned for a live show at the venue (0: none). */
+async function maxShowCapacity(db, venueId) {
+  const { rows } = await db.query(
+    `SELECT coalesce(max(s.capacity), 0)::int AS n
+     FROM event_schedules s JOIN events e ON e.id = s.event_id
+     WHERE s.venue_id = $1 AND s.status = 'SCHEDULED' AND e.status IN ('DRAFT', 'PENDING_APPROVAL', 'PUBLISHED')`,
+    [venueId],
+  );
+  return rows[0].n;
+}
+
+module.exports = { list, findById, lockById, maxShowCapacity, insert, update, lockVenuesOfEvent, activate };

@@ -47,7 +47,9 @@ test('organizer builds an event in the pages, submits it; the admin approves; it
   const pit = page.getByRole('form', { name: 'Gán hạng cho Khu đứng' })
   await pit.getByLabel('Tên hạng').fill('Vé đứng')
   await pit.getByLabel('Giá (VND)').fill('300000')
-  await expect(pit.getByLabel('Số vé')).toHaveValue('100')
+  // The zone holds 100 but only 50 of the 70 are left: that is the default; more is refused at once.
+  await expect(pit.getByLabel('Số vé')).toHaveValue('50')
+  await pit.getByLabel('Số vé').fill('51')
   await expect(pit.getByText('Chỉ còn 50 người chưa xếp (tổng số người tham dự).')).toBeVisible()
   await pit.getByLabel('Số vé').fill('50')
   await pit.getByRole('button', { name: 'Gán', exact: true }).click()

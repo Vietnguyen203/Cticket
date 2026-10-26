@@ -17,8 +17,9 @@ const n = (value: number) => value.toLocaleString('vi-VN')
  */
 export function venueCapacityMessage(error: ApiError): string | null {
   if (error.code !== 'VENUE_CAPACITY_EXCEEDED' || !Array.isArray(error.details)) return null
-  const d = error.details[0] as { capacity?: number; used?: number; adding?: number } | undefined
+  const d = error.details[0] as { capacity?: number; used?: number; adding?: number; show?: number } | undefined
   if (!d?.capacity) return null
+  if (d.show) return `Đã có buổi diễn dự kiến ${n(d.show)} người ở địa điểm này: sức chứa không thể nhỏ hơn ${n(d.show)}.`
   if (!d.adding) return `Các khu đã có ${n(d.used ?? 0)} chỗ: sức chứa không thể nhỏ hơn ${n(d.used ?? 0)}.`
   if (!d.used) return `Địa điểm chỉ chứa ${n(d.capacity)} người: không xếp được ${n(d.adding)}.`
   return `Vượt sức chứa ${n(d.capacity)} của địa điểm: các khu đã có ${n(d.used)} chỗ, chỉ còn thêm được ${n(Math.max(0, d.capacity - d.used))}.`

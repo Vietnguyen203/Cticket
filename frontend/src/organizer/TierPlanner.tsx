@@ -4,7 +4,7 @@ import { createTicketType, deleteTicketType, saveSeatPlan, updateSchedule } from
 import { Alert, Button, TextField } from '../components/ui'
 import { venueCapacityMessage, zonePlaces } from '../admin/venueCapacity'
 import { formatVnd } from '../utils/format'
-import { allocation, freeSeatsOfZones, planWith, tierCode, zoneLines, type ZoneLine } from './allocation'
+import { allocation, freeSeatsOfZones, planWith, planWithout, tierCode, zoneLines, type ZoneLine } from './allocation'
 import type { LoadedSchedule } from './setup'
 
 /**
@@ -152,21 +152,25 @@ function ZoneTierLine({ line, setup, remaining, onChanged }: { line: ZoneLine; s
   const { zone, seated } = line
   const [name, setName] = useState(zone.name)
   const [price, setPrice] = useState('')
-  const [count, setCount] = useState(String(line.free))
+  // The number typed; until then, what the zone has left within the total (follows every change).
+  const [typed, setTyped] = useState<string | null>(null)
+  const count = typed ?? String(Math.max(0, Math.min(line.free, remaining)))
   const [maxPerOrder, setMaxPerOrder] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const n = (x: number) => x.toLocaleString('vi-VN')
 
-  // Seated: every free seat of the zone. Standing: the number typed (default: what the zone has left).
-  const places = seated ? line.free : Number(count)
+  // Seated: that many of the zone's free seats, front rows first. Standing: that many tickets.
+  const places = Number(count)
   const problem =
     line.free === 0
       ? null
       : !Number.isInteger(places) || places < 1
-        ? 'Nhập số vé (số nguyên dương).'
-        : !seated && places > line.free
-          ? `Khu còn ${n(line.free)} chỗ.`
+        ? seated
+          ? 'Nhập số ghế (số nguyên dương).'
+          : 'Nhập số vé (số nguyên dương).'
+        : places > line.free
+          ? `Khu còn ${n(line.free)} ${seated ? 'ghế trống' : 'chỗ'}.`
           : places > remaining
             ? `Chỉ còn ${n(Math.max(0, remaining))} người chưa xếp (tổng số người tham dự).`
             : null
@@ -187,7 +191,7 @@ function ZoneTierLine({ line, setup, remaining, onChanged }: { line: ZoneLine; s
       })
       if (seated && zones) {
         try {
-          await saveSeatPlan(schedule.id, planWith(plan, created.id, freeSeatsOfZones(zones, plan, [zone.id])))
+          await saveSeatPlan(schedule.id, planWith(plan, created.id, freeSeatsOfZones(zones, plan, [zone.id]).slice(0, places)))
         } catch (err) {
           // A seated tier without its seats would be a dead end: take it back.
           await deleteTicketType(created.id).catch(() => undefined)
@@ -195,6 +199,7 @@ function ZoneTierLine({ line, setup, remaining, onChanged }: { line: ZoneLine; s
         }
       }
       setPrice('')
+      setTyped(null)
       onChanged()
     } catch (err) {
       setError(toApiError(err).message)
@@ -203,11 +208,20 @@ function ZoneTierLine({ line, setup, remaining, onChanged }: { line: ZoneLine; s
     }
   }
 
+  /**
+   * Takes the tier off THIS zone. A seated tier that also has seats in other
+   * zones (rows set with the advanced editor) keeps them: only this zone's
+   * seats leave it. Otherwise the tier itself goes.
+   */
   async function unassign(id: string) {
     setBusy(true)
     setError(null)
     try {
-      await deleteTicketType(id)
+      const zoneSeats = new Set(zone.seats.map((s) => s.id))
+      const elsewhere = seated && plan.assignments.some((a) => a.ticketTypeId === id && !zoneSeats.has(a.seatId))
+      if (elsewhere) await saveSeatPlan(schedule.id, planWithout(plan, id, [...zoneSeats]))
+      else await deleteTicketType(id)
+      setTyped(null)
       onChanged()
     } catch (err) {
       setError(toApiError(err).message)
@@ -240,9 +254,15 @@ function ZoneTierLine({ line, setup, remaining, onChanged }: { line: ZoneLine; s
         <form onSubmit={assign} className="flex flex-wrap items-end gap-2" noValidate aria-label={`Gán hạng cho ${zone.name}`}>
           <TextField label="Tên hạng" name={`tier-name-${zone.id}`} value={name} onChange={(e) => setName(e.target.value)} />
           <TextField label="Giá (VND)" name={`tier-price-${zone.id}`} type="number" min={0} step={1000} value={price} onChange={(e) => setPrice(e.target.value)} />
-          {!seated && (
-            <TextField label="Số vé" name={`tier-count-${zone.id}`} type="number" min={1} max={line.free} value={count} onChange={(e) => setCount(e.target.value)} />
-          )}
+          <TextField
+            label={seated ? 'Số ghế' : 'Số vé'}
+            name={`tier-count-${zone.id}`}
+            type="number"
+            min={1}
+            max={line.free}
+            value={count}
+            onChange={(e) => setTyped(e.target.value)}
+          />
           <TextField
             label="Tối đa / đơn"
             name={`tier-max-${zone.id}`}
@@ -254,7 +274,7 @@ function ZoneTierLine({ line, setup, remaining, onChanged }: { line: ZoneLine; s
             onChange={(e) => setMaxPerOrder(e.target.value)}
           />
           <Button type="submit" loading={busy} disabled={!name.trim() || price === '' || Boolean(problem)}>
-            {seated ? `Gán ${n(line.free)} ghế` : 'Gán'}
+            {seated ? `Gán ${n(places > 0 ? places : line.free)} ghế` : 'Gán'}
           </Button>
           {problem && <p className="w-full text-sm text-red-600">{problem}</p>}
         </form>

@@ -180,8 +180,8 @@ export function EventDetailPage() {
                   Nghệ sĩ khách mời
                 </h2>
                 <ul aria-labelledby="nghe-si" className="mt-3 flex flex-wrap gap-2">
-                  {e.lineup.map((item) => (
-                    <li key={item.artist} className="rounded-full border border-line bg-white px-3.5 py-1.5 text-sm font-semibold text-ink">
+                  {e.lineup.map((item, index) => (
+                    <li key={`${index}:${item.artist}`} className="rounded-full border border-line bg-white px-3.5 py-1.5 text-sm font-semibold text-ink">
                       {item.artist}
                     </li>
                   ))}

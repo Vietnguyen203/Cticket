@@ -66,11 +66,14 @@ async function assertFitsVenue(db, venue, adding, keep = {}) {
 }
 
 async function createZone(venueId, body, viewer) {
-  const venue = await venuesRepository.findById(pool, venueId);
-  assertCanBuild(venue, viewer);
-  if (body.kind === ZONE_KIND.STANDING) await assertFitsVenue(pool, venue, body.capacity ?? 0);
-  // A duplicate code is rejected by UNIQUE(venue_id, code) → 409 ZONE_CODE_TAKEN.
-  return toPublicZone(await layoutRepository.insertZone(pool, { venueId, ...body }));
+  return withTransaction(async (client) => {
+    // Locked: two zones added at once are checked against the capacity one after the other.
+    const venue = await venuesRepository.lockById(client, venueId);
+    assertCanBuild(venue, viewer);
+    if (body.kind === ZONE_KIND.STANDING) await assertFitsVenue(client, venue, body.capacity ?? 0);
+    // A duplicate code is rejected by UNIQUE(venue_id, code) → 409 ZONE_CODE_TAKEN.
+    return toPublicZone(await layoutRepository.insertZone(client, { venueId, ...body }));
+  });
 }
 
 async function updateZone(zoneId, changes) {
@@ -83,10 +86,14 @@ async function updateZone(zoneId, changes) {
       details: [{ field: 'body.capacity', message: 'a STANDING zone needs a capacity' }],
     });
   }
-  if (zone.kind === ZONE_KIND.STANDING && changes.capacity) {
-    await assertFitsVenue(pool, await venuesRepository.findById(pool, zone.venue_id), changes.capacity, { excludeZoneId: zoneId });
+  if (!(zone.kind === ZONE_KIND.STANDING && changes.capacity)) {
+    return toPublicZone(await layoutRepository.updateZone(pool, zoneId, changes));
   }
-  return toPublicZone(await layoutRepository.updateZone(pool, zoneId, changes));
+  return withTransaction(async (client) => {
+    const venue = await venuesRepository.lockById(client, zone.venue_id);
+    await assertFitsVenue(client, venue, changes.capacity, { excludeZoneId: zoneId });
+    return toPublicZone(await layoutRepository.updateZone(client, zoneId, changes));
+  });
 }
 
 /**
@@ -120,7 +127,7 @@ async function createSeats(zoneId, { rows, layout }, viewer) {
     if (!zone) {
       throw new AppError('NOT_FOUND', 'Zone not found.');
     }
-    const venue = await venuesRepository.findById(client, zone.venue_id);
+    const venue = await venuesRepository.lockById(client, zone.venue_id);
     assertCanBuild(venue, viewer);
     if (zone.kind !== ZONE_KIND.SEATED) {
       throw new AppError('ZONE_NOT_SEATED');
