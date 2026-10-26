@@ -34,6 +34,9 @@ test('buy 2 seats + 1 standing: hold, wrong then right code, declined card, paid
   await expect(page.getByText(`Mã ${code}: giảm 450.000`)).toBeVisible()
   await expect(page.getByRole('row', { name: /Tổng cộng/ })).toContainText('4.050.000')
 
+  // No checkout before the terms of sale are accepted.
+  await expect(page.getByRole('button', { name: 'Tiếp tục thanh toán' })).toBeDisabled()
+  await page.getByRole('checkbox', { name: /Tôi đã đọc và đồng ý/ }).check()
   await page.getByRole('button', { name: 'Tiếp tục thanh toán' }).click()
   await page.getByRole('button', { name: 'Giả lập thẻ bị từ chối' }).click()
   await expect(page.getByText('Thanh toán bị từ chối. Ghế vẫn được giữ')).toBeVisible()

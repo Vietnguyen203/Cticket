@@ -40,8 +40,9 @@ export async function listMyOrders(params: { status?: string; scheduleId?: strin
 }
 
 /** HELD → PAYMENT_PENDING: totals frozen (discount applied), time extended to pay. */
-export async function checkoutOrder(orderId: string, promotionCode?: string): Promise<Order> {
-  return (await api.post(`/orders/${orderId}/checkout`, promotionCode ? { promotionCode } : {})).data.data.order
+/** `termsVersion`: the terms of sale the buyer accepted (TERMS_VERSION of the page they read). */
+export async function checkoutOrder(orderId: string, termsVersion: string, promotionCode?: string): Promise<Order> {
+  return (await api.post(`/orders/${orderId}/checkout`, { termsVersion, ...(promotionCode ? { promotionCode } : {}) })).data.data.order
 }
 
 export interface PromotionPreview {

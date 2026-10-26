@@ -349,6 +349,7 @@ test('the ★ steps of the UI test guide', async ({ browser, api }) => {
       await expect(pageA.getByRole('row', { name: /Tổng cộng/ })).toContainText('2.970.000')
     })
     await step('5.8', 'Thẻ bị từ chối, ghế vẫn giữ', () => pageA, async () => {
+      await pageA.getByRole('checkbox', { name: /Tôi đã đọc và đồng ý/ }).check()
       await pageA.getByRole('button', { name: 'Tiếp tục thanh toán' }).click()
       await pageA.getByRole('button', { name: 'Giả lập thẻ bị từ chối' }).click()
       await expect(pageA.getByText('Thanh toán bị từ chối. Ghế vẫn được giữ')).toBeVisible()
@@ -400,6 +401,7 @@ test('the ★ steps of the UI test guide', async ({ browser, api }) => {
       await pageA.getByRole('button', { name: 'Giữ chỗ (10 phút)' }).click()
       await expect(pageA).toHaveURL(/\/orders\//)
       order2 = pageA.url().split('/').at(-1)!
+      await pageA.getByRole('checkbox', { name: /Tôi đã đọc và đồng ý/ }).check()
       await pageA.getByRole('button', { name: 'Tiếp tục thanh toán' }).click()
       await pageA.getByRole('button', { name: 'Giả lập thanh toán thành công' }).click()
       await expect(pageA.getByRole('link', { name: /Xem QR/ }).first()).toBeVisible()
@@ -465,6 +467,7 @@ test('the ★ steps of the UI test guide', async ({ browser, api }) => {
       await pageB.getByRole('button', { name: 'Thêm Vé đứng' }).click()
       await pageB.getByRole('button', { name: 'Thêm Vé đứng' }).click()
       await pageB.getByRole('button', { name: 'Giữ chỗ (10 phút)' }).click()
+      await pageB.getByRole('checkbox', { name: /Tôi đã đọc và đồng ý/ }).check()
       await pageB.getByRole('button', { name: 'Tiếp tục thanh toán' }).click()
       await pageB.getByRole('button', { name: 'Giả lập thanh toán thành công' }).click()
       await expect(pageB.getByRole('link', { name: /Xem QR/ })).toHaveCount(2)

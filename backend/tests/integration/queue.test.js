@@ -11,6 +11,7 @@ const { QUEUE, enqueue, getQueue, setQueueMode } = require('../../src/queue/queu
 const processors = require('../../src/queue/processors');
 const { startWorkers, MAINTENANCE_SCHEDULE } = require('../../src/worker');
 const { findInventoryMismatches } = require('../../src/modules/orders');
+const { TERMS_VERSION } = require('../../src/config/constants');
 
 const app = createApp();
 const mailbox = useFakeMailbox();
@@ -61,7 +62,7 @@ async function onSale() {
   return { ...world, seat: Object.fromEntries(world.seats.map((s) => [s.code, s.id])) };
 }
 
-const checkout = (token, orderId) => request(app).post(`/api/v1/orders/${orderId}/checkout`).set(bearer(token)).send({});
+const checkout = (token, orderId) => request(app).post(`/api/v1/orders/${orderId}/checkout`).set(bearer(token)).send({ termsVersion: TERMS_VERSION });
 const pay = (token, orderId) =>
   request(app).post('/api/v1/payments').set(bearer(token)).set('Idempotency-Key', randomUUID()).send({ orderId });
 

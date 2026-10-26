@@ -9,6 +9,7 @@ const { createCustomers, book, cancelOrder, makeDue } = require('../helpers/orde
 const { startServer, connect } = require('../helpers/ws');
 const { expireDueOrders } = require('../../src/modules/orders/order-release');
 const { findInventoryMismatches } = require('../../src/modules/orders');
+const { TERMS_VERSION } = require('../../src/config/constants');
 
 const app = createApp();
 const mailbox = useFakeMailbox();
@@ -43,7 +44,7 @@ async function onSale() {
 }
 
 const checkout = (token, orderId, body = {}) =>
-  request(app).post(`/api/v1/orders/${orderId}/checkout`).set(bearer(token)).send(body);
+  request(app).post(`/api/v1/orders/${orderId}/checkout`).set(bearer(token)).send({ termsVersion: TERMS_VERSION, ...body });
 
 const pay = (token, body, key = randomUUID()) =>
   request(app).post('/api/v1/payments').set(bearer(token)).set('Idempotency-Key', key).send(body);
@@ -100,6 +101,24 @@ describe('checkout (ORD-03)', () => {
     expect(rows[0].same_deadline).toBe(true);
 
     expect((await checkout(buyer.token, order.id)).body.error.code).toBe('INVALID_STATE_TRANSITION');
+  });
+
+  test('the terms of sale: required, the current version only, recorded on the order', async () => {
+    const { buyer, order } = await heldOrder();
+    const send = (body) => request(app).post(`/api/v1/orders/${order.id}/checkout`).set(bearer(buyer.token)).send(body);
+
+    const missing = await send({});
+    expect(missing.status).toBe(400);
+    expect(missing.body.error.code).toBe('VALIDATION_ERROR');
+    // A page left open on an older text: refused, with the version to read now.
+    const outdated = await send({ termsVersion: '2020-01-01' });
+    expect(outdated.status).toBe(409);
+    expect(outdated.body.error).toMatchObject({ code: 'TERMS_OUTDATED', details: [{ current: TERMS_VERSION }] });
+    expect((await orderRow(order.id)).status).toBe('HELD');
+
+    const res = await checkout(buyer.token, order.id).expect(200);
+    expect(res.body.data.order.termsVersion).toBe(TERMS_VERSION);
+    expect(new Date(res.body.data.order.termsAcceptedAt).getTime()).toBe(new Date(res.body.data.order.checkedOutAt).getTime());
   });
 
   test('promotions: percentage with a cap, fixed amount, and one use taken per checkout', async () => {

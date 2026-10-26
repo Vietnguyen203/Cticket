@@ -7,6 +7,7 @@ import { RequireAuth } from './auth/RequireAuth'
 import { Layout } from './components/Layout'
 import { HomePage } from './pages/HomePage'
 import { NotFoundPage } from './pages/NotFoundPage'
+import { TermsPage } from './pages/TermsPage'
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage'
 import { LoginPage } from './pages/auth/LoginPage'
 import { RegisterPage } from './pages/auth/RegisterPage'
@@ -64,6 +65,7 @@ export const router = createBrowserRouter([
       { path: 'tickets', element: signedIn(<MyTicketsPage />) },
       { path: 'waitlist', element: signedIn(<WaitlistPage />) }, // Phase 18.4
       { path: 'tickets/:id', element: signedIn(<TicketPage />) },
+      { path: 'dieu-khoan', element: <TermsPage /> },
       { path: 'login', element: <LoginPage /> },
       { path: 'register', element: <RegisterPage /> },
       { path: 'verify-email', element: <VerifyEmailPage /> },

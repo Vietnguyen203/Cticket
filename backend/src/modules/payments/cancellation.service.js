@@ -14,11 +14,11 @@ const { refundTerms } = require('./refund-policy');
 const POLICY_LABELS = { STANDARD: 'Tiêu chuẩn', FLEXIBLE: 'Linh hoạt' };
 const orderNotFound = () => new AppError('NOT_FOUND', 'Order not found.');
 
-/** The order with what the policy needs: its show and the event's policy. */
+/** The order with what the policy needs: its show, the event's policy now and the one at checkout. */
 async function findOrderTerms(db, orderId) {
   const { rows } = await db.query(
     `SELECT o.id, o.user_id, o.status, o.total_amount, es.start_at, es.status AS schedule_status,
-            e.status AS event_status, e.refund_policy
+            e.status AS event_status, e.refund_policy, o.refund_policy AS policy_at_checkout
      FROM orders o
      JOIN event_schedules es ON es.id = o.schedule_id
      JOIN events e ON e.id = es.event_id
@@ -29,19 +29,37 @@ async function findOrderTerms(db, orderId) {
 }
 
 /**
+ * The policy this buyer gets: the one accepted at checkout, or the event's
+ * current one when the organizer has since made it better for the buyer. A
+ * contract's terms are not changed against one party alone (Bộ luật Dân sự
+ * 2015, Điều 406: general terms that remove the other party's rights do not
+ * bind it), so a later, stricter policy never applies to an order already paid.
+ */
+function bestTerms(row, now) {
+  const policies = [...new Set([row.policy_at_checkout, row.refund_policy].filter(Boolean))];
+  const options = policies.map((policy) => ({
+    policy,
+    ...refundTerms({ policy, startAt: row.start_at, paidAmount: row.total_amount, now }),
+  }));
+  const allowed = options.filter((o) => o.allowed).sort((a, b) => b.refundAmount - a.refundAmount);
+  // Nothing allowed: the reason of the policy the buyer accepted (or the only one).
+  return allowed[0] ?? options[0];
+}
+
+/**
  * Can this order be cancelled by its buyer now, and for how much?
  * @returns {Promise<object>} { allowed, reason? , policy, percent, refundAmount, fee, tierEndsAt }
  */
 async function evaluate(db, actor, orderId) {
   const row = await findOrderTerms(db, orderId);
   if (!row || row.user_id !== actor.userId) throw orderNotFound();
-  const base = { policy: row.refund_policy, paidAmount: row.total_amount };
+  const base = { policy: row.policy_at_checkout ?? row.refund_policy, paidAmount: row.total_amount };
   if (row.status !== ORDER_STATUS.PAID) return { ...base, allowed: false, reason: 'NOT_PAID' };
   if (row.event_status !== EVENT_STATUS.PUBLISHED || row.schedule_status !== SCHEDULE_STATUS.SCHEDULED) {
     return { ...base, allowed: false, reason: 'SHOW_NOT_ON_SALE' };
   }
   if (await orders.hasCheckedInTickets(db, orderId)) return { ...base, allowed: false, reason: 'CHECKED_IN' };
-  return { ...base, ...refundTerms({ policy: row.refund_policy, startAt: row.start_at, paidAmount: row.total_amount }) };
+  return { ...base, ...bestTerms(row, new Date()) };
 }
 
 /** GET /orders/:id/cancellation: what cancelling now would give back. */

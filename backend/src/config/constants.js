@@ -247,6 +247,11 @@ const EVENT_LIMITS = Object.freeze({
   MAX_CATEGORIES: 5,
 });
 
+// The terms of sale in force (frontend/src/legal/terms.ts TERMS_VERSION, the
+// /dieu-khoan page). A buyer accepts them at checkout; a new text gets a new
+// version here and there, so a page left open on the old text is refused.
+const TERMS_VERSION = '2026-10-26';
+
 module.exports = {
   ROLES,
   USER_STATUS,
@@ -284,4 +289,5 @@ module.exports = {
   CHECKIN,
   PAGINATION,
   EVENT_LIMITS,
+  TERMS_VERSION,
 };

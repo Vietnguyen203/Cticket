@@ -157,6 +157,12 @@ export const ShieldIcon = (p: IconProps) => (
     <path d="m9 12 2 2 4-4" />
   </Icon>
 )
+export const ExternalLinkIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M14 4h6v6M20 4l-9 9" />
+    <path d="M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10" />
+  </Icon>
+)
 export const QrIcon = (p: IconProps) => (
   <Icon {...p}>
     <rect x="4" y="4" width="6" height="6" rx="1" />

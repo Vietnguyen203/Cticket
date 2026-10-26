@@ -10,6 +10,7 @@ const { createConfiguredEvent, publishEvent } = require('../helpers/inventory');
 const { createCustomers, book } = require('../helpers/orders');
 const { startServer, connect } = require('../helpers/ws');
 const { findInventoryMismatches } = require('../../src/modules/orders');
+const { TERMS_VERSION } = require('../../src/config/constants');
 
 const app = createApp();
 const mailbox = useFakeMailbox();
@@ -34,7 +35,7 @@ afterEach(async () => {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const checkout = (token, orderId) => request(app).post(`/api/v1/orders/${orderId}/checkout`).set(bearer(token)).send({});
+const checkout = (token, orderId) => request(app).post(`/api/v1/orders/${orderId}/checkout`).set(bearer(token)).send({ termsVersion: TERMS_VERSION });
 const pay = (token, orderId) =>
   request(app).post('/api/v1/payments').set(bearer(token)).set('Idempotency-Key', randomUUID()).send({ orderId });
 const scan = (token, body) => request(app).post('/api/v1/check-ins').set(bearer(token)).send(body);

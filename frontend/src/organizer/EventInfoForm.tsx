@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router'
 import { ApiError, toApiError } from '../api/errors'
 import { listCategories } from '../api/events'
 import type { EventInput } from '../api/organizer'
@@ -151,9 +152,15 @@ export function EventInfoForm({ event, onSubmit, submitLabel }: { event?: EventD
           ))}
         </select>
         <span className="mt-1 block text-slate-500">
-          {refundPolicyOf(form.refundPolicy).summary} Phần không hoàn là phí hủy, tính vào doanh thu. Đổi chính sách thì đơn hủy sau đó theo chính sách mới.
+          {refundPolicyOf(form.refundPolicy).summary} Phần không hoàn là phí hủy, tính vào doanh thu. Đổi chính sách chỉ áp dụng cho đơn mua sau đó; đơn đã
+          mua giữ chính sách lúc mua, trừ khi chính sách mới có lợi hơn cho khách.
         </span>
       </label>
+      <p className="-mt-2 text-sm">
+        <Link to="/dieu-khoan#huy-va-hoan-tien" target="_blank" className="font-semibold text-brand-700 hover:underline">
+          Xem Điều kiện giao dịch chung (Điều 5, Điều 6)
+        </Link>
+      </p>
       <fieldset disabled={locked('categoryIds')}>
         <legend className="mb-2 flex w-full flex-wrap items-center gap-x-3 text-sm font-medium text-slate-700">
           Danh mục (chọn ít nhất một)

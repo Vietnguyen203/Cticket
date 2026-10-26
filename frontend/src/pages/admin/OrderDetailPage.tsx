@@ -5,6 +5,7 @@ import { toApiError } from '../../api/errors'
 import { ConfirmDialog, PageHeader } from '../../admin/components'
 import { OrderStatusBadge } from '../../admin/OrderStatusBadge'
 import { Alert, Button, Card, FullPageSpinner } from '../../components/ui'
+import { refundPolicyOf } from '../../payments/refundPolicy'
 import { vnpayReason } from '../../payments/vnpayReasons'
 import { formatDateTime, formatVnd } from '../../utils/format'
 import { useAsync } from '../../utils/useAsync'
@@ -59,6 +60,12 @@ export function OrderDetailPage() {
             {formatDateTime(o.schedule.startAt)} · {o.schedule.venueName}
           </p>
           <p className="text-slate-600">Người mua: {o.buyerEmail}</p>
+          {o.termsAcceptedAt && (
+            <p className="text-slate-600">
+              Đồng ý Điều kiện giao dịch chung phiên bản {o.termsVersion} lúc {formatDateTime(o.termsAcceptedAt)}
+              {o.refundPolicy && <> · chính sách hủy lúc mua: {refundPolicyOf(o.refundPolicy).label}</>}
+            </p>
+          )}
           <table className="mt-3 min-w-full">
             <tbody>
               {o.items.map((item) => (

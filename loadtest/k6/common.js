@@ -9,6 +9,8 @@ import { Counter } from 'k6/metrics'
  * per VU (2.000 tokens × 500 VUs would not fit).
  */
 export const API = __ENV.API_URL || 'http://localhost:3200/api/v1'
+// The terms of sale a buyer accepts at checkout (backend/src/config/constants.js TERMS_VERSION).
+export const TERMS_VERSION = '2026-10-26'
 
 const load = (name, pick) => new SharedArray(name, () => pick(JSON.parse(open('../.data/data.json'))))
 export const tokens = load('tokens', (d) => d.tokens)
@@ -85,7 +87,7 @@ export function purchase(token) {
     return false
   }
   const orderId = hold.json('data.order.id')
-  const checkout = post(`/orders/${orderId}/checkout`, 'POST checkout', token, {})
+  const checkout = post(`/orders/${orderId}/checkout`, 'POST checkout', token, { termsVersion: TERMS_VERSION })
   const paid = checkout.status === 200 && post('/payments', 'POST pay', token, { orderId }, { 'Idempotency-Key': crypto.randomUUID() })
   const ok = check(paid, { 'paid 201': (r) => r && r.status === 201 })
   if (!ok) post(`/orders/${orderId}/cancel`, 'POST cancel', token, {}) // never leave a cart behind

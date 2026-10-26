@@ -102,6 +102,7 @@ test('README screenshots', async ({ browser, api, admin }) => {
   await shot(page, '03-order')
 
   // 4. Paid → a ticket with its QR code
+  await page.getByRole('checkbox', { name: /Tôi đã đọc và đồng ý/ }).check()
   await page.getByRole('button', { name: 'Tiếp tục thanh toán' }).click()
   // Through VNPay (the E2E stack's fake VNPay page).
   await page.getByRole('button', { name: /qua VNPay$/ }).click()

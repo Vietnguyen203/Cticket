@@ -4,6 +4,9 @@ import { E2E_TOTP_SECRET, MAILPIT_URL } from '../stack.mjs'
 import { createAdminAccount } from './db'
 import { totpCode } from './totp'
 
+/** The terms of sale a buyer accepts at checkout (backend/src/config/constants.js TERMS_VERSION). */
+export const TERMS_VERSION = '2026-10-26'
+
 /**
  * Background data made through the API (fast, stable); the part a test is
  * about is then done through the pages. Every name / email is unique, so the
@@ -169,7 +172,7 @@ export async function buy(
 ) {
   const h = { headers: bearer(buyer.token) }
   const { order } = await ok(api.post(`schedules/${scheduleId}/orders`, { ...h, data: body }))
-  await ok(api.post(`orders/${order.id}/checkout`, { ...h, data: {} }))
+  await ok(api.post(`orders/${order.id}/checkout`, { ...h, data: { termsVersion: TERMS_VERSION } }))
   const { payment } = await ok(
     api.post('payments', { headers: { ...h.headers, 'Idempotency-Key': randomUUID() }, data: { orderId: order.id } }),
   )

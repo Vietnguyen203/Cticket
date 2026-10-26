@@ -36,6 +36,7 @@ test('purchase queue: one buys, the other waits, then goes in by himself', async
   // Alice holds a seat and pays: her turn goes to Bob.
   await alicePage.getByRole('button', { name: seat('A01') }).click()
   await alicePage.getByRole('button', { name: 'Giữ chỗ (10 phút)' }).click()
+  await alicePage.getByRole('checkbox', { name: /Tôi đã đọc và đồng ý/ }).check()
   await alicePage.getByRole('button', { name: 'Tiếp tục thanh toán' }).click()
   await alicePage.getByRole('button', { name: 'Giả lập thanh toán thành công' }).click()
   await expect(alicePage.getByRole('link', { name: /Xem QR/ }).first()).toBeVisible()

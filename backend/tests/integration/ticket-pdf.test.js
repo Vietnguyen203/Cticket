@@ -8,6 +8,7 @@ const { useFakeMailbox } = require('../helpers/auth');
 const { bearer, createAdmin, createOrganizer, createCategory } = require('../helpers/catalog');
 const { createConfiguredEvent, publishEvent } = require('../helpers/inventory');
 const { createCustomers, book } = require('../helpers/orders');
+const { TERMS_VERSION } = require('../../src/config/constants');
 
 /** Phase 20: tickets as PDF, in the confirmation email and as downloads. */
 const app = createApp();
@@ -31,7 +32,7 @@ async function paidOrder() {
   const seat = Object.fromEntries(world.seats.map((s) => [s.code, s.id]));
   const [buyer] = await createCustomers(1);
   const { order } = (await book(app, buyer.token, world.schedule.id, { seatIds: [seat.A01, seat.A02] }).expect(201)).body.data;
-  await request(app).post(`/api/v1/orders/${order.id}/checkout`).set(bearer(buyer.token)).send({}).expect(200);
+  await request(app).post(`/api/v1/orders/${order.id}/checkout`).set(bearer(buyer.token)).send({ termsVersion: TERMS_VERSION }).expect(200);
   await request(app).post('/api/v1/payments').set(bearer(buyer.token)).set('Idempotency-Key', randomUUID()).send({ orderId: order.id }).expect(201);
   const email = (await query(`SELECT email FROM users WHERE id = $1`, [buyer.id])).rows[0].email;
   const tickets = (await query(`SELECT id, ticket_code FROM tickets WHERE order_id = $1 ORDER BY ticket_code`, [order.id])).rows;

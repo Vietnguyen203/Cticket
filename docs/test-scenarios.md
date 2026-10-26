@@ -110,6 +110,7 @@ Ký hiệu file test tự động:
 | TC-PAY-09 | Đã thu tiền sau khi báo thất bại | Lượt bị ghi thất bại (07) | VNPay báo thành công sau đó | Đơn còn chờ trả → thành đã thanh toán; không thì hoàn tiền (rà soát lỗi BUG-01) | P3 | BE:payments-vnpay |
 | TC-PAY-10 | Chữ ký sai / số tiền sai | — | Gửi IPN giả (`npm run vnpay:ipn` sửa tham số) | Bị từ chối (97 / 04); đơn không đổi | P2 | BE:payments-vnpay, BE-unit:vnpay |
 | TC-PAY-11 | Đơn 0 đồng | Mã giảm 100% | Áp mã → "Tiếp tục thanh toán" | Đơn thành đã thanh toán ngay, có vé, không qua cổng thanh toán | P3 | BE:payments |
+| TC-PAY-12 | Phải đồng ý Điều kiện giao dịch chung | Đơn đang giữ | Xem nút "Tiếp tục thanh toán" → tích "Tôi đã đọc và đồng ý…" → bấm | Nút mờ cho tới khi tích; đơn lưu phiên bản điều khoản và thời điểm đồng ý (admin thấy ở chi tiết đơn); trang mở trên bản cũ bị từ chối, báo tải lại | P1 | BE:payments, E2E:booking |
 
 ## 8. Hủy đơn và hoàn tiền (REF)
 
@@ -122,6 +123,8 @@ Ký hiệu file test tự động:
 | TC-REF-05 | Admin hoàn tiền | Đơn đã thanh toán | Admin → Đơn hàng → "Hoàn tiền" | Vé hết hiệu lực; báo cáo doanh thu ban tổ chức chuyển sang mục hoàn tiền; có audit | P1 | E2E:refund-report, BE:payments |
 | TC-REF-06 | Hủy cả sự kiện | Sự kiện có đơn đã trả và đơn đang giữ | Ban tổ chức "Hủy sự kiện" (nhập lý do) | Đơn đang giữ bị hủy, đơn đã trả được hoàn hết; khách nhận email | P2 | BE:events, BE:payments-vnpay |
 | TC-REF-07 | VNPay từ chối hoàn | — | (Test tự động mô phỏng) | Hoàn tiền "Thất bại", admin gửi lại được | P3 | BE:payments-vnpay |
+| TC-REF-08 | Chính sách lúc mua được giữ | Đơn mua lúc sự kiện "Linh hoạt" | Ban tổ chức đổi sang "Không hoàn" → khách xem trang đơn | Vẫn hủy được theo "Linh hoạt"; ngược lại, đổi sang chính sách có lợi hơn thì khách được hưởng chính sách mới | P1 | BE:cancellation |
+| TC-REF-09 | Trang Điều kiện giao dịch chung | — | Trang sự kiện → "Điều kiện hủy và hoàn tiền"; chân trang → "Điều kiện giao dịch" | Mở /dieu-khoan đúng Điều 5, có bảng mức hoàn và căn cứ pháp lý | P2 | E2E:terms |
 
 ## 9. Danh sách chờ khi hết vé (WTL)
 
@@ -271,4 +274,4 @@ cd e2e && npm test
 | LOAD | 3 | 3 | 0 |
 | **Tổng** | **111** | **103** | **8** |
 
-Test tự động hiện có: backend 423 test, web 125 test, E2E 27 kịch bản, k6 5 kịch bản (chi tiết `docs/testing.md`). Những ca "chỉ test tay" cần thiết bị hoặc dịch vụ thật (điện thoại, đồng hồ máy, cài đặt hệ điều hành) hoặc là cảm nhận giao diện.
+Test tự động hiện có: backend 425 test, web 128 test, E2E 28 kịch bản, k6 5 kịch bản (chi tiết `docs/testing.md`). Những ca "chỉ test tay" cần thiết bị hoặc dịch vụ thật (điện thoại, đồng hồ máy, cài đặt hệ điều hành) hoặc là cảm nhận giao diện.
