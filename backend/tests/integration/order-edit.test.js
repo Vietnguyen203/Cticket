@@ -7,6 +7,7 @@ const { createConfiguredEvent, publishEvent } = require('../helpers/inventory');
 const { createCustomers, book, makeDue } = require('../helpers/orders');
 const { startServer, connect } = require('../helpers/ws');
 const { findInventoryMismatches } = require('../../src/modules/orders');
+const { TERMS_VERSION } = require('../../src/config/constants');
 
 /**
  * BKG-02: changing the seats / standing tickets of a HELD order.
@@ -60,7 +61,7 @@ async function heldOrder(body, options) {
 const edit = (token, orderId, body) => request(app).put(`/api/v1/orders/${orderId}/items`).set(bearer(token)).send(body);
 const removeSeat = (token, orderId, seatId) =>
   request(app).delete(`/api/v1/orders/${orderId}/seats/${seatId}`).set(bearer(token));
-const checkout = (token, orderId) => request(app).post(`/api/v1/orders/${orderId}/checkout`).set(bearer(token)).send({});
+const checkout = (token, orderId) => request(app).post(`/api/v1/orders/${orderId}/checkout`).set(bearer(token)).send({ termsVersion: TERMS_VERSION });
 
 const seatRow = async (scheduleId, seatId) =>
   (

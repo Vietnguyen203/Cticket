@@ -5,6 +5,7 @@ const { query, closePool } = require('../../src/database/pool');
 const { useFakeMailbox, createLoggedInUser, login, DEFAULT_PASSWORD } = require('../helpers/auth');
 const { bearer, createAdmin, createOrganizer, createCategory, createVenue, createPublishedEvent } = require('../helpers/catalog');
 const { createCustomers, book } = require('../helpers/orders');
+const { TERMS_VERSION } = require('../../src/config/constants');
 
 const app = createApp();
 const mailbox = useFakeMailbox();
@@ -173,7 +174,7 @@ describe('orders and tickets (ORD-05, TKT-03)', () => {
     const [buyer] = await createCustomers(1);
     const ga = (await request(app).get(`/api/v1/schedules/${event.schedules[0].id}/ticket-types`).expect(200)).body.data.ticketTypes[0];
     const { order } = (await book(app, buyer.token, event.schedules[0].id, { items: [{ ticketTypeId: ga.id, quantity: 1 }] }).expect(201)).body.data;
-    await request(app).post(`/api/v1/orders/${order.id}/checkout`).set(bearer(buyer.token)).send({}).expect(200);
+    await request(app).post(`/api/v1/orders/${order.id}/checkout`).set(bearer(buyer.token)).send({ termsVersion: TERMS_VERSION }).expect(200);
     const { payment } = (
       await request(app).post('/api/v1/payments').set(bearer(buyer.token)).set('Idempotency-Key', randomUUID()).send({ orderId: order.id }).expect(201)
     ).body.data;

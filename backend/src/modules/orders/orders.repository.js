@@ -8,7 +8,7 @@ const OPEN = `('HELD', 'PAYMENT_PENDING', 'PAYMENT_FAILED')`;
 
 const ORDER_COLUMNS = `o.id, o.order_code, o.user_id, o.schedule_id, o.status, o.subtotal, o.discount_amount,
   o.total_amount, o.currency, o.expires_at, o.checked_out_at, o.paid_at, o.cancelled_at, o.cancel_reason,
-  o.created_at, o.updated_at,
+  o.terms_version, o.terms_accepted_at, o.refund_policy, o.created_at, o.updated_at,
   (o.status IN ${OPEN} AND o.expires_at <= now()) AS hold_expired,
   CASE WHEN o.status IN ${OPEN} THEN greatest(0, ceil(extract(epoch FROM o.expires_at - now())))::int END
     AS remaining_seconds`;
@@ -187,15 +187,18 @@ async function transition(db, { orderId, from, to, cancelReason = null }) {
  * by the payment window. now() is the transaction's start time, the same
  * value used for the seats' new hold_expires_at.
  */
-async function checkout(db, { orderId, discount, windowSeconds }) {
+async function checkout(db, { orderId, discount, windowSeconds, termsVersion }) {
   const { rows } = await db.query(
     `UPDATE orders
      SET status = 'PAYMENT_PENDING', checked_out_at = now(),
          expires_at = now() + make_interval(secs => $3),
-         discount_amount = $2, total_amount = subtotal - $2
+         discount_amount = $2, total_amount = subtotal - $2,
+         terms_version = $4, terms_accepted_at = now(),
+         refund_policy = (SELECT e.refund_policy FROM event_schedules es JOIN events e ON e.id = es.event_id
+                          WHERE es.id = orders.schedule_id)
      WHERE id = $1 AND status = 'HELD'
      RETURNING id, expires_at, total_amount`,
-    [orderId, discount, windowSeconds],
+    [orderId, discount, windowSeconds, termsVersion],
   );
   return rows[0] ?? null;
 }

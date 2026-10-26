@@ -41,6 +41,8 @@ const listQuery = z.object({
 
 const checkout = z.object({
   promotionCode: z.string().trim().min(3).max(50).optional(),
+  // The version of the terms of sale the buyer read and accepted (required: no sale without them).
+  termsVersion: z.string().trim().min(1).max(20),
 });
 
 module.exports = { idParams, seatParams, createOrder, updateItems, listQuery, checkout };

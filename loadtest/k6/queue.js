@@ -15,7 +15,7 @@ import http from 'k6/http'
 import { check, sleep } from 'k6'
 import exec from 'k6/execution'
 import { Counter, Trend } from 'k6/metrics'
-import { API, authHeaders, errorCode, get, post, queueEvent, refusals, tokens } from './common.js'
+import { API, authHeaders, errorCode, get, post, queueEvent, refusals, TERMS_VERSION, tokens } from './common.js'
 import { assertAccounts, seconds } from './profile.js'
 
 if (!queueEvent) throw new Error('No event with a purchase queue in loadtest/.data/data.json: run node loadtest/seed.mjs again')
@@ -89,7 +89,7 @@ export function buyer() {
     return
   }
   const orderId = hold.json('data.order.id')
-  const checkout = post(`/orders/${orderId}/checkout`, 'POST checkout', token, {})
+  const checkout = post(`/orders/${orderId}/checkout`, 'POST checkout', token, { termsVersion: TERMS_VERSION })
   const paid = checkout.status === 200 && post('/payments', 'POST pay', token, { orderId }, { 'Idempotency-Key': crypto.randomUUID() })
   if (check(paid, { 'paid 201': (r) => r && r.status === 201 })) purchases.add(1)
   else post(`/orders/${orderId}/cancel`, 'POST cancel', token, {}) // ends the turn too

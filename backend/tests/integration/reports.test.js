@@ -9,6 +9,7 @@ const { createCustomers, book } = require('../helpers/orders');
 const { findInventoryMismatches } = require('../../src/modules/orders');
 const { fillRate } = require('../../src/modules/reports/reports.service');
 const { vnToday, addDays } = require('../../src/modules/reports/vn-date');
+const { TERMS_VERSION } = require('../../src/config/constants');
 
 const app = createApp();
 const mailbox = useFakeMailbox();
@@ -67,7 +68,7 @@ async function buy(scheduleId, body, promotionCode) {
   await request(app)
     .post(`/api/v1/orders/${order.id}/checkout`)
     .set(bearer(buyer.token))
-    .send(promotionCode ? { promotionCode } : {})
+    .send({ termsVersion: TERMS_VERSION, ...(promotionCode ? { promotionCode } : {}) })
     .expect(200);
   const { payment } = (
     await request(app).post('/api/v1/payments').set(bearer(buyer.token)).set('Idempotency-Key', randomUUID()).send({ orderId: order.id }).expect(201)

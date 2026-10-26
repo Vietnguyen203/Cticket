@@ -39,6 +39,7 @@ const ERROR_CODES = Object.freeze({
   ACTIVE_ORDER_EXISTS: { status: 409, message: 'You already have an open order for this schedule.' },
   SEATS_UNAVAILABLE: { status: 409, message: 'One or more seats are no longer available.' },
   ORDER_EXPIRED: { status: 409, message: 'This order has expired.' },
+  TERMS_OUTDATED: { status: 409, message: 'The terms of sale have changed; read and accept the current version.' },
   ORDER_NOT_PAYABLE: { status: 409, message: 'This order cannot be paid in its current status.' },
   ORDER_ALREADY_PAID: { status: 409, message: 'This order has already been paid.' },
   PAYMENT_NOT_REFUNDABLE: { status: 409, message: 'Only a successful payment of a paid order can be refunded.' },

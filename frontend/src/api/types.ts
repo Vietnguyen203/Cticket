@@ -266,6 +266,10 @@ export interface Order {
   expiresAt: string | null
   remainingSeconds: number | null
   checkedOutAt: string | null
+  /** The terms of sale accepted at checkout, and the refund policy then (null before checkout) */
+  termsVersion: string | null
+  termsAcceptedAt: string | null
+  refundPolicy: string | null
   paidAt: string | null
   cancelledAt: string | null
   cancelReason: string | null

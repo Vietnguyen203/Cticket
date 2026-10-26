@@ -8,6 +8,7 @@ const { createConfiguredEvent, publishEvent } = require('../helpers/inventory');
 const { createCustomers, book } = require('../helpers/orders');
 const reviews = require('../../src/modules/reviews');
 const reminders = require('../../src/modules/reminders');
+const { TERMS_VERSION } = require('../../src/config/constants');
 
 /** Phase 19: event reviews. See docs/phase-19-reviews-design.md. */
 const app = createApp();
@@ -36,7 +37,7 @@ async function onSale() {
 async function buyer(world, seatCode, { attended = true } = {}) {
   const [customer] = await createCustomers(1);
   const { order } = (await book(app, customer.token, world.schedule.id, { seatIds: [world.seat[seatCode]] }).expect(201)).body.data;
-  await request(app).post(`/api/v1/orders/${order.id}/checkout`).set(bearer(customer.token)).send({}).expect(200);
+  await request(app).post(`/api/v1/orders/${order.id}/checkout`).set(bearer(customer.token)).send({ termsVersion: TERMS_VERSION }).expect(200);
   await request(app).post('/api/v1/payments').set(bearer(customer.token)).set('Idempotency-Key', randomUUID()).send({ orderId: order.id }).expect(201);
   if (attended) await query(`UPDATE tickets SET status = 'USED', used_at = now() WHERE order_id = $1`, [order.id]);
   const email = (await query(`SELECT email FROM users WHERE id = $1`, [customer.id])).rows[0].email;

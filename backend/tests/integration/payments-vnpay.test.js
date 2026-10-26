@@ -10,6 +10,7 @@ const { expireDueOrders } = require('../../src/modules/orders/order-release');
 const { findInventoryMismatches } = require('../../src/modules/orders');
 const vnpay = require('../../src/modules/payments/vnpay');
 const payments = require('../../src/modules/payments');
+const { TERMS_VERSION } = require('../../src/config/constants');
 
 /**
  * Phase 17: payments through VNPay, against a fake VNPay API
@@ -57,7 +58,7 @@ async function checkedOutOrder() {
   const seat = Object.fromEntries(world.seats.map((s) => [s.code, s.id]));
   const [buyer] = await createCustomers(1);
   const { order } = (await book(app, buyer.token, world.schedule.id, { seatIds: [seat.A01] }).expect(201)).body.data;
-  await request(app).post(`/api/v1/orders/${order.id}/checkout`).set(bearer(buyer.token)).send({}).expect(200);
+  await request(app).post(`/api/v1/orders/${order.id}/checkout`).set(bearer(buyer.token)).send({ termsVersion: TERMS_VERSION }).expect(200);
   return { ...world, seat, buyer, order };
 }
 
@@ -525,7 +526,7 @@ describe('refunds through VNPay', () => {
     const { event, schedule, seat, order: paid, attempt } = await paidByVnpay();
     const [other] = await createCustomers(1);
     const open = (await book(app, other.token, schedule.id, { seatIds: [seat.A02] }).expect(201)).body.data.order;
-    await request(app).post(`/api/v1/orders/${open.id}/checkout`).set(bearer(other.token)).send({}).expect(200);
+    await request(app).post(`/api/v1/orders/${open.id}/checkout`).set(bearer(other.token)).send({ termsVersion: TERMS_VERSION }).expect(200);
     const openAttempt = await startAttempt(other.token, open.id);
 
     await changeStatus(app, organizer.token, event.id, 'CANCELLED', 'Storm warning').expect(200);

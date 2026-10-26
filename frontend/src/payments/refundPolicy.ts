@@ -4,17 +4,31 @@
  */
 export type RefundPolicy = 'NONE' | 'STANDARD' | 'FLEXIBLE'
 
-export const REFUND_POLICIES: Array<{ value: RefundPolicy; label: string; summary: string }> = [
-  { value: 'NONE', label: 'Không hoàn', summary: 'Khách không tự hủy đơn được.' },
+/** A tier: cancelling at least `before` the show refunds `percent` (the earliest tier first). */
+export interface RefundTier {
+  before: string
+  percent: number
+}
+
+export const REFUND_POLICIES: Array<{ value: RefundPolicy; label: string; summary: string; tiers: RefundTier[] }> = [
+  { value: 'NONE', label: 'Không hoàn', summary: 'Khách không tự hủy đơn được.', tiers: [] },
   {
     value: 'STANDARD',
     label: 'Tiêu chuẩn',
     summary: 'Hủy trước giờ diễn từ 7 ngày: hoàn 80%; từ 3 ngày: hoàn 50%; sau đó không hủy được.',
+    tiers: [
+      { before: '7 ngày', percent: 80 },
+      { before: '3 ngày', percent: 50 },
+    ],
   },
   {
     value: 'FLEXIBLE',
     label: 'Linh hoạt',
     summary: 'Hủy trước giờ diễn từ 48 giờ: hoàn 100%; từ 24 giờ: hoàn 50%; sau đó không hủy được.',
+    tiers: [
+      { before: '48 giờ', percent: 100 },
+      { before: '24 giờ', percent: 50 },
+    ],
   },
 ]
 

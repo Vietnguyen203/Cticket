@@ -7,6 +7,7 @@ const { bearer, createAdmin, createOrganizer, createCategory } = require('../hel
 const { createConfiguredEvent, publishEvent } = require('../helpers/inventory');
 const { createCustomers, book } = require('../helpers/orders');
 const reminders = require('../../src/modules/reminders');
+const { TERMS_VERSION } = require('../../src/config/constants');
 
 /** Phase 18.2: reminders 24 hours and 2 hours before the show. */
 const app = createApp();
@@ -32,7 +33,7 @@ async function paidOrder({ startsIn = '23 hours', paidAgo = '3 days' } = {}) {
   const seat = world.seats.find((s) => s.code === 'A01').id;
   const [buyer] = await createCustomers(1);
   const { order } = (await book(app, buyer.token, world.schedule.id, { seatIds: [seat] }).expect(201)).body.data;
-  await request(app).post(`/api/v1/orders/${order.id}/checkout`).set(bearer(buyer.token)).send({}).expect(200);
+  await request(app).post(`/api/v1/orders/${order.id}/checkout`).set(bearer(buyer.token)).send({ termsVersion: TERMS_VERSION }).expect(200);
   await request(app)
     .post('/api/v1/payments')
     .set(bearer(buyer.token))

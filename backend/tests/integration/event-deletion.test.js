@@ -7,6 +7,7 @@ const { bearer, createAdmin, createOrganizer, createCategory } = require('../hel
 const { createConfiguredEvent, publishEvent } = require('../helpers/inventory');
 const { createCustomers, book } = require('../helpers/orders');
 const { findInventoryMismatches } = require('../../src/modules/orders');
+const { TERMS_VERSION } = require('../../src/config/constants');
 
 const app = createApp();
 const mailbox = useFakeMailbox();
@@ -54,7 +55,7 @@ async function soldEvent() {
   const { order } = (
     await book(app, buyer.token, world.schedule.id, { seatIds: [seat.A01], items: [{ ticketTypeId: world.standing.id, quantity: 3 }] }).expect(201)
   ).body.data;
-  await request(app).post(`/api/v1/orders/${order.id}/checkout`).set(bearer(buyer.token)).send({ promotionCode: code }).expect(200);
+  await request(app).post(`/api/v1/orders/${order.id}/checkout`).set(bearer(buyer.token)).send({ promotionCode: code, termsVersion: TERMS_VERSION }).expect(200);
   await request(app).post('/api/v1/payments').set(bearer(buyer.token)).set('Idempotency-Key', randomUUID()).send({ orderId: order.id }).expect(201);
   await book(app, holder.token, world.schedule.id, { seatIds: [seat.A02] }).expect(201);
   await query(

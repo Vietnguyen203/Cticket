@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router'
 import { cancelPaidOrder, getCancellationTerms, type CancellationTerms } from '../../api/orders'
 import { toApiError } from '../../api/errors'
 import { ConfirmDialog } from '../../admin/components'
@@ -25,7 +26,10 @@ export function CancelOrderCard({ orderId, onCancelled }: { orderId: string; onC
     return (
       <Card className="text-sm text-slate-600">
         <p>
-          <span className="font-semibold text-slate-800">Chính sách hủy: {policy.label}.</span> {CANCEL_REFUSALS[terms.reason ?? ''] ?? ''}
+          <span className="font-semibold text-slate-800">Chính sách hủy: {policy.label}.</span> {CANCEL_REFUSALS[terms.reason ?? ''] ?? ''}{' '}
+          <Link to="/dieu-khoan#huy-va-hoan-tien" className="font-semibold text-brand-700 hover:underline">
+            Điều kiện hủy và hoàn tiền
+          </Link>
         </p>
       </Card>
     )

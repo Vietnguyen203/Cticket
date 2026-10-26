@@ -9,6 +9,7 @@ const { createCustomers, book } = require('../helpers/orders');
 const { startFakeVnpay, signedCallback, nextTransactionNo } = require('../helpers/fake-vnpay');
 const { findInventoryMismatches } = require('../../src/modules/orders');
 const vnpay = require('../../src/modules/payments/vnpay');
+const { TERMS_VERSION } = require('../../src/config/constants');
 
 /** Phase 18.3: a buyer cancels a paid order under the event's refund policy. */
 const app = createApp();
@@ -45,7 +46,7 @@ async function onSale(policy = 'STANDARD') {
 
 async function holdAndCheckout(world, buyer, seatCode = 'A01', body = {}) {
   const { order } = (await book(app, buyer.token, world.schedule.id, { seatIds: [world.seat[seatCode]] }).expect(201)).body.data;
-  await request(app).post(`/api/v1/orders/${order.id}/checkout`).set(bearer(buyer.token)).send(body).expect(200);
+  await request(app).post(`/api/v1/orders/${order.id}/checkout`).set(bearer(buyer.token)).send({ termsVersion: TERMS_VERSION, ...body }).expect(200);
   return order;
 }
 
@@ -125,6 +126,28 @@ describe('cancelling a paid order (simulator)', () => {
     const [stranger] = await createCustomers(1);
     await preview(stranger.token, used.order.id).expect(404);
     await cancel(stranger.token, used.order.id, 2_000_000).expect(404);
+  });
+
+  test('the policy accepted at checkout holds: a stricter one later does not apply, a better one does', async () => {
+    // Bought under "Linh hoạt" (100% from 48 h before), then the organizer switches to "Không hoàn".
+    const { buyer, order, event } = await paidOrder('FLEXIBLE');
+    await request(app).patch(`/api/v1/events/${event.id}`).set(bearer(organizer.token)).send({ refundPolicy: 'NONE' }).expect(200);
+    expect((await preview(buyer.token, order.id).expect(200)).body.data.cancellation).toMatchObject({
+      allowed: true,
+      policy: 'FLEXIBLE',
+      percent: 100,
+    });
+
+    // Bought under "Không hoàn", then the organizer opens refunds: the buyer gets the better deal.
+    const strict = await paidOrder('NONE');
+    expect((await preview(strict.buyer.token, strict.order.id).expect(200)).body.data.cancellation).toMatchObject({
+      allowed: false,
+      reason: 'NO_REFUND_POLICY',
+    });
+    await request(app).patch(`/api/v1/events/${strict.event.id}`).set(bearer(organizer.token)).send({ refundPolicy: 'STANDARD' }).expect(200);
+    const better = (await preview(strict.buyer.token, strict.order.id).expect(200)).body.data.cancellation;
+    expect(better).toMatchObject({ allowed: true, policy: 'STANDARD', percent: 80 });
+    await cancel(strict.buyer.token, strict.order.id, better.refundAmount).expect(200);
   });
 
   test('two cancels at the same time: one refund', async () => {

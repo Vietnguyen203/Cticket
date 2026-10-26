@@ -19,6 +19,7 @@ test('VNPay: cancelled at VNPay (reason shown), then paid: back on the order wit
   await page.getByRole('button', { name: 'Giữ chỗ (10 phút)' }).click()
   await expect(page).toHaveURL(/\/orders\/[0-9a-f-]{36}$/)
   const orderUrl = page.url()
+  await page.getByRole('checkbox', { name: /Tôi đã đọc và đồng ý/ }).check()
   await page.getByRole('button', { name: 'Tiếp tục thanh toán' }).click()
 
   // 1. To VNPay's page (our signed URL is accepted there), and cancel.

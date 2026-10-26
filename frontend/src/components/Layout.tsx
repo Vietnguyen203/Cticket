@@ -2,13 +2,25 @@ import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { canUseAdmin, canUseOrganizer, canUseStaff } from '../admin/permissions'
 import { useAuth } from '../auth/AuthContext'
-import { CloseIcon, MenuIcon, SearchIcon } from './icons'
+import { CloseIcon, ExternalLinkIcon, MenuIcon, SearchIcon } from './icons'
 import { Alert, Button, FullPageSpinner } from './ui'
 
+// Narrower between lg and xl: an admin who is also organizer and gate staff has 8 links in one row.
 const navClass = ({ isActive }: { isActive: boolean }) =>
-  `whitespace-nowrap rounded-control px-3 py-2 text-sm font-medium transition duration-150 ${
+  `whitespace-nowrap rounded-control px-3 py-2 text-sm font-medium transition duration-150 lg:px-2 xl:px-3 ${
     isActive ? 'bg-brand-50 text-brand-800' : 'text-slate-600 hover:bg-slate-100 hover:text-ink'
   }`
+
+/** "Chính sách": the terms of sale and refund policies, in a new tab (the current page, a held order, stays open). */
+function PoliciesLink({ className = '', onClick }: { className?: string; onClick?: () => void }) {
+  return (
+    <a href="/dieu-khoan" target="_blank" rel="noopener" onClick={onClick} className={`${navClass({ isActive: false })} inline-flex items-center gap-1 ${className}`}>
+      Chính sách
+      <ExternalLinkIcon size={14} className="text-slate-400" />
+      <span className="sr-only"> (mở tab mới)</span>
+    </a>
+  )
+}
 
 /** The site's mark: the favicon and the name. */
 function Logo({ dark = false, compact = false }: { dark?: boolean; compact?: boolean }) {
@@ -71,12 +83,13 @@ export function Layout() {
           <Link to="/" className="mr-3 rounded-control" aria-label="ETP Tickets, trang chủ">
             <Logo compact />
           </Link>
-          <nav aria-label="Chính" className="hidden flex-1 items-center gap-1 lg:flex">
+          <nav aria-label="Chính" className="hidden flex-1 items-center gap-0.5 lg:flex xl:gap-1">
             {links.map(([to, label]) => (
               <NavLink key={to} to={to} className={navClass}>
                 {label}
               </NavLink>
             ))}
+            <PoliciesLink />
           </nav>
           <div className="flex-1 lg:hidden" />
           <Link
@@ -96,8 +109,9 @@ export function Layout() {
               <span aria-hidden="true" className="flex h-8 w-8 items-center justify-center rounded-full bg-ink text-xs font-semibold uppercase text-white">
                 {user.firstName.slice(0, 1)}
               </span>
-              <span className="hidden max-w-28 truncate sm:block">{user.firstName}</span>
-              <span className="sr-only sm:hidden">{user.firstName}</span>
+              {/* Beside the avatar from sm, except lg–xl where the menu row needs the room. */}
+              <span className="hidden max-w-28 truncate sm:block lg:hidden xl:block">{user.firstName}</span>
+              <span className="sr-only sm:hidden lg:block xl:hidden">{user.firstName}</span>
             </NavLink>
           ) : (
             status === 'anonymous' && (
@@ -135,6 +149,7 @@ export function Layout() {
                   {label}
                 </NavLink>
               ))}
+              <PoliciesLink onClick={closeMenu} className="!flex !py-3 !text-base" />
               {!signedIn && status === 'anonymous' && (
                 <NavLink to="/register" onClick={closeMenu} className={(state) => `block ${navClass(state)} !py-3 !text-base`}>
                   Đăng ký tài khoản
@@ -191,6 +206,9 @@ export function Layout() {
             </Link>
             <Link to="/organizer/apply" className="block hover:text-white">
               Trở thành ban tổ chức
+            </Link>
+            <Link to="/dieu-khoan" className="block hover:text-white">
+              Điều kiện giao dịch
             </Link>
           </nav>
           <nav aria-label="Tài khoản" className="space-y-2 text-sm">

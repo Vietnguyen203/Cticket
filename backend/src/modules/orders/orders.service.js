@@ -12,6 +12,7 @@ const {
   ACTIVE_ORDER_STATUSES,
   CANCEL_REASON,
   ORDER_LIMITS,
+  TERMS_VERSION,
 } = require('../../config/constants');
 const AppError = require('../../utils/AppError');
 const { toLimitOffset, toPageMeta } = require('../../utils/pagination');
@@ -112,6 +113,10 @@ function toOrder(row, items, payments, tickets, refunds) {
     expiresAt: row.expires_at,
     remainingSeconds: row.remaining_seconds,
     checkedOutAt: row.checked_out_at,
+    // The terms of sale accepted at checkout (null before checkout).
+    termsVersion: row.terms_version,
+    termsAcceptedAt: row.terms_accepted_at,
+    refundPolicy: row.refund_policy,
     paidAt: row.paid_at,
     cancelledAt: row.cancelled_at,
     cancelReason: row.cancel_reason,
@@ -706,8 +711,12 @@ async function cancelOrder(context, actor, orderId) {
  * and one use taken now), and extends the hold by the payment window.
  * Lock order: order → its seats → the promotion row, as in every order flow.
  * A 0đ order (100% discount) has nothing to pay and becomes PAID right away.
+ * The buyer accepts the terms of sale in force here (TERMS_VERSION), recorded on the order.
  */
-async function checkoutOrder(context, actor, orderId, { promotionCode }) {
+async function checkoutOrder(context, actor, orderId, { promotionCode, termsVersion }) {
+  if (termsVersion !== TERMS_VERSION) {
+    throw new AppError('TERMS_OUTDATED', undefined, { details: [{ field: 'body.termsVersion', current: TERMS_VERSION }] });
+  }
   const outcome = await withTransaction(async (client) => {
     const order = await ordersRepository.findById(client, orderId, { forUpdate: true });
     if (!order || order.user_id !== actor.userId) throw orderNotFound();
@@ -724,7 +733,7 @@ async function checkoutOrder(context, actor, orderId, { promotionCode }) {
     const { discount } = promotionCode
       ? await promotions.useForOrder(client, { code: promotionCode, orderId, subtotal: order.subtotal, userId: actor.userId })
       : { discount: 0 };
-    const checkedOut = await ordersRepository.checkout(client, { orderId, discount, windowSeconds });
+    const checkedOut = await ordersRepository.checkout(client, { orderId, discount, windowSeconds, termsVersion });
     if (checkedOut.total_amount === 0) await markOrderPaid(client, orderId);
     else scheduleExpiry(client, orderId, checkedOut.expires_at);
     return 'CHECKED_OUT';

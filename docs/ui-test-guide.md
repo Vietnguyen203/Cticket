@@ -155,7 +155,7 @@ Hai hồ sơ: "Khách A" và "Khách B", để **cạnh nhau** trên màn hình.
 | 5.5 · BKG-07 | A quay lại trang chọn chỗ của suất này, chọn thêm 1 ghế → giữ chỗ | Báo đã có đơn chưa hoàn tất ở suất này, có link mở đơn đó | |
 | 5.6 · PAY-01 ★ | Ở trang đơn của A: "Mã giảm giá" `SAIMA99` → "Áp dụng" | Báo lỗi, tổng không đổi | |
 | 5.7 · PAY-01 ★ | "Mã giảm giá" `TEST10` → "Áp dụng" | "Mã TEST10: giảm 330.000"; "Tổng cộng" **2.970.000** | |
-| 5.8 · PAY-03 ★ | "Tiếp tục thanh toán" → "Giả lập thẻ bị từ chối" | "Thanh toán bị từ chối. Ghế vẫn được giữ…"; đồng hồ vẫn chạy | |
+| 5.8 · PAY-03 ★ | Nút "Tiếp tục thanh toán" mờ cho tới khi tích "Tôi đã đọc và đồng ý Điều kiện giao dịch chung"; tích → "Tiếp tục thanh toán" → "Giả lập thẻ bị từ chối" | "Thanh toán bị từ chối. Ghế vẫn được giữ…"; đồng hồ vẫn chạy | |
 | 5.9 · PAY-02 ★ | "Giả lập thanh toán thành công" | "Thanh toán thành công!"; 3 vé, mỗi vé có link "Xem QR" | |
 | 5.10 · TKT-03 ★ | Mở hộp thư của A | Email xác nhận đơn, có file PDF vé đính kèm | |
 | 5.11 · TKT-01 ★ | "Xem QR" một vé | Vé dạng cuống vé: sự kiện, giờ, chỗ, "Còn hiệu lực", mã QR, mã vé `TKT-…` | |

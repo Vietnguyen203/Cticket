@@ -165,6 +165,9 @@ export function EventDetailPage() {
               <div>
                 <p className="font-semibold text-ink">Chính sách hủy: {policy.label}</p>
                 <p className="mt-1 leading-relaxed text-slate-600">{policy.summary}</p>
+                <Link to="/dieu-khoan#huy-va-hoan-tien" className="mt-1 inline-block font-semibold text-brand-700 hover:underline">
+                  Điều kiện hủy và hoàn tiền
+                </Link>
               </div>
             </div>
           </aside>

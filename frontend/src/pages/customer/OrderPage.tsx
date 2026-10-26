@@ -19,6 +19,7 @@ import { CalendarIcon, CheckCircleIcon, ChevronLeftIcon, ChevronRightIcon, Clock
 import { VNPAY_MIN_SECONDS, vnpayReason } from '../../payments/vnpayReasons'
 import { CancelOrderCard } from './CancelOrderCard'
 import { realtime } from '../../realtime'
+import { TERMS_VERSION } from '../../legal/terms'
 import { formatDateTime, formatVnd } from '../../utils/format'
 import { mmss, useCountdown } from '../../utils/useCountdown'
 import { useAsync } from '../../utils/useAsync'
@@ -57,6 +58,8 @@ export function OrderPage() {
   const [error, setError] = useState<ApiError | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [code, setCode] = useState('')
+  // The terms of sale: accepted (checkbox) before checkout, sent with their version.
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [checked, setChecked] = useState<PromotionPreview | null>(null)
   const o = order.data
   // A code checked against another subtotal (seats changed since: BKG-02) is not shown.
@@ -210,8 +213,29 @@ export function OrderPage() {
                   <span className="text-sm text-slate-600">Cần thanh toán</span>
                   <span className="text-xl font-bold text-ink">{formatVnd(total)}</span>
                 </div>
+                <label className="flex items-start gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-brand-700"
+                    checked={acceptedTerms}
+                    onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  />
+                  <span>
+                    Tôi đã đọc và đồng ý{' '}
+                    <Link to="/dieu-khoan" target="_blank" className="font-semibold text-brand-700 hover:underline">
+                      Điều kiện giao dịch chung
+                    </Link>
+                    , gồm chính sách hủy và hoàn tiền của sự kiện.
+                  </span>
+                </label>
                 <div className="space-y-2">
-                  <Button size="lg" className="w-full" loading={busy === 'checkout'} onClick={() => run('checkout', () => checkoutOrder(id, preview?.code))}>
+                  <Button
+                    size="lg"
+                    className="w-full"
+                    disabled={!acceptedTerms}
+                    loading={busy === 'checkout'}
+                    onClick={() => run('checkout', () => checkoutOrder(id, TERMS_VERSION, preview?.code))}
+                  >
                     Tiếp tục thanh toán
                   </Button>
                   <Button variant="secondary" className="w-full" loading={busy === 'cancel'} onClick={() => run('cancel', () => cancelOrder(id))}>
