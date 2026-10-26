@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The checks below are called by name from the list in main().
-# shellcheck disable=SC2317
+# shellcheck disable=SC2317,SC2329
 # Is the site really up? Checks from OUTSIDE, through Caddy → nginx → API
 # (Phase 16): after every deploy (GitHub Actions), or by hand.
 #
