@@ -19,17 +19,24 @@ async function insertRefreshToken(db, { userId, tokenHash, familyId, ttlDays, ip
   return rows[0].id;
 }
 
-/** Locks the token row so two refreshes of the same token run one after the other. */
-async function findRefreshTokenForUpdate(db, tokenHash) {
+/**
+ * Locks the token row so two refreshes of the same token run one after the other.
+ * `lost_rotation`: rotated less than `graceSeconds` ago and its successor never
+ * used, i.e. the browser most likely never received the new cookie.
+ */
+async function findRefreshTokenForUpdate(db, tokenHash, { graceSeconds = 0 } = {}) {
   const { rows } = await db.query(
     `SELECT rt.id, rt.user_id, rt.family_id, rt.revoked_at, rt.replaced_by_id, rt.mfa,
             rt.expires_at <= now() AS expired,
+            (rt.replaced_by_id IS NOT NULL AND nx.revoked_at IS NULL
+              AND rt.revoked_at > now() - make_interval(secs => $2)) AS lost_rotation,
             u.status AS user_status
      FROM refresh_tokens rt
      JOIN users u ON u.id = rt.user_id
+     LEFT JOIN refresh_tokens nx ON nx.id = rt.replaced_by_id
      WHERE rt.token_hash = $1
      FOR UPDATE OF rt`,
-    [tokenHash],
+    [tokenHash, graceSeconds],
   );
   return rows[0] ?? null;
 }
@@ -39,6 +46,11 @@ async function markRefreshTokenRotated(db, tokenId, replacedById) {
     `UPDATE refresh_tokens SET revoked_at = now(), replaced_by_id = $2 WHERE id = $1`,
     [tokenId, replacedById],
   );
+}
+
+/** The successor of a lost rotation: nobody holds it, it must never work. */
+async function revokeRefreshToken(db, tokenId) {
+  await db.query(`UPDATE refresh_tokens SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL`, [tokenId]);
 }
 
 async function revokeRefreshTokenFamily(db, familyId) {
@@ -70,6 +82,7 @@ module.exports = {
   insertRefreshToken,
   findRefreshTokenForUpdate,
   markRefreshTokenRotated,
+  revokeRefreshToken,
   revokeRefreshTokenFamily,
   revokeFamilyByTokenHash,
   revokeAllRefreshTokensOfUser,

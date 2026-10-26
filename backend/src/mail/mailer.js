@@ -19,10 +19,13 @@ function getTransporter() {
  * Phase 2 calls this directly; Phase 9 moves the call into a BullMQ worker so
  * HTTP requests never wait for SMTP. Callers depend only on this function.
  *
- * @param {{ to: string, subject: string, text: string, html: string }} message
+ * `attachments` (Phase 20: the tickets as a PDF) go to nodemailer as they are.
+ *
+ * @param {{ to: string, subject: string, text: string, html: string,
+ *   attachments?: Array<{ filename: string, content: Buffer, contentType: string }> }} message
  */
-async function sendMail({ to, subject, text, html }) {
-  await getTransporter().sendMail({ from: env.MAIL_FROM, to, subject, text, html });
+async function sendMail({ to, subject, text, html, attachments = [] }) {
+  await getTransporter().sendMail({ from: env.MAIL_FROM, to, subject, text, html, attachments });
 }
 
 /** Connect and authenticate to the SMTP server without sending anything. */

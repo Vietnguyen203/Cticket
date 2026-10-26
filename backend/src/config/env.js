@@ -43,6 +43,8 @@ const envSchema = z.object({
   JWT_ISSUER: z.string().default('etp-api'),
   JWT_AUDIENCE: z.string().default('etp-app'),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(7),
+  // A token rotated this recently, whose successor was never used, still works once (lost response; 0: never).
+  REFRESH_REUSE_GRACE_SECONDS: z.coerce.number().int().min(0).max(60).default(10),
   // Server-side key for hashing OTP codes (HMAC). Without it, a leaked
   // database would let an attacker brute-force all 1,000,000 codes offline.
   OTP_SECRET: secret,

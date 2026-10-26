@@ -168,14 +168,25 @@ async function login({ email, password, remember }, meta) {
  * Every refresh token works ONCE. Presenting an already-rotated token means a
  * copy of it exists somewhere else (stolen or replayed), so the whole session
  * family is revoked and both holders must log in again.
+ *
+ * One exception, a lost response: the browser left the page (a link, F5, the
+ * return from VNPay) while its refresh was running, so the API rotated the
+ * token but the new cookie never arrived, and the next page load sends the
+ * old one. Within REFRESH_REUSE_GRACE_SECONDS, while the successor was never
+ * used, the old token is rotated once more and the lost successor revoked;
+ * otherwise those page loads would log the user out.
  */
 async function refresh({ refreshToken }, meta) {
   const outcome = await withTransaction(async (client) => {
-    const current = await authRepository.findRefreshTokenForUpdate(client, tokens.hashRefreshToken(refreshToken));
+    const current = await authRepository.findRefreshTokenForUpdate(client, tokens.hashRefreshToken(refreshToken), {
+      graceSeconds: env.REFRESH_REUSE_GRACE_SECONDS,
+    });
     if (!current) {
       return { error: 'INVALID_REFRESH_TOKEN' };
     }
-    if (current.revoked_at) {
+    if (current.lost_rotation) {
+      await authRepository.revokeRefreshToken(client, current.replaced_by_id);
+    } else if (current.revoked_at) {
       if (current.replaced_by_id) {
         await authRepository.revokeRefreshTokenFamily(client, current.family_id);
         return { error: 'REFRESH_TOKEN_REUSED' };

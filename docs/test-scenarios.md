@@ -271,4 +271,4 @@ cd e2e && npm test
 | LOAD | 3 | 3 | 0 |
 | **Tổng** | **111** | **103** | **8** |
 
-Test tự động hiện có: backend 418 test, web 125 test, E2E 27 kịch bản, k6 5 kịch bản (chi tiết `docs/testing.md`). Những ca "chỉ test tay" cần thiết bị hoặc dịch vụ thật (điện thoại, đồng hồ máy, cài đặt hệ điều hành) hoặc là cảm nhận giao diện.
+Test tự động hiện có: backend 423 test, web 125 test, E2E 27 kịch bản, k6 5 kịch bản (chi tiết `docs/testing.md`). Những ca "chỉ test tay" cần thiết bị hoặc dịch vụ thật (điện thoại, đồng hồ máy, cài đặt hệ điều hành) hoặc là cảm nhận giao diện.
