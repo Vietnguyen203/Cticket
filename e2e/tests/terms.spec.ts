@@ -12,7 +12,10 @@ test('the terms of sale: from the event page to the refund article, with the leg
   await expect(page.getByRole('heading', { name: 'Điều kiện giao dịch chung' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Điều 5. Khách hàng hủy đơn và hoàn tiền' })).toBeInViewport()
   await expect(page.getByRole('table', { name: 'Các mức hoàn tiền khi Khách hàng tự hủy đơn' }).getByRole('row')).toHaveCount(4)
-  await expect(page.getByText('Bộ luật Dân sự số 91/2015/QH13')).toBeVisible()
+  // Each legal basis opens its full text in a new tab (not followed here: an outside site).
+  const civilCode = page.getByRole('link', { name: /^Bộ luật Dân sự số 91\/2015\/QH13/ })
+  await expect(civilCode).toHaveAttribute('href', /^https:\/\/thuvienphapluat\.vn\/van-ban\//)
+  await expect(civilCode).toHaveAttribute('target', '_blank')
 
   // Also one click away from every page: the footer, and "Chính sách" in the menu (a new tab).
   await page.goto('/')

@@ -10,27 +10,40 @@ export const TERMS_EFFECTIVE_DATE = '26/10/2026'
 export interface LegalBasis {
   law: string
   articles?: string
+  /** The full text (Thư viện Pháp luật), opened in a new tab. */
+  url: string
 }
 
 /** "Căn cứ": the laws the terms rest on, as in a Vietnamese contract's preamble. */
 export const LEGAL_BASES: LegalBasis[] = [
   {
     law: 'Hiến pháp nước Cộng hòa xã hội chủ nghĩa Việt Nam năm 2013 (sửa đổi, bổ sung năm 2025)',
+    url: 'https://thuvienphapluat.vn/van-ban/Bo-may-hanh-chinh/Hien-phap-nam-2013-215627.aspx',
     articles:
       'Điều 21 (quyền bất khả xâm phạm về đời sống riêng tư, bí mật cá nhân), Điều 32 (quyền sở hữu thu nhập hợp pháp, tài sản), Điều 33 (quyền tự do kinh doanh trong những ngành nghề pháp luật không cấm)',
   },
   {
     law: 'Bộ luật Dân sự số 91/2015/QH13',
+    url: 'https://thuvienphapluat.vn/van-ban/Quyen-dan-su/Bo-luat-dan-su-2015-296215.aspx',
     articles:
       'Điều 3 (nguyên tắc tự do, tự nguyện cam kết, thỏa thuận; thiện chí, trung thực), Điều 385 (hợp đồng), Điều 405 (hợp đồng theo mẫu), Điều 406 (giao kết hợp đồng có điều kiện giao dịch chung), khoản 1 Điều 156 và khoản 2 Điều 351 (sự kiện bất khả kháng)',
   },
   {
-    law: 'Luật Bảo vệ quyền lợi người tiêu dùng số 19/2023/QH15 và Nghị định số 55/2024/NĐ-CP hướng dẫn thi hành',
+    law: 'Luật Bảo vệ quyền lợi người tiêu dùng số 19/2023/QH15',
+    url: 'https://thuvienphapluat.vn/van-ban/Thuong-mai/Luat-Bao-ve-quyen-loi-nguoi-tieu-dung-2023-19-2023-QH15-500102.aspx',
     articles: 'các quy định về hợp đồng theo mẫu, điều kiện giao dịch chung (Điều 23) và giao dịch với người tiêu dùng',
   },
-  { law: 'Luật Giao dịch điện tử số 20/2023/QH15', articles: 'giá trị pháp lý của thông điệp dữ liệu và hợp đồng điện tử' },
-  { law: 'Luật Thương mại điện tử số 122/2025/QH15' },
-  { law: 'Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15' },
+  {
+    law: 'Nghị định số 55/2024/NĐ-CP quy định chi tiết Luật Bảo vệ quyền lợi người tiêu dùng',
+    url: 'https://thuvienphapluat.vn/van-ban/Thuong-mai/Nghi-dinh-55-2024-ND-CP-huong-dan-Luat-Bao-ve-quyen-loi-nguoi-tieu-dung-610488.aspx',
+  },
+  {
+    law: 'Luật Giao dịch điện tử số 20/2023/QH15',
+    url: 'https://thuvienphapluat.vn/van-ban/Cong-nghe-thong-tin/Luat-Giao-dich-dien-tu-2023-20-2023-QH15-513347.aspx',
+    articles: 'giá trị pháp lý của thông điệp dữ liệu và hợp đồng điện tử',
+  },
+  { law: 'Luật Thương mại điện tử số 122/2025/QH15', url: 'https://thuvienphapluat.vn/van-ban/Thuong-mai/Luat-Thuong-mai-dien-tu-2025-so-122-2025-QH15-662035.aspx' },
+  { law: 'Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15', url: 'https://thuvienphapluat.vn/van-ban/Bo-may-hanh-chinh/Luat-Bao-ve-du-lieu-ca-nhan-2025-so-91-2025-QH15-625628.aspx' },
 ]
 
 export interface Article {

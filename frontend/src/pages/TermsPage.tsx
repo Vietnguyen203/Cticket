@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router'
+import { ExternalLinkIcon } from '../components/icons'
 import { Card, PageHeader } from '../components/ui'
 import { ARTICLES, LEGAL_BASES, TERMS_EFFECTIVE_DATE, TERMS_VERSION, type Article } from '../legal/terms'
 import { REFUND_POLICIES } from '../payments/refundPolicy'
@@ -31,12 +32,23 @@ export function TermsPage() {
         <ul className="list-disc space-y-1.5 pl-5">
           {LEGAL_BASES.map((basis) => (
             <li key={basis.law}>
-              <span className="font-medium text-ink">{basis.law}</span>
+              {/* The full text of the law, in a new tab (this page stays). */}
+              <a
+                href={basis.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-sm font-medium text-ink decoration-2 underline-offset-2 transition-colors hover:bg-brand-50 hover:text-brand-700 hover:underline focus-visible:text-brand-700 focus-visible:underline"
+              >
+                {basis.law}
+                <ExternalLinkIcon size={13} className="ml-1 inline-block align-[-1px] text-slate-400" />
+                <span className="sr-only"> (mở toàn văn ở tab mới)</span>
+              </a>
               {basis.articles && <>: {basis.articles}</>}
               ;
             </li>
           ))}
         </ul>
+        <p className="text-xs text-slate-500">Bấm vào tên văn bản để đọc toàn văn trên Thư viện Pháp luật.</p>
         <p>Trên cơ sở tự nguyện, bình đẳng, thiện chí và trung thực, Khách hàng mua vé trên ETP đồng ý với các điều khoản sau.</p>
       </Card>
 
