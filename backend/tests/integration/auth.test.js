@@ -238,14 +238,51 @@ describe('refresh token rotation and logout', () => {
     const first = await refresh(session.refreshToken).expect(200);
     const rotated = first.body.data.refreshToken;
     expect(rotated).not.toBe(session.refreshToken);
+    const latest = (await refresh(rotated).expect(200)).body.data.refreshToken;
 
-    // The original token is presented again → it was copied/stolen.
+    // The original token is presented again, its successor already used → it was copied/stolen.
     const replay = await refresh(session.refreshToken);
     expect(replay.status).toBe(401);
     expect(replay.body.error.code).toBe('REFRESH_TOKEN_REUSED');
 
     // The legitimate newer token died with the family.
-    expect((await refresh(rotated)).status).toBe(401);
+    expect((await refresh(latest)).status).toBe(401);
+  });
+
+  test('a lost response: the old token works once more while its successor was never used', async () => {
+    const { session } = await createLoggedInUser(app, mailbox);
+    const lost = (await refresh(session.refreshToken).expect(200)).body.data.refreshToken;
+
+    // The new token never reached the browser (it left the page): the old one comes back.
+    const again = await refresh(session.refreshToken).expect(200);
+    const kept = again.body.data.refreshToken;
+    expect(kept).not.toBe(lost);
+
+    // The lost successor no longer works (nobody should hold it); the session goes on.
+    expect((await refresh(lost)).status).toBe(401);
+    expect((await refresh(kept)).status).toBe(200);
+  });
+
+  test('past the grace window, the old token is a replay even if its successor was never used', async () => {
+    const { email, session } = await createLoggedInUser(app, mailbox);
+    const unused = (await refresh(session.refreshToken).expect(200)).body.data.refreshToken;
+    await query(
+      `UPDATE refresh_tokens SET revoked_at = now() - interval '1 minute'
+       WHERE replaced_by_id IS NOT NULL AND user_id = (SELECT id FROM users WHERE email = $1)`,
+      [email],
+    );
+
+    const replay = await refresh(session.refreshToken);
+    expect(replay.body.error.code).toBe('REFRESH_TOKEN_REUSED');
+    expect((await refresh(unused)).status).toBe(401);
+  });
+
+  test('a logged-out session never comes back through the grace window', async () => {
+    const { session } = await createLoggedInUser(app, mailbox);
+    const rotated = (await refresh(session.refreshToken).expect(200)).body.data.refreshToken;
+    await request(app).post(api('/logout')).send({ refreshToken: rotated }).expect(204);
+
+    expect((await refresh(session.refreshToken)).status).toBe(401);
   });
 
   test('logout revokes the session; logout is idempotent', async () => {
@@ -318,11 +355,12 @@ describe('refresh token in an httpOnly cookie (web app, Phase 11)', () => {
     expect(res.body.data).not.toHaveProperty('refreshToken');
     const second = valueOf(refreshCookieOf(res));
     expect(second).not.toBe(first);
+    const third = valueOf(refreshCookieOf(await webRefresh(second).expect(200)));
 
     const replay = await webRefresh(first).expect(401);
     expect(replay.body.error.code).toBe('REFRESH_TOKEN_REUSED');
     expect(refreshCookieOf(replay)).toMatch(/etp_refresh=;.*Expires=Thu, 01 Jan 1970/);
-    expect((await webRefresh(second)).status).toBe(401);
+    expect((await webRefresh(third)).status).toBe(401);
   });
 
   test('the cookie is ignored without the header (CSRF); the header without a cookie is no session', async () => {
