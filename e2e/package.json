@@ -6,6 +6,7 @@
   "scripts": {
     "test": "playwright test --project=desktop --project=mobile",
     "screenshots": "playwright test --project=screenshots",
+    "walkthrough": "playwright test --project=walkthrough --global-timeout=1800000",
     "test:ui": "playwright test --ui",
     "report": "playwright show-report",
     "typecheck": "tsc --noEmit"

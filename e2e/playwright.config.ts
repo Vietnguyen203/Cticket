@@ -32,6 +32,14 @@ export default defineConfig({
     { name: 'mobile', use: { ...devices['Pixel 7'] }, testMatch: /\.mobile\.spec\.ts$/, dependencies: ['warmup'] },
     // README images (npm run screenshots); never part of npm test / CI.
     { name: 'screenshots', testDir: './screenshots', use: { ...devices['Desktop Chrome'] } },
+    // The ★ steps of docs/ui-test-guide.md, one screenshot each (npm run walkthrough); never part of npm test / CI.
+    // A missing control fails its step after 15 s instead of holding the whole run.
+    {
+      name: 'walkthrough',
+      testDir: './walkthrough',
+      use: { ...devices['Desktop Chrome'], actionTimeout: 15_000, navigationTimeout: 30_000 },
+      dependencies: ['warmup'],
+    },
   ],
   webServer: [
     {
