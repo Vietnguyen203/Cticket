@@ -1,4 +1,4 @@
-const { renderTicketsPdf, pageContent } = require('../../src/modules/tickets/ticket-pdf');
+const { renderTicketsPdf, pageContent, maskCode } = require('../../src/modules/tickets/ticket-pdf');
 const { qrToken, parseQrToken } = require('../../src/modules/tickets/qr');
 
 /** Phase 20: the ticket PDF. */
@@ -20,15 +20,20 @@ const standing = { ...base, id: '11111111-2222-4333-8444-666666666666', ticket_c
 describe('ticket PDF', () => {
   test('a page says what, when, where, which place, and carries the ticket’s current QR', () => {
     const page = pageContent(seat);
-    expect(page).toMatchObject({ title: 'Đêm nhạc mùa thu', place: 'Ghế Khu A - A01', ticketType: 'Hạng VIP', code: 'TKT-AAAAAAAAAA' });
+    expect(page).toMatchObject({ title: 'Đêm nhạc mùa thu', place: 'Ghế Khu A - A01', ticketType: 'Hạng VIP', code: 'TKT-••••••AAAA' }); // the middle hidden
     expect(page.when).toContain('20:00');
     expect(page.where).toBe('Cung Điền Kinh Mỹ Đình — Lê Đức Thọ, Hà Nội');
-    expect(page.footer).toEqual(['Đơn ETP-261016-ABCDEF · Nguyễn Việt']);
+    expect(page.footer).toEqual(['Đơn ETP-••••••-••CDEF · Nguyễn Việt']);
     expect(page.notes[0]).toBe('Cổng soát vé mở từ 17:00.'); // 3 hours before
     expect(page.qrToken).toBe(qrToken(seat.id, 1));
     expect(parseQrToken(page.qrToken)).toEqual({ ticketId: seat.id, version: 1 }); // what the gate reads
     expect(pageContent({ ...seat, qr_version: 2 }).qrToken).not.toBe(page.qrToken); // a re-issued QR prints the new code
     expect(pageContent(standing).place).toBe('Vé số 2');
+  });
+
+  test('codes keep their prefix and last 4 characters, the rest is hidden', () => {
+    expect(maskCode('TKT-8QLET9GGXZ')).toBe('TKT-••••••GGXZ');
+    expect(maskCode('ETP-261027-V9VQUM')).toBe('ETP-••••••-••VQUM');
   });
 
   test('a real PDF, one page per ticket, with the Vietnamese font embedded', async () => {

@@ -35,6 +35,17 @@ const vnTime = (date) =>
   new Date(date).toLocaleTimeString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit' });
 
 /**
+ * A code with its middle hidden: the prefix and the last 4 characters stay,
+ * the rest become dots (TKT-8QLET9GGXZ → TKT-••••••GGXZ). A printed or
+ * forwarded PDF then does not give the full ticket or order code away; the
+ * gate reads the QR, and the full codes are on the buyer's account pages.
+ */
+const maskCode = (code) => {
+  const dash = code.indexOf('-');
+  return [...code].map((ch, i) => (i <= dash || i >= code.length - 4 || ch === '-' ? ch : '•')).join('');
+};
+
+/**
  * What one page says (pure: tested without reading the PDF, whose text is
  * stored as glyph ids of the embedded font).
  * @param {object} row  a ticket with its order, buyer, show and place (tickets.repository pdfTickets)
@@ -48,9 +59,9 @@ function pageContent(row) {
     where: `${row.venue_name} — ${row.venue_address}, ${row.venue_city}`,
     place: row.seat_label ? `Ghế ${row.seat_label}` : `Vé số ${row.admission_no}`, // the type is the line below
     ticketType: row.ticket_type_name,
-    code: row.ticket_code,
+    code: maskCode(row.ticket_code),
     qrToken: qrToken(row.id, row.qr_version),
-    footer: [`Đơn ${row.order_code}${buyer ? ` · ${buyer}` : ''}`],
+    footer: [`Đơn ${maskCode(row.order_code)}${buyer ? ` · ${buyer}` : ''}`],
     notes: [
       `Cổng soát vé mở từ ${vnTime(gatesOpenAt)}.`,
       'Mỗi vé vào cổng một lần. Không chia sẻ ảnh mã QR.',
@@ -119,4 +130,4 @@ async function renderTicketsPdf(rows, { compress = true, title = 'Vé ETP' } = {
   return Buffer.concat(chunks);
 }
 
-module.exports = { renderTicketsPdf, pageContent };
+module.exports = { renderTicketsPdf, pageContent, maskCode };
