@@ -4,7 +4,7 @@
  * TERMS_VERSION: a changed text gets a new version in both places, so a buyer
  * whose page still shows the old text is asked to read the new one.
  */
-export const TERMS_VERSION = '2026-10-27'
+export const TERMS_VERSION = '2026-10-27.2'
 export const TERMS_EFFECTIVE_DATE = '27/10/2026'
 
 export interface LegalBasis {
@@ -51,8 +51,6 @@ export interface Article {
   id: string
   title: string
   clauses: string[]
-  /** Rendered after the clauses (the refund tiers table). */
-  extra?: 'refund-tiers'
 }
 
 export const ARTICLES: Article[] = [
@@ -64,7 +62,6 @@ export const ARTICLES: Article[] = [
       '"Ban tổ chức" là tổ chức, cá nhân được ETP duyệt hồ sơ, tổ chức sự kiện và chịu trách nhiệm về nội dung, chất lượng sự kiện. Tên Ban tổ chức hiển thị trên trang của từng sự kiện.',
       '"Khách hàng" là người đặt mua vé trên ETP; là người tiêu dùng theo Luật Bảo vệ quyền lợi người tiêu dùng khi mua vé cho nhu cầu cá nhân, gia đình.',
       '"Đơn hàng" là yêu cầu mua một hoặc nhiều vé của một suất diễn; "Vé" là vé điện tử có mã QR, mỗi vé cho một người vào cửa một lần.',
-      '"Chính sách hủy" là mức hoàn tiền khi Khách hàng tự hủy đơn, do Ban tổ chức chọn cho từng sự kiện trong các mức nêu tại Điều 5.',
     ],
   },
   {
@@ -72,8 +69,8 @@ export const ARTICLES: Article[] = [
     title: 'Phạm vi áp dụng và giao kết hợp đồng',
     clauses: [
       'Điều kiện giao dịch chung này áp dụng cho mọi đơn hàng mua vé trên ETP và được công khai tại trang này để Khách hàng đọc trước khi mua (Điều 406 Bộ luật Dân sự 2015).',
-      'Hợp đồng mua vé là hợp đồng điện tử, gồm: thông tin đơn hàng (sự kiện, suất diễn, chỗ ngồi, giá), Chính sách hủy của sự kiện tại thời điểm thanh toán, và Điều kiện giao dịch chung này. Hợp đồng điện tử có giá trị pháp lý như hợp đồng bằng văn bản theo Luật Giao dịch điện tử 2023.',
-      'Hợp đồng được giao kết khi Khách hàng đánh dấu "Tôi đã đọc và đồng ý Điều kiện giao dịch chung" và bấm "Tiếp tục thanh toán"; có hiệu lực khi thanh toán thành công. ETP lưu trên đơn hàng phiên bản Điều kiện giao dịch chung, thời điểm Khách hàng đồng ý và Chính sách hủy áp dụng, làm căn cứ khi có tranh chấp.',
+      'Hợp đồng mua vé là hợp đồng điện tử, gồm: thông tin đơn hàng (sự kiện, suất diễn, chỗ ngồi, giá) và Điều kiện giao dịch chung này. Hợp đồng điện tử có giá trị pháp lý như hợp đồng bằng văn bản theo Luật Giao dịch điện tử 2023.',
+      'Hợp đồng được giao kết khi Khách hàng đánh dấu "Tôi đã đọc và đồng ý Điều kiện giao dịch chung" và bấm "Tiếp tục thanh toán"; có hiệu lực khi thanh toán thành công. ETP lưu trên đơn hàng phiên bản Điều kiện giao dịch chung và thời điểm Khách hàng đồng ý, làm căn cứ khi có tranh chấp.',
       'Điều khoản nào chưa rõ ràng được giải thích theo hướng có lợi cho Khách hàng (khoản 2 Điều 405 Bộ luật Dân sự 2015). Điều khoản nào miễn trách nhiệm của ETP hoặc Ban tổ chức, tăng trách nhiệm hoặc loại bỏ quyền lợi chính đáng của Khách hàng thì không có hiệu lực (khoản 3 Điều 406 Bộ luật Dân sự 2015).',
     ],
   },
@@ -98,22 +95,20 @@ export const ARTICLES: Article[] = [
   },
   {
     id: 'huy-va-hoan-tien',
-    title: 'Khách hàng hủy đơn và hoàn tiền',
+    title: 'Không hủy vé, hoàn tiền khi sự kiện bị hủy',
     clauses: [
-      'Mỗi sự kiện áp dụng một trong ba Chính sách hủy dưới đây, hiển thị trên trang sự kiện trước khi mua. Mốc thời gian tính theo giờ bắt đầu suất diễn (giờ Việt Nam).',
-      'Khách hàng tự hủy đơn đã thanh toán tại trang đơn hàng; số tiền được hoàn và phí hủy được hiển thị trước khi xác nhận. Phần không được hoàn là phí hủy, thuộc về Ban tổ chức theo thỏa thuận tại hợp đồng này.',
-      'Chính sách hủy áp dụng cho đơn hàng là chính sách tại thời điểm thanh toán. Ban tổ chức đổi sang chính sách khác sau đó thì đơn hàng đã mua vẫn giữ chính sách cũ, trừ khi chính sách mới có lợi hơn cho Khách hàng.',
-      'Không hủy được: đơn có vé đã vào cửa; suất diễn đã qua mốc hủy cuối cùng; sự kiện chọn "Không hoàn" (trừ các trường hợp tại Điều 6 và Điều 7).',
+      'Vé đã thanh toán không được hủy, đổi hoặc trả lại theo yêu cầu của Khách hàng; tiền vé không được hoàn vì lý do riêng của Khách hàng (không đến dự, mua nhầm, đổi ý). Điều này được nêu trên trang sự kiện và tại bước thanh toán, trước khi Khách hàng mua.',
+      'Tiền vé chỉ được hoàn khi sự kiện hoặc suất diễn bị hủy (Điều 6, Điều 7): hoàn 100% số tiền đã trả, tự động.',
+      'Khoản tiền bị trừ sau khi đơn đã hết hạn hoặc bị trừ hai lần không phải tiền vé và luôn được hoàn lại toàn bộ (Điều 3).',
       'Tiền được hoàn về phương thức thanh toán ban đầu; thời gian tiền về tài khoản tùy ngân hàng (thường 1–15 ngày làm việc). Lượt dùng mã giảm giá không được trả lại.',
     ],
-    extra: 'refund-tiers',
   },
   {
     id: 'ban-to-chuc-huy',
     title: 'Sự kiện bị hủy, hoãn hoặc thay đổi',
     clauses: [
-      'Ban tổ chức hoặc ETP hủy sự kiện hoặc suất diễn: mọi đơn đã thanh toán được hoàn 100% số tiền đã trả, tự động, không phụ thuộc Chính sách hủy, và Khách hàng được báo qua email.',
-      'Sự kiện bị hoãn sang thời gian khác, đổi địa điểm hoặc thay đổi nội dung chính (nghệ sĩ chính, chương trình): Ban tổ chức thông báo cho Khách hàng. Khách hàng không đồng ý với thay đổi có quyền yêu cầu hủy đơn và được hoàn 100% số tiền đã trả.',
+      'Ban tổ chức hoặc ETP hủy sự kiện hoặc suất diễn: mọi đơn đã thanh toán được hoàn 100% số tiền đã trả, tự động, và Khách hàng được báo qua email.',
+      'Sự kiện bị hoãn sang thời gian khác, đổi địa điểm hoặc thay đổi nội dung chính (nghệ sĩ chính, chương trình): Ban tổ chức thông báo cho Khách hàng trước khi thay đổi. Sự kiện không còn diễn ra như đã công bố thì Ban tổ chức hủy suất diễn và Khách hàng được hoàn 100% số tiền đã trả theo khoản 1.',
     ],
   },
   {
@@ -128,8 +123,8 @@ export const ARTICLES: Article[] = [
     id: 'quyen-khach-hang',
     title: 'Quyền và nghĩa vụ của Khách hàng',
     clauses: [
-      'Được cung cấp thông tin đầy đủ, chính xác về sự kiện, giá vé, Chính sách hủy trước khi mua; được nhận vé đúng như đơn hàng đã thanh toán.',
-      'Được hủy đơn và hoàn tiền theo Điều 5, Điều 6, Điều 7; được khiếu nại và yêu cầu giải quyết theo Điều 12.',
+      'Được cung cấp thông tin đầy đủ, chính xác về sự kiện, giá vé và điều kiện hoàn tiền trước khi mua; được nhận vé đúng như đơn hàng đã thanh toán.',
+      'Được hoàn tiền khi sự kiện bị hủy theo Điều 5, Điều 6, Điều 7; được khiếu nại và yêu cầu giải quyết theo Điều 12.',
       'Cung cấp thông tin tài khoản chính xác; không mua vé để bán lại trái phép, không dùng công cụ tự động để giữ chỗ hàng loạt; bảo quản tài khoản và mã QR.',
       'Đánh giá sự kiện trung thực, không đăng nội dung vi phạm pháp luật, xúc phạm người khác; ETP có quyền ẩn đánh giá vi phạm và nêu lý do.',
     ],
@@ -138,7 +133,7 @@ export const ARTICLES: Article[] = [
     id: 'quyen-ban-to-chuc',
     title: 'Quyền và nghĩa vụ của Ban tổ chức và ETP',
     clauses: [
-      'Ban tổ chức chịu trách nhiệm tổ chức sự kiện đúng thông tin đã công bố và có giấy phép theo quy định; thực hiện hoàn tiền theo Chính sách hủy và Điều 6.',
+      'Ban tổ chức chịu trách nhiệm tổ chức sự kiện đúng thông tin đã công bố và có giấy phép theo quy định; hoàn tiền cho Khách hàng khi sự kiện bị hủy theo Điều 6, Điều 7.',
       'ETP thực hiện đúng quy trình đặt chỗ, thanh toán, phát vé, hoàn tiền; bảo đảm mỗi chỗ ngồi chỉ được bán một lần; giải quyết khiếu nại về giao dịch trên nền tảng.',
       'ETP có quyền tạm khóa tài khoản có dấu hiệu gian lận (ví dụ dùng mã QR giả, giữ chỗ hàng loạt) và thông báo lý do cho người bị khóa.',
     ],
@@ -157,7 +152,7 @@ export const ARTICLES: Article[] = [
     id: 'cham-dut',
     title: 'Chấm dứt hợp đồng',
     clauses: [
-      'Hợp đồng chấm dứt khi: vé đã được sử dụng và sự kiện kết thúc; đơn hàng được hủy và hoàn tiền theo Điều 5, Điều 6, Điều 7; hoặc đơn hết hạn trước khi thanh toán.',
+      'Hợp đồng chấm dứt khi: vé đã được sử dụng và sự kiện kết thúc; sự kiện bị hủy và đơn hàng được hoàn tiền theo Điều 6, Điều 7; hoặc đơn hết hạn trước khi thanh toán.',
     ],
   },
   {

@@ -1,5 +1,5 @@
 const { z } = require('zod');
-const { EVENT_STATUS, EVENT_LIMITS, REFUND_POLICY, PURCHASE_QUEUE } = require('../../config/constants');
+const { EVENT_STATUS, EVENT_LIMITS, PURCHASE_QUEUE } = require('../../config/constants');
 const { paginationQuery } = require('../../utils/pagination');
 const { isoDateTime, imageUrl, nonEmptyPatch } = require('../../utils/schemas');
 const { SORT_ORDERS } = require('./events.repository');
@@ -24,7 +24,6 @@ const fields = {
   bannerUrl: imageUrl.nullable(),
   thumbnailUrl: imageUrl.nullable(),
   ageRestriction: z.number().int().min(0).max(99).nullable(),
-  refundPolicy: z.enum(Object.values(REFUND_POLICY)), // Phase 18.3
   // Phase 21: purchase queue (changed with PATCH only; a new event starts without it)
   queueEnabled: z.boolean(),
   queueCapacity: z.number().int().min(1).max(PURCHASE_QUEUE.MAX_CAPACITY),
@@ -47,7 +46,6 @@ const createEvent = z.object({
   bannerUrl: fields.bannerUrl.optional(),
   thumbnailUrl: fields.thumbnailUrl.optional(),
   ageRestriction: fields.ageRestriction.optional(),
-  refundPolicy: fields.refundPolicy.optional(),
   categoryIds: fields.categoryIds,
 });
 

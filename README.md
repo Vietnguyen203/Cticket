@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Vietnguyen203/Cticket/actions/workflows/ci.yml/badge.svg)](https://github.com/Vietnguyen203/Cticket/actions/workflows/ci.yml)
 
-> **English summary.** A ticketing platform for concerts and events, built as a learning project with production habits: a Node.js modular monolith (Express, PostgreSQL, Redis, BullMQ, WebSocket) and a React web app. Buyers pick seats on a **live seat map**, hold them for 10 minutes (and can swap seats in the held order without losing the others), pay through **VNPay** (sandbox: signed IPN, query-back, reconciliation, automatic refunds of late payments) or a simulator, and get **QR tickets** (a printable PDF in the confirmation email) with email reminders before the show; they can cancel under the event's refund policy (partial refunds), wait their turn in a **purchase queue** when the organizer switches it on for a rush, or join a **waiting list** that keeps freed places for them for 30 minutes; people who went in **review** the event (stars, comment, organizer replies, admin moderation); gate staff scan them with a **phone camera**; organizers build events and seat plans and follow their sales; admins approve, refund and see platform reports. **Two-factor authentication** with an authenticator app (TOTP, written from RFC 6238), required for admins, and a per-email lock after repeated wrong passwords. Buyers accept **terms of sale** written as a Vietnamese contract (legal bases linked), can **download their personal data** and **delete their account** (anonymised, orders kept for the accounts). **No seat is ever sold twice**: Redis filters the rush, PostgreSQL row locks and constraints decide (proven by 100-buyers-one-seat tests and a 500-user k6 load test). 430 backend tests, 136 web tests, 29 Playwright end-to-end tests, CI on GitHub Actions. Ready to deploy on one VPS with Docker Compose: Caddy (automatic HTTPS), deploy on green CI with automatic fallback, nightly backups with tested restores. Documentation is in Vietnamese.
+> **English summary.** A ticketing platform for concerts and events, built as a learning project with production habits: a Node.js modular monolith (Express, PostgreSQL, Redis, BullMQ, WebSocket) and a React web app. Buyers pick seats on a **live seat map**, hold them for 10 minutes (and can swap seats in the held order without losing the others), pay through **VNPay** (sandbox: signed IPN, query-back, reconciliation, automatic refunds of late payments) or a simulator, and get **QR tickets** (a printable PDF in the confirmation email) with email reminders before the show; tickets are not cancelled or refunded on request, only when the event is cancelled (100%, automatic); buyers wait their turn in a **purchase queue** when the organizer switches it on for a rush, or join a **waiting list** that keeps freed places for them for 30 minutes; people who went in **review** the event (stars, comment, organizer replies, admin moderation); gate staff scan them with a **phone camera**; organizers build events and seat plans and follow their sales; admins approve, follow refunds and see platform reports. **Two-factor authentication** with an authenticator app (TOTP, written from RFC 6238), required for admins, and a per-email lock after repeated wrong passwords. Buyers accept **terms of sale** written as a Vietnamese contract (legal bases linked), can **download their personal data** and **delete their account** (anonymised, orders kept for the accounts). **No seat is ever sold twice**: Redis filters the rush, PostgreSQL row locks and constraints decide (proven by 100-buyers-one-seat tests and a 500-user k6 load test). 421 backend tests, 138 web tests, 29 Playwright end-to-end tests, CI on GitHub Actions. Ready to deploy on one VPS with Docker Compose: Caddy (automatic HTTPS), deploy on green CI with automatic fallback, nightly backups with tested restores. Documentation is in Vietnamese.
 
 Nền tảng bán vé sự kiện (concert, sân khấu…), làm như một dự án học tập nhưng theo thói quen của sản phẩm thật: thiết kế trước rồi mới code, test ở nhiều tầng, đo tải, tài liệu cho từng phase.
 
@@ -18,12 +18,12 @@ Nền tảng bán vé sự kiện (concert, sân khấu…), làm như một d�
 - **Thanh toán qua VNPay** (sandbox): kết quả nhận bằng IPN có chữ ký và hỏi lại VNPay, đơn hết giờ khi đang trả thì đối soát trước khi mở bán lại ghế; tiền đến muộn hoặc trả trùng được **hoàn tự động**. Thêm thanh toán giả lập để thử (bấm hai lần không bị trừ tiền hai lần), tắt mặc định trên production.
 - **Đổi / bỏ ghế trong đơn đang giữ**: ghế cũ vẫn là của mình cho tới khi đổi xong, không phải hủy đơn rồi đặt lại.
 - Vé có **mã QR** (ký số, cấp lại được), **vé PDF** (mỗi vé một trang, đính kèm email xác nhận, tải ở trang đơn / trang vé), email xác nhận, thông báo, **nhắc lịch** 24 giờ và 2 giờ trước giờ diễn (tắt được).
-- **Tự hủy đơn theo chính sách hoàn của sự kiện** (Không hoàn / Tiêu chuẩn / Linh hoạt): thấy trước số tiền được hoàn, hoàn một phần qua VNPay, phần còn lại là phí hủy.
+- **Vé không hủy, không hoàn theo yêu cầu**: chỉ hoàn tiền khi sự kiện hoặc suất diễn bị hủy (100%, tự động, qua VNPay); điều này hiện trên trang sự kiện và ở bước thanh toán.
 - **Đánh giá sự kiện** (1–5 sao, nhận xét): chỉ người đã vào cổng mới viết được, có nhãn "Đã đi xem"; điểm trung bình trên trang sự kiện và danh sách; email mời đánh giá một ngày sau buổi diễn.
 - **Danh sách chờ** khi hạng vé hết: có vé trả lại thì người chờ sớm nhất được báo và được giữ vé 30 phút để đặt.
 
 **Ban tổ chức**
-- Tạo sự kiện (một buổi diễn, giờ gõ theo 24 giờ), nghệ sĩ khách mời; tổng số người tham dự theo sức chứa địa điểm, gán hạng vé cho từng khu có sẵn (khu ngồi / khu đứng); khóa / mở ghế; đề xuất địa điểm mới; tải ảnh lên; chọn chính sách hủy đơn; bật **hàng chờ mua vé** và xem số người đang mua / đang chờ; trả lời công khai các đánh giá.
+- Tạo sự kiện (một buổi diễn, giờ gõ theo 24 giờ), nghệ sĩ khách mời; tổng số người tham dự theo sức chứa địa điểm, gán hạng vé cho từng khu có sẵn (khu ngồi / khu đứng); khóa / mở ghế; đề xuất địa điểm mới; tải ảnh lên; bật **hàng chờ mua vé** và xem số người đang mua / đang chờ; trả lời công khai các đánh giá.
 - Thêm nhân viên soát vé; **báo cáo doanh thu** theo suất / hạng vé, tỷ lệ lấp đầy, số người đã vào cổng, xuất CSV.
 
 **Nhân viên soát vé**
@@ -35,7 +35,7 @@ Nền tảng bán vé sự kiện (concert, sân khấu…), làm như một d�
 - **Dữ liệu cá nhân** (Luật Bảo vệ dữ liệu cá nhân 2025): trang Tài khoản cho tải toàn bộ dữ liệu đang lưu (file JSON) và tự xóa tài khoản. Xóa thì thông tin cá nhân mất hẳn, đăng xuất mọi thiết bị; đơn hàng, thanh toán, hoàn tiền giữ ở dạng ẩn danh để đối soát. Chưa xóa được khi còn vé sắp diễn, đơn dở dang hoặc hoàn tiền đang chờ.
 
 **Quản trị**
-- Duyệt nhà tổ chức và sự kiện, quản lý địa điểm / sơ đồ ghế, danh mục, người dùng và vai trò, đơn hàng và **hoàn tiền**, mã giảm giá, ẩn đánh giá vi phạm, **audit log**, dashboard và báo cáo doanh thu toàn hệ thống.
+- Duyệt nhà tổ chức và sự kiện, quản lý địa điểm / sơ đồ ghế, danh mục, người dùng và vai trò, đơn hàng và theo dõi **hoàn tiền** (gửi lại khi VNPay lỗi), mã giảm giá, ẩn đánh giá vi phạm, **audit log**, dashboard và báo cáo doanh thu toàn hệ thống.
 
 | Chọn ghế | Giữ chỗ, mã giảm giá | Vé QR | Soát vé trên điện thoại |
 |---|---|---|---|
@@ -197,7 +197,7 @@ docs/        Thiết kế từng phase, kiến trúc, kiểm thử, checklist pr
 
 ## Giới hạn và hướng phát triển
 
-- **VNPay mới chạy với sandbox**: dùng tiền thật cần hợp đồng với VNPay (mã website và địa chỉ production) — xem checklist production. Chính sách hủy là 3 mẫu cố định (ban tổ chức chưa tự đặt % và mốc).
+- **VNPay mới chạy với sandbox**: dùng tiền thật cần hợp đồng với VNPay (mã website và địa chỉ production) — xem checklist production.
 - Chưa có: chuyển nhượng vé. Phần triển khai đã sẵn sàng nhưng chưa chạy trên máy chủ thật (cần VPS và tên miền).
 - Ảnh tải lên lưu trên ổ đĩa của API: nhiều máy chủ thì chuyển sang kho chung (S3…).
 - Một tiến trình Node.js dùng một nhân CPU: tải lớn thì chạy nhiều bản API sau load balancer (đã thử trong load test).

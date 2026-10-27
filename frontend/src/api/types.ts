@@ -133,8 +133,6 @@ export interface EventDetail {
   bannerUrl: string | null
   thumbnailUrl: string | null
   ageRestriction: number | null
-  /** Phase 18.3: NONE / STANDARD / FLEXIBLE (payments/refundPolicy.ts) */
-  refundPolicy?: string
   /** Phase 19 */
   rating?: { average: number | null; count: number }
   /** Phase 21: purchase queue (at most `capacity` people buy at once) */
@@ -270,10 +268,9 @@ export interface Order {
   expiresAt: string | null
   remainingSeconds: number | null
   checkedOutAt: string | null
-  /** The terms of sale accepted at checkout, and the refund policy then (null before checkout) */
+  /** The terms of sale accepted at checkout (null before checkout) */
   termsVersion: string | null
   termsAcceptedAt: string | null
-  refundPolicy: string | null
   paidAt: string | null
   cancelledAt: string | null
   cancelReason: string | null

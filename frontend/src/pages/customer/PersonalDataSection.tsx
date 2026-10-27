@@ -9,7 +9,7 @@ import { useAsync } from '../../utils/useAsync'
 /** What to do about each reason the account cannot be deleted yet. */
 const BLOCKERS: Record<DeletionBlocker, { text: string; link?: [string, string] }> = {
   UPCOMING_TICKETS: {
-    text: 'Bạn còn vé cho buổi diễn chưa diễn ra. Hủy đơn (nếu chính sách của sự kiện cho phép) hoặc đợi buổi diễn kết thúc.',
+    text: 'Bạn còn vé cho buổi diễn chưa diễn ra. Xóa được sau khi buổi diễn kết thúc.',
     link: ['/tickets', 'Vé của tôi'],
   },
   OPEN_ORDER: { text: 'Bạn có đơn đang giữ chỗ hoặc chờ thanh toán. Thanh toán hoặc hủy giữ chỗ trước.', link: ['/orders', 'Đơn hàng'] },

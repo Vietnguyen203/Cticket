@@ -118,55 +118,29 @@ async function getPayment(actor, paymentId) {
 }
 
 /**
- * Refund a paid order in the caller's transaction (order already locked):
- * refund row, payment REFUNDED, then the order and its inventory, audited.
- * A 0đ order has no payment: only the order part applies. A VNPay payment's
- * money goes back through the payments queue (refunds.js): the order and its
- * tickets are refunded now, the refund row says when VNPay has accepted it.
+ * Refund a paid order in full, in the caller's transaction (order already
+ * locked): refund row, payment REFUNDED, then the order and its inventory,
+ * audited. A 0đ order has no payment: only the order part applies. A VNPay
+ * payment's money goes back through the payments queue (refunds.js): the
+ * order and its tickets are refunded now, the refund row says when VNPay has
+ * accepted it. Only an event or show cancellation refunds (refundPaidOrders):
+ * there is no refund on request, by the buyer or by an admin.
  */
-async function refundLockedOrder(client, { orderId, payment, reason, context, amount = payment?.amount ?? 0, action = 'PAYMENT_REFUNDED' }) {
-  // Phase 18.3: `amount` below the payment = a customer's cancellation; the rest is the fee kept.
+async function refundLockedOrder(client, { orderId, payment, reason, context }) {
+  const amount = payment?.amount ?? 0;
   if (payment) {
-    if (amount > 0) await startRefund(client, { payment, orderId, reason, amount, requestedBy: context?.userId ?? 'system' });
+    if (amount > 0) await startRefund(client, { payment, orderId, reason, requestedBy: context?.userId ?? 'system' });
     await paymentsRepository.markRefunded(client, payment.id);
   }
   await orders.refundPaidOrder(client, orderId, { refundAmount: amount });
   await recordAudit(client, {
     context,
-    action,
+    action: 'PAYMENT_REFUNDED',
     entityType: 'order',
     entityId: orderId,
     oldValue: { status: ORDER_STATUS.PAID },
-    newValue: {
-      status: ORDER_STATUS.REFUNDED,
-      paymentId: payment?.id ?? null,
-      amount,
-      fee: (payment?.amount ?? 0) - amount,
-      reason,
-    },
+    newValue: { status: ORDER_STATUS.REFUNDED, paymentId: payment?.id ?? null, amount, reason },
   });
-}
-
-/**
- * PAY-05: full refund of a successful payment, in ONE transaction. The order
- * is locked first (same lock order as paying), then the payment.
- */
-async function refundPayment(context, paymentId, { reason }) {
-  await withTransaction(async (client) => {
-    const found = await paymentsRepository.findById(client, paymentId);
-    if (!found) throw paymentNotFound();
-    const order = await orders.lockOrder(client, found.order_id);
-    const payment = await paymentsRepository.findById(client, paymentId, { forUpdate: true });
-    if (payment.status !== PAYMENT_STATUS.SUCCESS || order.status !== ORDER_STATUS.PAID) {
-      throw new AppError('PAYMENT_NOT_REFUNDABLE');
-    }
-    // Phase 10: the customer has been in. A cancelled event still refunds everyone (refundPaidOrders).
-    if (await orders.hasCheckedInTickets(client, order.id)) {
-      throw new AppError('PAYMENT_NOT_REFUNDABLE', 'Tickets of this order have already been checked in.');
-    }
-    await refundLockedOrder(client, { orderId: order.id, payment, reason, context });
-  });
-  return toPayment(await paymentsRepository.findById(pool, paymentId));
 }
 
 /**
@@ -206,4 +180,4 @@ function paymentMethods() {
   return [...(env.VNPAY_ENABLED ? [PAYMENT_PROVIDER.VNPAY] : []), ...(env.PAYMENT_SIMULATOR ? [PAYMENT_PROVIDER.SIMULATOR] : [])];
 }
 
-module.exports = { pay, getPayment, refundPayment, refundPaidOrders, refundLockedOrder, retryRefund, paymentMethods };
+module.exports = { pay, getPayment, refundPaidOrders, refundLockedOrder, retryRefund, paymentMethods };

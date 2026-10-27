@@ -90,8 +90,8 @@ function callback(attempt, { code = '00', amount = attempt.amount, tmnCode = 'TE
 
 const ipn = (params) => request(app).get('/api/v1/payments/vnpay/ipn').query(params).expect(200);
 const vnpayReturn = (token, params) => request(app).get('/api/v1/payments/vnpay/return').set(bearer(token)).query(params);
-const adminRefund = (paymentId) =>
-  request(app).post(`/api/v1/payments/${paymentId}/refund`).set(bearer(admin.token)).send({ reason: 'Customer is ill' });
+// The only refund there is: the event is cancelled.
+const cancelEvent = (event) => changeStatus(app, organizer.token, event.id, 'CANCELLED', 'Storm warning').expect(200);
 
 const orderStatus = async (id) => (await query(`SELECT status FROM orders WHERE id = $1`, [id])).rows[0].status;
 const paymentRow = async (id) => (await query(`SELECT * FROM payments WHERE id = $1`, [id])).rows[0];
@@ -463,10 +463,10 @@ describe('reconciliation', () => {
 // ---------------------------------------------------------------------------
 
 describe('refunds through VNPay', () => {
-  test('admin refund: the order is refunded at once, the money sent back by the payments queue', async () => {
-    const { order, attempt, transactionNo, schedule, seat } = await paidByVnpay();
-    const res = await adminRefund(attempt.id).expect(200);
-    expect(res.body.data.payment.status).toBe('REFUNDED');
+  test('event cancelled: the order is refunded at once, the money sent back by the payments queue', async () => {
+    const { event, order, attempt, transactionNo, schedule, seat } = await paidByVnpay();
+    await cancelEvent(event);
+    expect((await paymentRow(attempt.id)).status).toBe('REFUNDED');
     expect(await orderStatus(order.id)).toBe('REFUNDED');
     expect(await seatStatus(schedule.id, seat.A01)).toBe('AVAILABLE');
 
@@ -477,10 +477,10 @@ describe('refunds through VNPay', () => {
       vnp_Amount: '200000000',
       vnp_TransactionNo: transactionNo,
       vnp_TransactionDate: created,
-      vnp_CreateBy: admin.id.replace(/-/g, ''),
+      vnp_CreateBy: organizer.id.replace(/-/g, ''),
     });
     const [refund] = await refundsOf(attempt.id);
-    expect(refund).toMatchObject({ status: 'SUCCESS', attempts: 1, failure_message: null, requested_by: admin.id });
+    expect(refund).toMatchObject({ status: 'SUCCESS', attempts: 1, failure_message: null, requested_by: organizer.id });
     expect(refund.provider_refund_id).toBeTruthy();
 
     const detail = await request(app).get(`/api/v1/orders/${order.id}`).set(bearer(admin.token)).expect(200);
@@ -488,9 +488,9 @@ describe('refunds through VNPay', () => {
   });
 
   test('VNPay down: retried by the queue, FAILED after the last try; an admin sends it again', async () => {
-    const { buyer, order, attempt } = await paidByVnpay();
+    const { buyer, order, attempt, event } = await paidByVnpay();
     fake.state.down = true;
-    await adminRefund(attempt.id).expect(200);
+    await cancelEvent(event);
     let [refund] = await refundsOf(attempt.id);
     expect(refund).toMatchObject({ status: 'PENDING', attempts: 1 }); // the job threw: BullMQ would try again
 
@@ -514,9 +514,9 @@ describe('refunds through VNPay', () => {
   });
 
   test('VNPay refuses for good (95) → FAILED at once, with its reason', async () => {
-    const { attempt } = await paidByVnpay();
+    const { attempt, event } = await paidByVnpay();
     fake.state.refundCode = '95';
-    await adminRefund(attempt.id).expect(200);
+    await cancelEvent(event);
     const [refund] = await refundsOf(attempt.id);
     expect(refund).toMatchObject({ status: 'FAILED', attempts: 1 });
     expect(refund.failure_message).toContain('mã 95');

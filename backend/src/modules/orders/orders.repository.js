@@ -193,9 +193,7 @@ async function checkout(db, { orderId, discount, windowSeconds, termsVersion }) 
      SET status = 'PAYMENT_PENDING', checked_out_at = now(),
          expires_at = now() + make_interval(secs => $3),
          discount_amount = $2, total_amount = subtotal - $2,
-         terms_version = $4, terms_accepted_at = now(),
-         refund_policy = (SELECT e.refund_policy FROM event_schedules es JOIN events e ON e.id = es.event_id
-                          WHERE es.id = orders.schedule_id)
+         terms_version = $4, terms_accepted_at = now()
      WHERE id = $1 AND status = 'HELD'
      RETURNING id, expires_at, total_amount`,
     [orderId, discount, windowSeconds, termsVersion],
@@ -253,15 +251,6 @@ async function listTickets(db, orderId) {
     [orderId],
   );
   return rows;
-}
-
-/**
- * Before a refund: lock the order's tickets (a gate scanning one of them
- * waits, then sees it REFUNDED) and tell whether any has been checked in.
- */
-async function lockTicketsHasUsed(db, orderId) {
-  const { rows } = await db.query(`SELECT status FROM tickets WHERE order_id = $1 ORDER BY id FOR UPDATE`, [orderId]);
-  return rows.some((row) => row.status === 'USED');
 }
 
 /** Refund: tickets issued for the order (Phase 9) stop being valid. */
@@ -428,7 +417,6 @@ module.exports = {
   listRefunds,
   cancelPendingPaymentsOfOrder,
   refundTicketsOfOrder,
-  lockTicketsHasUsed,
   completeOrdersOfFinishedSchedules,
   listTickets,
   findInventoryMismatches,

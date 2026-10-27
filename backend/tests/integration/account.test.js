@@ -68,7 +68,7 @@ describe('my personal data (export)', () => {
         orderCode: order.orderCode,
         status: 'PAID',
         items: [expect.objectContaining({ seat: expect.stringContaining('A01'), unitPrice: 2_000_000 })],
-        termsOfSale: { version: TERMS_VERSION, acceptedAt: expect.any(String), refundPolicy: expect.any(String) },
+        termsOfSale: { version: TERMS_VERSION, acceptedAt: expect.any(String), refundPolicy: null },
         payments: [expect.objectContaining({ status: 'SUCCESS', amount: 2_000_000 })],
       }),
     ]);

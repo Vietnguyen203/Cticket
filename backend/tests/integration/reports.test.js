@@ -5,7 +5,7 @@ const { pool, query, closePool } = require('../../src/database/pool');
 const { useFakeMailbox } = require('../helpers/auth');
 const { bearer, createAdmin, createOrganizer, createCategory } = require('../helpers/catalog');
 const { createConfiguredEvent, publishEvent } = require('../helpers/inventory');
-const { createCustomers, book } = require('../helpers/orders');
+const { createCustomers, book, refundOrder } = require('../helpers/orders');
 const { findInventoryMismatches } = require('../../src/modules/orders');
 const { fillRate } = require('../../src/modules/reports/reports.service');
 const { vnToday, addDays } = require('../../src/modules/reports/vn-date');
@@ -76,8 +76,7 @@ async function buy(scheduleId, body, promotionCode) {
   return { buyer, order, payment };
 }
 
-const refund = (paymentId) =>
-  request(app).post(`/api/v1/payments/${paymentId}/refund`).set(bearer(admin.token)).send({ reason: 'Report test' }).expect(200);
+const refund = (paymentId) => refundOrder(paymentId, 'Report test');
 
 const eventSales = (token, eventId) => request(app).get(`/api/v1/reports/events/${eventId}/sales`).set(bearer(token));
 const platformSales = (token, qs) => request(app).get(`/api/v1/reports/sales?${qs}`).set(bearer(token));
@@ -132,7 +131,7 @@ describe('event report (REP-01)', () => {
       gross: 5_500_000,
       discount: 550_000,
       revenue: 4_950_000,
-      cancellationFees: 0, // an admin refund gives everything back (Phase 18.3)
+      cancellationFees: 0, // a refund gives everything back
       refunds: { orders: 1, amount: 1_000_000 },
       capacity: 120,
       blocked: 1,

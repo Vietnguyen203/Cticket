@@ -4,7 +4,7 @@ const paymentsRepository = require('./payments.repository');
 
 /**
  * Start the refund of a payment, in the caller's transaction (its order is
- * locked). Shared by admin refunds, event cancellations and late VNPay money.
+ * locked). Shared by event / show cancellations and late VNPay money.
  *
  * - SIMULATOR: done at once (nothing to call).
  * - VNPAY (Phase 17): a PENDING refund that the payments queue sends to VNPay
@@ -12,7 +12,6 @@ const paymentsRepository = require('./payments.repository');
  * @returns {Promise<string>} the refund id
  */
 async function startRefund(client, { payment, orderId, reason, requestedBy, amount = payment.amount }) {
-  // Phase 18.3: `amount` may be part of the payment (a customer's cancellation).
   if (payment.provider !== PAYMENT_PROVIDER.VNPAY) {
     return paymentsRepository.insertRefund(client, { paymentId: payment.id, orderId, amount, reason });
   }

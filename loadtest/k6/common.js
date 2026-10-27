@@ -10,7 +10,7 @@ import { Counter } from 'k6/metrics'
  */
 export const API = __ENV.API_URL || 'http://localhost:3200/api/v1'
 // The terms of sale a buyer accepts at checkout (backend/src/config/constants.js TERMS_VERSION).
-export const TERMS_VERSION = '2026-10-27'
+export const TERMS_VERSION = '2026-10-27.2'
 
 const load = (name, pick) => new SharedArray(name, () => pick(JSON.parse(open('../.data/data.json'))))
 export const tokens = load('tokens', (d) => d.tokens)

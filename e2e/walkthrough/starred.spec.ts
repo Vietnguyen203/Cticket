@@ -214,12 +214,11 @@ test('the ★ steps of the UI test guide', async ({ browser, api }) => {
       if (await refresh.isVisible()) await refresh.click()
       await expect(pageBtc.getByRole('link', { name: 'Vào trang ban tổ chức' })).toBeVisible()
     })
-    const createEvent = async (title: string, standard: boolean) => {
+    const createEvent = async (title: string) => {
       await pageBtc.goto('/organizer/events/new')
       await pageBtc.getByLabel('Tên sự kiện').fill(title)
       await pageBtc.getByLabel('Mô tả').fill('Mô tả sự kiện thử.')
       await pageBtc.getByText(category, { exact: true }).click()
-      if (standard) await pageBtc.getByLabel('Chính sách hủy đơn của khách').selectOption('STANDARD')
       await pageBtc.getByRole('button', { name: 'Tạo và tiếp tục' }).click()
       await expect(pageBtc).toHaveURL(/tab=schedules/)
       return new URL(pageBtc.url()).pathname.split('/').at(-1)!
@@ -241,8 +240,8 @@ test('the ★ steps of the UI test guide', async ({ browser, api }) => {
       await adminPage.getByRole('dialog').getByRole('button', { name: 'Duyệt và mở bán' }).click()
       await expect(adminPage.getByText('Đang bán').first()).toBeVisible()
     }
-    await step('3.4', 'Tạo sự kiện 1 (chính sách Tiêu chuẩn)', () => pageBtc, async () => {
-      event1Id = await createEvent(title1, true)
+    await step('3.4', 'Tạo sự kiện 1', () => pageBtc, async () => {
+      event1Id = await createEvent(title1)
     })
     await step('3.8', 'Buổi diễn 30 ngày sau, 19:00 → 21:00 (gõ 1900)', () => pageBtc, async () => {
       await saveShow(vnDate(Date.now() + 30 * DAY), '1900', '21:00')
@@ -275,7 +274,7 @@ test('the ★ steps of the UI test guide', async ({ browser, api }) => {
       await submitAndApprove(event1Id)
     })
     await step('3.13-3.14', 'Sự kiện 2: buổi diễn 2 giờ nữa, tổng 2, gán 2 vé đứng', () => pageBtc, async () => {
-      event2Id = await createEvent(title2, false)
+      event2Id = await createEvent(title2)
       const at = Date.now() + 2 * 3_600_000
       await saveShow(vnDate(at), vnTime(at), '')
       await pageBtc.getByLabel('Tổng số người tham dự').fill('2')
@@ -302,12 +301,12 @@ test('the ★ steps of the UI test guide', async ({ browser, api }) => {
       await expect(pageA).toHaveURL(/\/events\?q=/)
       await expect(pageA.getByRole('link', { name: new RegExp(title1) })).toHaveCount(1)
     })
-    await step('4.5', 'Chi tiết sự kiện: giá từ 300.000, chính sách Tiêu chuẩn', () => pageA, async () => {
+    await step('4.5', 'Chi tiết sự kiện: giá từ 300.000, vé không hủy không hoàn', () => pageA, async () => {
       await pageA.getByRole('link', { name: new RegExp(title1) }).first().click()
       await expect(pageA.getByRole('heading', { name: title1 })).toBeVisible()
       slug1 = new URL(pageA.url()).pathname.split('/').at(-1)!
       await expect(pageA.getByText('Giá vé từ', { exact: true }).first().locator('..')).toContainText('300.000')
-      await expect(pageA.getByText('Chính sách hủy: Tiêu chuẩn')).toBeVisible()
+      await expect(pageA.getByText('Vé không hủy, không hoàn')).toBeVisible()
     })
 
     // --- Phiên 5: mua vé
@@ -475,20 +474,16 @@ test('the ★ steps of the UI test guide', async ({ browser, api }) => {
       await expect(pageB.getByText('Đã đặt')).toBeVisible()
     })
 
-    // --- Phiên 9: hủy, hoàn tiền
-    await step('9.1-9.2', 'A hủy đơn C01: hoàn 1.200.000 (80%), phí 300.000', () => pageA, async () => {
+    // --- Phiên 9: không hủy, không hoàn theo yêu cầu (chỉ hoàn khi sự kiện bị hủy)
+    await step('9.1-9.2', 'Đơn C01 đã thanh toán của A: không có nút hủy đơn', () => pageA, async () => {
       await pageA.goto(`/orders/${order2}`)
-      await expect(pageA.getByText(/hoàn 1\.200\.000.*\(80%\), phí hủy 300\.000/)).toBeVisible()
-      await pageA.getByRole('button', { name: 'Hủy đơn và hoàn tiền' }).click()
-      await pageA.getByRole('dialog').getByRole('button', { name: 'Hủy đơn' }).click()
-      await expect(pageA.getByText('Đã hoàn tiền', { exact: true })).toBeVisible()
+      await expect(pageA.getByText('Đã thanh toán').first()).toBeVisible()
+      await expect(pageA.getByRole('button', { name: /Hủy đơn/ })).toHaveCount(0)
     })
-    await step('9.4', 'Admin hoàn tiền đơn 3 vé', () => adminPage, async () => {
+    await step('9.4', 'Admin xem đơn 3 vé: không có nút hoàn tiền', () => adminPage, async () => {
       await adminPage.goto(`/admin/orders/${order1}`)
-      await adminPage.getByRole('button', { name: 'Hoàn tiền' }).click()
-      await adminPage.getByRole('dialog').getByLabel('Lý do').fill('Thử hoàn tiền')
-      await adminPage.getByRole('dialog').getByRole('button', { name: 'Hoàn tiền' }).click()
-      await expect(adminPage.getByText('Đã hoàn tiền').first()).toBeVisible()
+      await expect(adminPage.getByText('Thanh toán', { exact: true })).toBeVisible()
+      await expect(adminPage.getByRole('button', { name: 'Hoàn tiền' })).toHaveCount(0)
     })
     await step('9.5', 'Báo cáo doanh thu của ban tổ chức', () => pageBtc, async () => {
       await pageBtc.goto(`/organizer/events/${event1Id}?tab=sales`)

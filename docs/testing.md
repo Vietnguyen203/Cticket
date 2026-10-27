@@ -34,9 +34,8 @@ Test chạy trên **PostgreSQL và Redis thật** (không giả lập database),
 | Sơ đồ ghế, tồn kho, khóa / mở ghế | `inventory` | 16 |
 | Giữ chỗ, đơn hàng, khóa Redis, gợi ý ghế | `orders`, `booking-redis` | 25 |
 | Đổi / bỏ ghế trong đơn đang giữ (BKG-02) | `order-edit` | 15 |
-| Thanh toán (idempotency), mã giảm giá, hoàn tiền | `payments`, `payments-simulator-off` | 17 |
-| **VNPay** (Phase 17, với một VNPay giả trong test): ký / kiểm chữ ký, URL thanh toán, IPN (mọi mã trả lời), Return URL hỏi lại VNPay, lượt thứ hai, tiền đến muộn và trả trùng → hoàn tự động, đối soát khi đơn hết giờ, hoàn tiền qua hàng đợi (thành công / thử lại / bị từ chối / admin gửi lại), hủy sự kiện; **đã thu tiền sau khi báo thất bại** (rà soát lỗi BUG-01) | `payments-vnpay`, `vnpay` | 30 |
-| **Hủy đơn theo chính sách** (Phase 18.3): các mốc và ranh giới, số tiền khách đã thấy phải còn đúng, đã vào cổng, đơn 0đ, VNPay hoàn một phần (`03`), phí hủy trong báo cáo | `cancellation`, `refund-policy` | 11 |
+| Thanh toán (idempotency), mã giảm giá; không hoàn tiền theo yêu cầu, chỉ khi hủy sự kiện | `payments`, `payments-simulator-off` | 18 |
+| **VNPay** (Phase 17, với một VNPay giả trong test): ký / kiểm chữ ký, URL thanh toán, IPN (mọi mã trả lời), Return URL hỏi lại VNPay, lượt thứ hai, tiền đến muộn và trả trùng → hoàn tự động, đối soát khi đơn hết giờ, hủy sự kiện → hoàn tiền qua hàng đợi (thành công / thử lại / bị từ chối / admin gửi lại); **đã thu tiền sau khi báo thất bại** (rà soát lỗi BUG-01) | `payments-vnpay`, `vnpay` | 30 |
 | **Nhắc lịch** (Phase 18.2): cửa sổ 24 giờ / 2 giờ, không gửi trùng, người tắt nhắc, đơn mua sau mốc, đơn đã hoàn | `reminders` | 3 |
 | **Danh sách chờ** (Phase 18.4): chỉ vào khi hết, mời đúng thứ tự và số lượng, chỗ đang dành không ai khác lấy được (vé đứng và ghế), hết 30 phút → người sau, suất ngừng bán → đóng | `waitlist` | 4 |
 | **Đánh giá** (Phase 19): chỉ người đã vào cổng, sửa tại chỗ, hạn 60 ngày, điểm và phân bố, trả lời của đúng ban tổ chức, admin ẩn / hiện (audit), đối chiếu điểm, email mời đánh giá | `reviews` | 8 |

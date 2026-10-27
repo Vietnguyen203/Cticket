@@ -2,7 +2,7 @@ const { buildSetClause } = require('../../utils/sql');
 const { escapeLike } = require('../../utils/pagination');
 
 const EVENT_COLUMNS = `e.id, e.organizer_id, e.title, e.slug, e.description, e.banner_url, e.thumbnail_url,
-  e.status, e.age_restriction, e.refund_policy, e.queue_enabled, e.queue_capacity, e.queue_session_minutes, e.lineup, e.rating_count, e.rating_sum, e.published_at, e.created_at, e.updated_at`;
+  e.status, e.age_restriction, e.queue_enabled, e.queue_capacity, e.queue_session_minutes, e.lineup, e.rating_count, e.rating_sum, e.published_at, e.created_at, e.updated_at`;
 
 const UPDATABLE = {
   title: 'title',
@@ -10,7 +10,6 @@ const UPDATABLE = {
   bannerUrl: 'banner_url',
   thumbnailUrl: 'thumbnail_url',
   ageRestriction: 'age_restriction',
-  refundPolicy: 'refund_policy', // Phase 18.3
   // Phase 21: purchase queue
   queueEnabled: 'queue_enabled',
   queueCapacity: 'queue_capacity',
@@ -39,8 +38,8 @@ const SORT_ORDERS = Object.freeze({
 
 async function insertEvent(db, event) {
   const { rows } = await db.query(
-    `INSERT INTO events (organizer_id, title, slug, description, banner_url, thumbnail_url, age_restriction, refund_policy)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, coalesce($8, 'NONE'))
+    `INSERT INTO events (organizer_id, title, slug, description, banner_url, thumbnail_url, age_restriction)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING id`,
     [
       event.organizerId,
@@ -50,7 +49,6 @@ async function insertEvent(db, event) {
       event.bannerUrl ?? null,
       event.thumbnailUrl ?? null,
       event.ageRestriction ?? null,
-      event.refundPolicy ?? null,
     ],
   );
   return rows[0].id;

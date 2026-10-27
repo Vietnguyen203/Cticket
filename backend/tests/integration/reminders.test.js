@@ -5,7 +5,7 @@ const { query, closePool } = require('../../src/database/pool');
 const { useFakeMailbox } = require('../helpers/auth');
 const { bearer, createAdmin, createOrganizer, createCategory } = require('../helpers/catalog');
 const { createConfiguredEvent, publishEvent } = require('../helpers/inventory');
-const { createCustomers, book } = require('../helpers/orders');
+const { createCustomers, book, refundOrder } = require('../helpers/orders');
 const reminders = require('../../src/modules/reminders');
 const { TERMS_VERSION } = require('../../src/config/constants');
 
@@ -87,7 +87,7 @@ describe('reminders before the show', () => {
     await request(app).patch('/api/v1/users/me').set(bearer(off.buyer.token)).send({ eventReminders: false }).expect(200);
     const refunded = await paidOrder({ startsIn: '23 hours' });
     const { rows } = await query(`SELECT id FROM payments WHERE order_id = $1`, [refunded.order.id]);
-    await request(app).post(`/api/v1/payments/${rows[0].id}/refund`).set(bearer(admin.token)).send({ reason: 'Test refund' }).expect(200);
+    await refundOrder(rows[0].id);
 
     await reminders.sendDueReminders();
     for (const world of [late, off, refunded]) {

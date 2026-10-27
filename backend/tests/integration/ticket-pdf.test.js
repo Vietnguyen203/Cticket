@@ -7,7 +7,7 @@ const ticketsRepository = require('../../src/modules/tickets/tickets.repository'
 const { useFakeMailbox } = require('../helpers/auth');
 const { bearer, createAdmin, createOrganizer, createCategory } = require('../helpers/catalog');
 const { createConfiguredEvent, publishEvent } = require('../helpers/inventory');
-const { createCustomers, book } = require('../helpers/orders');
+const { createCustomers, book, refundOrder } = require('../helpers/orders');
 const { TERMS_VERSION } = require('../../src/config/constants');
 
 /** Phase 20: tickets as PDF, in the confirmation email and as downloads. */
@@ -90,7 +90,7 @@ describe('downloads', () => {
     await download(stranger.token, `/api/v1/tickets/${tickets[0].id}/ticket.pdf`).expect(404);
 
     const { rows } = await query(`SELECT id FROM payments WHERE order_id = $1`, [order.id]);
-    await request(app).post(`/api/v1/payments/${rows[0].id}/refund`).set(bearer(admin.token)).send({ reason: 'Test' }).expect(200);
+    await refundOrder(rows[0].id);
     const refused = await request(app).get(`/api/v1/orders/${order.id}/tickets.pdf`).set(bearer(buyer.token)).expect(409);
     expect(refused.body.error.code).toBe('TICKET_NOT_VALID');
   });

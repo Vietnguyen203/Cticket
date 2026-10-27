@@ -7,7 +7,6 @@ import { ArrowRightIcon, CalendarIcon, ChevronRightIcon, MapPinIcon, ShieldIcon,
 import { Alert, Badge, FullPageSpinner, type BadgeTone } from '../../components/ui'
 import { dateParts, formatDateTime, formatVnd } from '../../utils/format'
 import { useAsync } from '../../utils/useAsync'
-import { refundPolicyOf } from '../../payments/refundPolicy'
 import { initialsOf } from '../../utils/initials'
 import { EventReviews } from './EventReviews'
 
@@ -76,7 +75,6 @@ export function EventDetailPage() {
     .filter((tt) => tt.available > 0)
     .map((tt) => tt.price)
   const fromPrice = prices.length > 0 ? Math.min(...prices) : null
-  const policy = refundPolicyOf(e.refundPolicy)
   const nextWhen = next ? dateParts(next.startAt) : null
 
   return (
@@ -171,14 +169,14 @@ export function EventDetailPage() {
               <ScheduleBox key={schedule.id} schedule={schedule} slug={e.slug} ticketTypes={availability.data?.[schedule.id]} />
             ))}
             {schedules.length === 0 && <p className="text-sm text-slate-500">Chưa có suất diễn.</p>}
-            {/* Phase 18.3 */}
+            {/* Terms of sale, Điều 5: said before buying */}
             <div className="flex gap-3 rounded-card border border-line bg-surface p-4 text-sm">
               <ShieldIcon size={20} className="mt-0.5 shrink-0 text-brand-700" />
               <div>
-                <p className="font-semibold text-ink">Chính sách hủy: {policy.label}</p>
-                <p className="mt-1 leading-relaxed text-slate-600">{policy.summary}</p>
+                <p className="font-semibold text-ink">Vé không hủy, không hoàn</p>
+                <p className="mt-1 leading-relaxed text-slate-600">Sự kiện hoặc suất diễn bị hủy thì bạn được hoàn 100% tự động.</p>
                 <Link to="/dieu-khoan#huy-va-hoan-tien" className="mt-1 inline-block font-semibold text-brand-700 hover:underline">
-                  Điều kiện hủy và hoàn tiền
+                  Điều kiện hoàn tiền
                 </Link>
               </div>
             </div>

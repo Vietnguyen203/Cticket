@@ -6,7 +6,7 @@ const mailer = require('../../src/mail/mailer');
 const { useFakeMailbox, registerUser } = require('../helpers/auth');
 const { bearer, createAdmin, createOrganizer, createCategory } = require('../helpers/catalog');
 const { createConfiguredEvent, publishEvent } = require('../helpers/inventory');
-const { createCustomers, book, cancelOrder, makeDue } = require('../helpers/orders');
+const { createCustomers, book, cancelOrder, makeDue, refundOrder } = require('../helpers/orders');
 const { QUEUE, enqueue, getQueue, setQueueMode } = require('../../src/queue/queues');
 const processors = require('../../src/queue/processors');
 const { startWorkers, MAINTENANCE_SCHEDULE } = require('../../src/worker');
@@ -130,12 +130,12 @@ describe('issuing tickets (Q-01)', () => {
     const add = jest.spyOn(queue, 'add').mockRejectedValueOnce(new Error('Connection is closed.'));
     const early = await paidOrder();
     add.mockRestore();
-    await request(app).post(`/api/v1/payments/${early.payment.id}/refund`).set(bearer(admin.token)).send({ reason: 'Early' }).expect(200);
+    await refundOrder(early.payment.id);
     expect(await processors.run(QUEUE.TICKETS, { name: 'issue', data: { orderId: early.order.id } })).toBe(0);
 
     const late = await paidOrder();
     await waitFor(async () => (await ticketCount(late.order.id)) === 5, { what: 'tickets' });
-    await request(app).post(`/api/v1/payments/${late.payment.id}/refund`).set(bearer(admin.token)).send({ reason: 'Late' }).expect(200);
+    await refundOrder(late.payment.id);
     const { rows } = await query(`SELECT DISTINCT status FROM tickets WHERE order_id = $1`, [late.order.id]);
     expect(rows).toEqual([{ status: 'REFUNDED' }]);
   });

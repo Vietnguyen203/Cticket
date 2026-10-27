@@ -6,12 +6,12 @@ test('the terms of sale: from the event page to the refund article, with the leg
   const world = await createPublishedEvent(api, { admin, organizer })
 
   await page.goto(`/events/${world.event.slug}`)
-  await page.getByRole('link', { name: 'Điều kiện hủy và hoàn tiền' }).click()
+  await page.getByRole('link', { name: 'Điều kiện hoàn tiền' }).click()
 
   await expect(page).toHaveURL(/\/dieu-khoan#huy-va-hoan-tien$/)
   await expect(page.getByRole('heading', { name: 'Điều kiện giao dịch chung' })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Điều 5. Khách hàng hủy đơn và hoàn tiền' })).toBeInViewport()
-  await expect(page.getByRole('table', { name: 'Các mức hoàn tiền khi Khách hàng tự hủy đơn' }).getByRole('row')).toHaveCount(4)
+  await expect(page.getByRole('heading', { name: 'Điều 5. Không hủy vé, hoàn tiền khi sự kiện bị hủy' })).toBeInViewport()
+  await expect(page.getByText(/Tiền vé chỉ được hoàn khi sự kiện hoặc suất diễn bị hủy/)).toBeVisible()
   // Each legal basis opens its full text in a new tab (not followed here: an outside site).
   const civilCode = page.getByRole('link', { name: /^Bộ luật Dân sự số 91\/2015\/QH13/ })
   await expect(civilCode).toHaveAttribute('href', /^https:\/\/thuvienphapluat\.vn\/van-ban\//)
