@@ -40,8 +40,8 @@ export function TicketPage() {
         Vé của tôi
       </Link>
 
-      <article className="animate-scale-in overflow-hidden rounded-panel bg-white shadow-raised ring-1 ring-line">
-        <header className="space-y-2 bg-ink p-5 text-white">
+      <article className="animate-scale-in overflow-hidden rounded-panel bg-surface shadow-raised ring-1 ring-line">
+        <header className="space-y-2 bg-night p-5 text-white">
           <p className="text-xs font-semibold uppercase tracking-wider text-brand-300">Vé điện tử</p>
           <h1 className="text-xl font-bold leading-snug">{t.event.title}</h1>
           <p className="flex items-start gap-2 text-sm text-slate-300">
@@ -82,7 +82,7 @@ export function TicketPage() {
                   <a
                     href={qrUrl}
                     download={`${t.code}.png`}
-                    className="flex h-11 flex-1 items-center justify-center rounded-control border border-line bg-white text-sm font-semibold text-ink shadow-card hover:bg-slate-50"
+                    className="flex h-11 flex-1 items-center justify-center rounded-control border border-line bg-surface text-sm font-semibold text-ink shadow-card hover:bg-slate-50"
                   >
                     Tải ảnh QR
                   </a>

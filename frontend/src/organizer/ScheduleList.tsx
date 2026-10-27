@@ -60,7 +60,7 @@ export function ScheduleList({ event, onChanged }: { event: EventDetail; onChang
                 setNewVenue(e.target.value === NEW_VENUE)
                 if (e.target.value !== NEW_VENUE) setVenueId(e.target.value)
               }}
-              className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5"
+              className="block w-full rounded-lg border border-slate-300 bg-surface px-3 py-2.5"
             >
               <option value="">Chọn địa điểm…</option>
               {venues.data?.venues.map((venue) => (
@@ -182,7 +182,7 @@ function ScheduleLine({
                 aria-label={`Ngày diễn${suffix}`}
                 value={row.date}
                 onChange={(e) => set({ date: e.target.value })}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-base outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100 sm:text-sm"
+                className="rounded-lg border border-slate-300 bg-surface px-3 py-2.5 text-base outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100 sm:text-sm"
               />
             </label>
             <div>

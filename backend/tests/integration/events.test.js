@@ -2,6 +2,8 @@ const request = require('supertest');
 const { createApp } = require('../../src/app');
 const { query, closePool } = require('../../src/database/pool');
 const { useFakeMailbox, createLoggedInUser } = require('../helpers/auth');
+const { createCustomers, book } = require('../helpers/orders');
+const { createConfiguredEvent, publishEvent } = require('../helpers/inventory');
 const {
   bearer,
   unique,
@@ -338,6 +340,27 @@ describe('GET /events (list, search, filters)', () => {
 
     const page2 = await list({ categoryId: listCategory.id, pageSize: 1, page: 2 }).expect(200);
     expect(page2.body.data.events.map((e) => e.id)).toEqual([later.id]);
+  });
+
+  test('each card has its "from" price and the places left; a booking lowers them', async () => {
+    const cardCategory = await createCategory(app, admin.token);
+    const world = await createConfiguredEvent(app, { adminToken: admin.token, organizerToken: organizerA.token, categoryId: cardCategory.id });
+    await publishEvent(app, { adminToken: admin.token, organizerToken: organizerA.token, eventId: world.event.id });
+
+    const cardOf = async (params) => {
+      const { events } = (await list({ categoryId: cardCategory.id, ...params }).expect(200)).body.data;
+      return Object.fromEntries(events.map((e) => [e.id, e]));
+    };
+    // 20 seats (A, B rows) + 100 standing; the cheapest on sale is standing, 500.000đ.
+    const before = await cardOf({});
+    expect(before[world.event.id]).toMatchObject({ fromPrice: 500_000, places: { total: 120, left: 120 } });
+
+    const [buyer] = await createCustomers(1);
+    const seatA01 = world.seats.find((s) => s.code === 'A01').id;
+    await book(app, buyer.token, world.schedule.id, { seatIds: [seatA01], items: [{ ticketTypeId: world.standing.id, quantity: 2 }] }).expect(201);
+    // Another query (the list is cached for a minute per query).
+    const after = await cardOf({ sort: '-startAt' });
+    expect(after[world.event.id].places).toEqual({ total: 120, left: 117 });
   });
 
   test('search ignores accents; city filter ignores accents; LIKE wildcards are literal', async () => {

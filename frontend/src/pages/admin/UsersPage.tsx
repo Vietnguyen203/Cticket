@@ -77,8 +77,8 @@ export function UsersPage() {
         role="search"
         className="mb-4 grid gap-2 sm:grid-cols-[2fr_1fr_1fr_auto]"
       >
-        <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Email hoặc tên" aria-label="Tìm người dùng" className="rounded-lg border border-slate-300 bg-white px-3 py-2" />
-        <select value={filters.role} onChange={(e) => setFilters({ ...filters, role: e.target.value, page: 1 })} aria-label="Vai trò" className="rounded-lg border border-slate-300 bg-white px-3 py-2">
+        <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Email hoặc tên" aria-label="Tìm người dùng" className="rounded-lg border border-slate-300 bg-surface px-3 py-2" />
+        <select value={filters.role} onChange={(e) => setFilters({ ...filters, role: e.target.value, page: 1 })} aria-label="Vai trò" className="rounded-lg border border-slate-300 bg-surface px-3 py-2">
           <option value="">Mọi vai trò</option>
           {(Object.keys(ROLE_LABELS) as Role[]).map((role) => (
             <option key={role} value={role}>
@@ -86,7 +86,7 @@ export function UsersPage() {
             </option>
           ))}
         </select>
-        <select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value, page: 1 })} aria-label="Trạng thái" className="rounded-lg border border-slate-300 bg-white px-3 py-2">
+        <select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value, page: 1 })} aria-label="Trạng thái" className="rounded-lg border border-slate-300 bg-surface px-3 py-2">
           <option value="">Mọi trạng thái</option>
           {Object.entries(STATUS_LABELS).map(([value, label]) => (
             <option key={value} value={value}>
@@ -146,15 +146,15 @@ export function UsersPage() {
                   )}
                 </td>
                 <td className="text-xs">
-                  {user.twoFactorEnabled ? <span className="font-semibold text-emerald-700">Bật</span> : <span className="text-slate-400">—</span>}
+                  {user.twoFactorEnabled ? <span className="font-semibold text-emerald-700">Bật</span> : <span className="text-slate-500">—</span>}
                 </td>
                 <td className="whitespace-nowrap text-slate-600">{formatDateTime(user.createdAt)}</td>
                 <td className="whitespace-nowrap text-right">
                   {isMe ? (
-                    <span className="text-xs text-slate-400">Bạn</span>
+                    <span className="text-xs text-slate-500">Bạn</span>
                   ) : user.status === 'DELETED' ? (
                     // Deleted by its owner: personal data gone, nothing left to manage.
-                    <span className="text-xs text-slate-400">—</span>
+                    <span className="text-xs text-slate-500">—</span>
                   ) : (
                     <>
                       <Button variant="ghost" onClick={() => setEditingRoles(user)}>

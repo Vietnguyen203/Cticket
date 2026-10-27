@@ -65,7 +65,7 @@ function SoldOutRow({ scheduleId, ticketType }: { scheduleId: string; ticketType
               value={quantity}
               onChange={(e) => setQuantity(Number(e.target.value))}
               aria-label={`Số vé ${ticketType.name} muốn mua`}
-              className="rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm"
+              className="rounded-lg border border-slate-300 bg-surface px-2 py-2 text-sm"
             >
               {Array.from({ length: max }, (_, i) => i + 1).map((n) => (
                 <option key={n} value={n}>

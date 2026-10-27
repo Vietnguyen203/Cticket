@@ -19,12 +19,12 @@ export function SideMenuLayout({ title, menu }: { title: string; menu: MenuEntry
           type="button"
           onClick={() => setMenuOpen((open) => !open)}
           aria-expanded={menuOpen}
-          className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold md:hidden"
+          className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-surface px-4 py-2.5 text-sm font-semibold md:hidden"
         >
           Menu {title.toLowerCase()} <span aria-hidden="true">{menuOpen ? '▲' : '▼'}</span>
         </button>
-        <nav className={`${menuOpen ? 'mt-2 block' : 'hidden'} space-y-1 rounded-xl border border-slate-200 bg-white p-2 md:block`}>
-          <p className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{title}</p>
+        <nav className={`${menuOpen ? 'mt-2 block' : 'hidden'} space-y-1 rounded-xl border border-slate-200 bg-surface p-2 md:block`}>
+          <p className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</p>
           {entries.map((entry) => (
             <NavLink
               key={entry.to}

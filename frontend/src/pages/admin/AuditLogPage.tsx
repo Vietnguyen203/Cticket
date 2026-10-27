@@ -45,7 +45,7 @@ export function AuditLogPage() {
     <>
       <PageHeader title="Audit log" subtitle="Lịch sử thay đổi quan trọng: ai làm, lúc nào, giá trị cũ → mới." />
       <form onSubmit={apply} className="mb-4 grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
-        <select value={draft.entityType} onChange={(e) => setDraft({ ...draft, entityType: e.target.value })} aria-label="Loại đối tượng" className="rounded-lg border border-slate-300 bg-white px-3 py-2">
+        <select value={draft.entityType} onChange={(e) => setDraft({ ...draft, entityType: e.target.value })} aria-label="Loại đối tượng" className="rounded-lg border border-slate-300 bg-surface px-3 py-2">
           <option value="">Mọi đối tượng</option>
           {Object.entries(ENTITY_TYPES).map(([value, label]) => (
             <option key={value} value={value}>
@@ -53,7 +53,7 @@ export function AuditLogPage() {
             </option>
           ))}
         </select>
-        <select value={draft.action} onChange={(e) => setDraft({ ...draft, action: e.target.value })} aria-label="Hành động" className="rounded-lg border border-slate-300 bg-white px-3 py-2">
+        <select value={draft.action} onChange={(e) => setDraft({ ...draft, action: e.target.value })} aria-label="Hành động" className="rounded-lg border border-slate-300 bg-surface px-3 py-2">
           <option value="">Mọi hành động</option>
           {actions.data?.map((action) => (
             <option key={action} value={action}>
@@ -61,9 +61,9 @@ export function AuditLogPage() {
             </option>
           ))}
         </select>
-        <input value={draft.entityId} onChange={(e) => setDraft({ ...draft, entityId: e.target.value })} placeholder="Id đối tượng" aria-label="Id đối tượng" className="rounded-lg border border-slate-300 bg-white px-3 py-2" />
-        <input type="date" value={draft.from} onChange={(e) => setDraft({ ...draft, from: e.target.value })} aria-label="Từ ngày" className="rounded-lg border border-slate-300 bg-white px-3 py-2" />
-        <input type="date" value={draft.to} onChange={(e) => setDraft({ ...draft, to: e.target.value })} aria-label="Đến ngày" className="rounded-lg border border-slate-300 bg-white px-3 py-2" />
+        <input value={draft.entityId} onChange={(e) => setDraft({ ...draft, entityId: e.target.value })} placeholder="Id đối tượng" aria-label="Id đối tượng" className="rounded-lg border border-slate-300 bg-surface px-3 py-2" />
+        <input type="date" value={draft.from} onChange={(e) => setDraft({ ...draft, from: e.target.value })} aria-label="Từ ngày" className="rounded-lg border border-slate-300 bg-surface px-3 py-2" />
+        <input type="date" value={draft.to} onChange={(e) => setDraft({ ...draft, to: e.target.value })} aria-label="Đến ngày" className="rounded-lg border border-slate-300 bg-surface px-3 py-2" />
         <Button type="submit" variant="secondary">
           Lọc
         </Button>
@@ -97,11 +97,11 @@ function Row({ log, open, onToggle }: { log: AuditLog; open: boolean; onToggle: 
     <>
       <tr>
         <td className="whitespace-nowrap text-slate-600">{formatDateTime(log.createdAt)}</td>
-        <td className="text-slate-600">{log.userEmail ?? <span className="text-slate-400">hệ thống</span>}</td>
+        <td className="text-slate-600">{log.userEmail ?? <span className="text-slate-500">hệ thống</span>}</td>
         <td className="font-mono text-xs">{log.action}</td>
         <td className="text-xs text-slate-600">
           {ENTITY_TYPES[log.entityType] ?? log.entityType}
-          <p className="font-mono text-[11px] text-slate-400">{log.entityId}</p>
+          <p className="font-mono text-[11px] text-slate-500">{log.entityId}</p>
         </td>
         <td className="text-right">
           <Button variant="ghost" onClick={onToggle} aria-expanded={open}>
@@ -115,14 +115,14 @@ function Row({ log, open, onToggle }: { log: AuditLog; open: boolean; onToggle: 
             <div className="grid gap-3 text-xs sm:grid-cols-2">
               <div>
                 <p className="mb-1 font-semibold text-slate-500">Trước</p>
-                <pre className="overflow-x-auto whitespace-pre-wrap rounded bg-white p-2 ring-1 ring-slate-200">{JSON.stringify(log.oldValue, null, 2) ?? '—'}</pre>
+                <pre className="overflow-x-auto whitespace-pre-wrap rounded bg-surface p-2 ring-1 ring-slate-200">{JSON.stringify(log.oldValue, null, 2) ?? '—'}</pre>
               </div>
               <div>
                 <p className="mb-1 font-semibold text-slate-500">Sau</p>
-                <pre className="overflow-x-auto whitespace-pre-wrap rounded bg-white p-2 ring-1 ring-slate-200">{JSON.stringify(log.newValue, null, 2) ?? '—'}</pre>
+                <pre className="overflow-x-auto whitespace-pre-wrap rounded bg-surface p-2 ring-1 ring-slate-200">{JSON.stringify(log.newValue, null, 2) ?? '—'}</pre>
               </div>
             </div>
-            {log.ipAddress && <p className="mt-2 text-xs text-slate-400">IP: {log.ipAddress}</p>}
+            {log.ipAddress && <p className="mt-2 text-xs text-slate-500">IP: {log.ipAddress}</p>}
           </td>
         </tr>
       )}

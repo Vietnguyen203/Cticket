@@ -175,7 +175,7 @@ function PromotionForm({ promotion, onClose, onSaved }: { promotion: Promotion |
         <TextField label="Tên" name="promoName" value={form.name} onChange={set('name')} error={fieldErrors.name} className="sm:col-span-2" />
         <label className="text-sm">
           <span className="mb-1 block font-medium text-slate-700">Kiểu giảm</span>
-          <select value={form.discountType} onChange={set('discountType')} className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5">
+          <select value={form.discountType} onChange={set('discountType')} className="block w-full rounded-lg border border-slate-300 bg-surface px-3 py-2.5">
             <option value="PERCENTAGE">Phần trăm (%)</option>
             <option value="FIXED_AMOUNT">Số tiền (VND)</option>
           </select>
@@ -206,7 +206,7 @@ function PromotionForm({ promotion, onClose, onSaved }: { promotion: Promotion |
         <DateTimeField label="Hết hạn (giờ VN)" name="expiresAt" value={form.expiresAt} onChange={(expiresAt) => setForm((f) => ({ ...f, expiresAt }))} error={fieldErrors.expiresAt} />
         <label className="text-sm">
           <span className="mb-1 block font-medium text-slate-700">Trạng thái</span>
-          <select value={form.status} onChange={set('status')} className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5">
+          <select value={form.status} onChange={set('status')} className="block w-full rounded-lg border border-slate-300 bg-surface px-3 py-2.5">
             <option value="ACTIVE">Đang dùng</option>
             <option value="INACTIVE">Tạm dừng</option>
           </select>

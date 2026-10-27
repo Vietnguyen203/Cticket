@@ -60,7 +60,7 @@ export function LineupCard({ event, onSave }: { event: EventDetail; onSave: (inp
                 value={row.artist}
                 disabled={!editable}
                 onChange={(e) => setArtist(row.key, e.target.value)}
-                className="block w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100 disabled:bg-slate-100"
+                className="block w-full min-w-0 rounded-lg border border-slate-300 bg-surface px-3 py-2 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100 disabled:bg-slate-100"
               />
               {editable && (
                 <Button

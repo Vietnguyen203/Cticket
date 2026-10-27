@@ -44,7 +44,7 @@ export function VnpayReturnPage() {
 
   return (
     <div className="mx-auto max-w-md px-4 py-12 sm:py-16">
-      <div className="space-y-5 rounded-panel border border-line bg-white p-6 text-center shadow-card sm:p-8">
+      <div className="space-y-5 rounded-panel border border-line bg-surface p-6 text-center shadow-card sm:p-8">
         <div className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full ${look.box}`}>{look.icon}</div>
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Kết quả thanh toán VNPay</p>
@@ -66,7 +66,7 @@ export function VnpayReturnPage() {
             </Alert>
           )}
         </div>
-        <Link to={`/orders/${r.orderId}`} className="flex h-11 items-center justify-center rounded-control bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-800">
+        <Link to={`/orders/${r.orderId}`} className="pressable flex h-11 items-center justify-center rounded-control bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-800">
           Về trang đơn hàng
         </Link>
       </div>

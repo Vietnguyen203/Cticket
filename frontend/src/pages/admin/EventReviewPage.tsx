@@ -39,7 +39,7 @@ const DECISIONS: Record<Decision, { status: 'PUBLISHED' | 'DRAFT' | 'CANCELLED';
   },
 }
 
-const LINK_BUTTON = 'inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50'
+const LINK_BUTTON = 'inline-flex items-center rounded-lg border border-slate-300 bg-surface px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50'
 
 /** EVT review: what the organizer submitted, then approve / reject / cancel. */
 export function EventReviewPage() {

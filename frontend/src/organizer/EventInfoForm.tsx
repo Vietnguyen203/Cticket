@@ -143,7 +143,7 @@ export function EventInfoForm({ event, onSubmit, submitLabel }: { event?: EventD
           value={form.refundPolicy}
           disabled={locked('refundPolicy')}
           onChange={(e) => setForm({ ...form, refundPolicy: e.target.value as RefundPolicy })}
-          className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 sm:w-1/2"
+          className="block w-full rounded-lg border border-slate-300 bg-surface px-3 py-2.5 sm:w-1/2"
         >
           {REFUND_POLICIES.map((policy) => (
             <option key={policy.value} value={policy.value}>
@@ -188,7 +188,7 @@ export function EventInfoForm({ event, onSubmit, submitLabel }: { event?: EventD
             <label
               key={category.id}
               className={`cursor-pointer rounded-full border px-3 py-1.5 text-sm ${
-                form.categoryIds.includes(category.id) ? 'border-brand-600 bg-brand-50 text-brand-800' : 'border-slate-300 bg-white text-slate-700'
+                form.categoryIds.includes(category.id) ? 'border-brand-600 bg-brand-50 text-brand-800' : 'border-slate-300 bg-surface text-slate-700'
               }`}
             >
               <input type="checkbox" className="sr-only" checked={form.categoryIds.includes(category.id)} onChange={() => toggleCategory(category.id)} />

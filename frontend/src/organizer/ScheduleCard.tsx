@@ -100,7 +100,7 @@ function TicketTypesTable({ setup, draft, onChanged }: { setup: LoadedSchedule; 
               {ticketTypes.map((tt) => (
                 <tr key={tt.id} className="border-t border-slate-100">
                   <td className="py-1.5 pr-4 font-medium">
-                    {tt.name} <span className="text-xs text-slate-400">{tt.code}</span>
+                    {tt.name} <span className="text-xs text-slate-500">{tt.code}</span>
                   </td>
                   <td className="py-1.5 pr-4 text-slate-600">{tt.inventoryMode === 'RESERVED'
                       ? `Ghế ngồi${zones && seatsOf(tt.id).length ? ` · ${seatRangeLabel(zones, seatsOf(tt.id))}` : ''}`

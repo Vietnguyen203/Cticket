@@ -88,7 +88,7 @@ export function ImageField({
           value={value}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
-          className={`h-11 min-w-0 flex-1 basis-60 rounded-control border bg-white px-3.5 text-base text-ink outline-none transition focus:ring-4 disabled:bg-slate-100 sm:text-sm ${
+          className={`h-11 min-w-0 flex-1 basis-60 rounded-control border bg-surface px-3.5 text-base text-ink outline-none transition focus:ring-4 disabled:bg-slate-100 sm:text-sm ${
             error ? 'border-red-400 focus:ring-red-100' : 'border-line hover:border-slate-300 focus:border-brand-600 focus:ring-brand-100'
           }`}
         />

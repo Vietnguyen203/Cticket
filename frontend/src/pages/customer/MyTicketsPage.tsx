@@ -2,7 +2,7 @@ import { Link } from 'react-router'
 import { listMyTickets, type MyTicket } from '../../api/tickets'
 import { OrderStatusBadge } from '../../admin/OrderStatusBadge'
 import { DateBlock } from '../../components/DateBlock'
-import { ChevronRightIcon, MapPinIcon, StarIcon, TicketIcon } from '../../components/icons'
+import { CalendarIcon, ChevronRightIcon, MapPinIcon, StarIcon, TicketIcon } from '../../components/icons'
 import { EmptyState, ErrorState, PageHeader, Skeleton } from '../../components/ui'
 import { formatDateTime } from '../../utils/format'
 import { useAsync } from '../../utils/useAsync'
@@ -38,7 +38,7 @@ export function MyTicketsPage() {
           icon={<TicketIcon />}
           title="Bạn chưa có vé nào"
           action={
-            <Link to="/events" className="inline-flex h-11 items-center rounded-control bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-800">
+            <Link to="/events" className="pressable inline-flex h-11 items-center rounded-control bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-800">
               Tìm sự kiện
             </Link>
           }
@@ -66,15 +66,19 @@ function Section({ title, tickets, past = false }: { title: string; tickets: MyT
         <div key={ticket.id} className="space-y-1.5">
           <Link
             to={`/tickets/${ticket.id}`}
-            className="group flex animate-fade-up items-center gap-4 rounded-card border border-line bg-white p-4 shadow-card transition hover:-translate-y-px hover:border-slate-300 hover:shadow-raised"
+            className="group flex animate-fade-up items-center gap-4 rounded-card border border-line bg-surface p-4 shadow-card transition hover:-translate-y-px hover:border-slate-300 hover:shadow-raised"
           >
             <DateBlock iso={ticket.schedule.startAt} muted={past} />
             <div className="min-w-0 flex-1">
               <p className="line-clamp-2 font-semibold leading-snug text-ink group-hover:text-brand-700">{ticket.event.title}</p>
-              <p className="mt-1 flex items-start gap-1 text-sm text-slate-600">
-                <MapPinIcon size={15} className="mt-0.5 shrink-0 text-slate-400" />
-                <span>
-                  {formatDateTime(ticket.schedule.startAt)} · {ticket.venue.name}
+              <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-slate-600">
+                <span className="inline-flex items-center gap-1">
+                  <CalendarIcon size={15} className="shrink-0 text-slate-400" />
+                  {formatDateTime(ticket.schedule.startAt)}
+                </span>
+                <span className="inline-flex min-w-0 items-center gap-1">
+                  <MapPinIcon size={15} className="shrink-0 text-slate-400" />
+                  <span className="truncate">{ticket.venue.name}</span>
                 </span>
               </p>
               <p className="mt-1.5 text-xs text-slate-500">

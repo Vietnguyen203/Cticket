@@ -40,7 +40,7 @@ export function AdminHomePage() {
       <h2 className="mb-3 mt-8 text-lg font-semibold">Đi tới</h2>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {ADMIN_MENU.filter((entry) => entry.to !== '/admin' && hasAny(user, entry.anyOf)).map((entry) => (
-          <Link key={entry.to} to={entry.to} className="rounded-xl border border-slate-200 bg-white p-4 font-medium text-slate-800 shadow-sm hover:border-brand-600">
+          <Link key={entry.to} to={entry.to} className="rounded-xl border border-slate-200 bg-surface p-4 font-medium text-slate-800 shadow-sm hover:border-brand-600">
             {entry.label}
           </Link>
         ))}
@@ -98,7 +98,7 @@ function SalesOverview() {
                 {o.topEvents.map((e, i) => (
                   <li key={e.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
                     <Link to={`/admin/reports/events/${e.id}`} className="min-w-0 hover:underline">
-                      <span className="mr-2 text-slate-400">{i + 1}</span>
+                      <span className="mr-2 text-slate-500">{i + 1}</span>
                       <span className="font-medium">{e.title}</span>
                       <span className="block truncate text-xs text-slate-500">{e.organizerName} · {e.tickets} vé</span>
                     </Link>

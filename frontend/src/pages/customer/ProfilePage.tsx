@@ -156,7 +156,7 @@ export function ProfilePage() {
         </p>
         <Link
           to={user.roles?.includes('ORGANIZER') ? '/organizer' : '/organizer/apply'}
-          className="shrink-0 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+          className="shrink-0 rounded-lg border border-slate-300 bg-surface px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50"
         >
           {user.roles?.includes('ORGANIZER') ? 'Trang ban tổ chức' : 'Trở thành nhà tổ chức'}
         </Link>

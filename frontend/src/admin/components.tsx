@@ -94,7 +94,7 @@ export function Pagination({ meta, onPage }: { meta: PageMeta | undefined; onPag
 /** A white box holding a table; scrolls sideways on small screens. */
 export function TableCard({ children }: { children: ReactNode }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-surface shadow-sm">
       <table className="min-w-full divide-y divide-slate-200 text-sm [&_td]:px-4 [&_td]:py-3 [&_th]:px-4 [&_th]:py-2.5 [&_th]:text-left [&_th]:text-xs [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-slate-500 [&_tbody_tr]:align-top [&_tbody]:divide-y [&_tbody]:divide-slate-100">
         {children}
       </table>

@@ -88,6 +88,10 @@ export interface EventSummary {
   categories: Category[]
   /** Phase 19: published reviews (average null when none) */
   rating?: { average: number | null; count: number }
+  /** The lowest price on sale in the upcoming shows (null: nothing on sale yet) */
+  fromPrice?: number | null
+  /** Places of the upcoming shows, and how many are left (null: nothing on sale yet) */
+  places?: { total: number; left: number } | null
 }
 
 export interface Venue {

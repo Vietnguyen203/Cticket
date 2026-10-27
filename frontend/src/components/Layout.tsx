@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router'
 import { canUseAdmin, canUseOrganizer, canUseStaff } from '../admin/permissions'
 import { useAuth } from '../auth/AuthContext'
-import { CloseIcon, ExternalLinkIcon, MenuIcon, SearchIcon } from './icons'
+import { CloseIcon, ExternalLinkIcon, MenuIcon, MonitorIcon, MoonIcon, SearchIcon, SunIcon } from './icons'
+import { CHOICE_LABEL, NEXT_CHOICE, useTheme } from '../theme/theme'
 import { Alert, Button, FullPageSpinner } from './ui'
 
 // Narrower between lg and xl: an admin who is also organizer and gate staff has 8 links in one row.
@@ -10,6 +11,24 @@ const navClass = ({ isActive }: { isActive: boolean }) =>
   `whitespace-nowrap rounded-control px-3 py-2 text-sm font-medium transition duration-150 lg:px-2 xl:px-3 ${
     isActive ? 'bg-brand-50 text-brand-800' : 'text-slate-600 hover:bg-slate-100 hover:text-ink'
   }`
+
+/** Light / dark / the device's: one button, its label says what it is now and what a press does. */
+function ThemeButton() {
+  const [choice, setChoice] = useTheme()
+  const Icon = choice === 'light' ? SunIcon : choice === 'dark' ? MoonIcon : MonitorIcon
+  const next = NEXT_CHOICE[choice]
+  return (
+    <button
+      type="button"
+      onClick={() => setChoice(next)}
+      aria-label={`Giao diện: ${CHOICE_LABEL[choice]}. Bấm để chuyển sang ${CHOICE_LABEL[next]}`}
+      title={`Giao diện: ${CHOICE_LABEL[choice]}`}
+      className="flex h-10 w-10 items-center justify-center rounded-control text-slate-600 transition hover:bg-slate-100 hover:text-ink"
+    >
+      <Icon size={19} />
+    </button>
+  )
+}
 
 /** "Chính sách": the terms of sale and refund policies, in a new tab (the current page, a held order, stays open). */
 function PoliciesLink({ className = '', onClick }: { className?: string; onClick?: () => void }) {
@@ -75,10 +94,10 @@ export function Layout() {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <a href="#noi-dung" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-50 focus:rounded-control focus:bg-white focus:px-4 focus:py-2 focus:shadow-raised">
+      <a href="#noi-dung" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-50 focus:rounded-control focus:bg-surface focus:px-4 focus:py-2 focus:shadow-raised">
         Bỏ qua menu
       </a>
-      <header className={`sticky top-0 z-30 border-b bg-white/95 backdrop-blur transition-shadow duration-200 supports-[backdrop-filter]:bg-white/85 ${scrolled ? 'border-transparent shadow-raised' : 'border-line'}`}>
+      <header className={`sticky top-0 z-30 border-b bg-surface/95 backdrop-blur transition-shadow duration-200 supports-[backdrop-filter]:bg-surface/85 ${scrolled ? 'border-transparent shadow-raised' : 'border-line'}`}>
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
           <Link to="/" className="mr-3 rounded-control" aria-label="ETP Tickets, trang chủ">
             <Logo compact />
@@ -92,6 +111,7 @@ export function Layout() {
             <PoliciesLink />
           </nav>
           <div className="flex-1 lg:hidden" />
+          <ThemeButton />
           <Link
             to="/events"
             aria-label="Tìm sự kiện"
@@ -106,7 +126,7 @@ export function Layout() {
                 `flex items-center gap-2 rounded-full py-1 pl-1 pr-3 text-sm font-medium transition hover:bg-slate-100 ${isActive ? 'bg-brand-50 text-brand-800' : 'text-ink'}`
               }
             >
-              <span aria-hidden="true" className="flex h-8 w-8 items-center justify-center rounded-full bg-ink text-xs font-semibold uppercase text-white">
+              <span aria-hidden="true" className="flex h-8 w-8 items-center justify-center rounded-full bg-night text-xs font-semibold uppercase text-white">
                 {user.firstName.slice(0, 1)}
               </span>
               {/* Beside the avatar from sm, except lg–xl where the menu row needs the room. */}
@@ -119,7 +139,7 @@ export function Layout() {
                 <Link to="/register" className="hidden rounded-control px-3 py-2 text-sm font-semibold text-ink hover:bg-slate-100 sm:block">
                   Đăng ký
                 </Link>
-                <Link to="/login" className="whitespace-nowrap rounded-control bg-brand-700 px-4 py-2 text-sm font-semibold text-white shadow-card transition hover:bg-brand-800">
+                <Link to="/login" className="pressable whitespace-nowrap rounded-control bg-brand-700 px-4 py-2 text-sm font-semibold text-white shadow-card transition hover:bg-brand-800">
                   Đăng nhập
                 </Link>
               </div>
@@ -138,11 +158,11 @@ export function Layout() {
         </div>
         {menuOpen && (
           <>
-            <button type="button" aria-label="Đóng menu" onClick={closeMenu} className="fixed inset-0 top-16 z-10 animate-fade-in cursor-default bg-ink/30 lg:hidden" />
+            <button type="button" aria-label="Đóng menu" onClick={closeMenu} className="fixed inset-0 top-16 z-10 animate-fade-in cursor-default bg-night/30 lg:hidden" />
             <nav
               id="menu-dien-thoai"
               aria-label="Chính"
-              className="absolute inset-x-0 top-16 z-20 animate-slide-down border-b border-line bg-white px-4 pb-4 pt-2 shadow-raised lg:hidden"
+              className="absolute inset-x-0 top-16 z-20 animate-slide-down border-b border-line bg-surface px-4 pb-4 pt-2 shadow-raised lg:hidden"
             >
               {links.map(([to, label]) => (
                 <NavLink key={to} to={to} onClick={closeMenu} className={(state) => `block ${navClass(state)} !py-3 !text-base`}>
@@ -191,7 +211,7 @@ export function Layout() {
         )}
       </main>
 
-      <footer className="mt-16 bg-ink text-slate-300">
+      <footer className="mt-16 bg-night text-slate-300">
         <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:grid-cols-[2fr_1fr_1fr] sm:px-6">
           <div className="max-w-sm space-y-3">
             <Logo dark />

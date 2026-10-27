@@ -10,7 +10,7 @@ const BACKDROPS: Array<[Backdrop, string]> = [
   ['light', 'Trắng'],
   ['dark', 'Tối'],
 ]
-const DARK = '#0b1b24' // --color-ink
+const DARK = '#0f0a1f' // --color-night
 const JPEG_QUALITY = 0.88
 const KEY_STEP = 20 // frame units per arrow key (×4 with Shift)
 
@@ -21,7 +21,7 @@ const KEY_STEP = 20 // frame units per arrow key (×4 with Shift)
 function Framed({ src, at, backdrop, className = '' }: { src: string; at: Placement; backdrop: Backdrop; className?: string }) {
   const gaps = hasGaps(at)
   return (
-    <div className={`relative aspect-video overflow-hidden ${backdrop === 'light' ? 'bg-white' : 'bg-ink'} ${className}`}>
+    <div className={`relative aspect-video overflow-hidden ${backdrop === 'light' ? 'bg-white' : 'bg-night'} ${className}`}>
       {gaps && backdrop === 'blur' && (
         <img src={src} alt="" aria-hidden="true" draggable={false} className="absolute inset-0 h-full w-full scale-110 object-cover opacity-80 blur-2xl" />
       )}
@@ -177,7 +177,7 @@ export function ImageCropDialog({
         event.preventDefault() // Esc: close through onCancel (the parent unmounts us)
         if (!working) onCancel()
       }}
-      className="m-auto w-[min(100%-2rem,56rem)] animate-scale-in rounded-panel border border-line bg-white p-0 text-ink shadow-raised backdrop:bg-ink/60 backdrop:backdrop-blur-sm"
+      className="m-auto w-[min(100%-2rem,56rem)] animate-scale-in rounded-panel border border-line bg-surface p-0 text-ink shadow-raised backdrop:bg-night/60 backdrop:backdrop-blur-sm"
     >
       <div className="max-h-[90dvh] overflow-y-auto p-5 sm:p-6">
         <h2 id="can-chinh-anh" className="text-xl font-bold">
@@ -254,7 +254,7 @@ export function ImageCropDialog({
                 {BACKDROPS.map(([value, label]) => (
                   <label
                     key={value}
-                    className={`cursor-pointer rounded-full border px-3 py-1.5 text-sm transition ${backdrop === value ? 'border-ink bg-ink text-white' : 'border-line hover:border-slate-300'}`}
+                    className={`cursor-pointer rounded-full border px-3 py-1.5 text-sm transition ${backdrop === value ? 'border-night bg-night text-white' : 'border-line hover:border-slate-300'}`}
                   >
                     <input type="radio" name="nen-anh" value={value} checked={backdrop === value} onChange={() => setBackdrop(value)} className="sr-only" />
                     {label}
@@ -266,7 +266,7 @@ export function ImageCropDialog({
 
           <aside className="space-y-2">
             <p className="text-sm font-medium">Xem trước thẻ sự kiện</p>
-            <div className="overflow-hidden rounded-card border border-line bg-white shadow-card">
+            <div className="overflow-hidden rounded-card border border-line bg-surface shadow-card">
               {at ? <Framed src={src} at={at} backdrop={backdrop} /> : <div className="skeleton aspect-video animate-shimmer" />}
               <div className="space-y-1 p-3">
                 <p className="line-clamp-2 text-sm font-semibold">{title?.trim() || 'Tên sự kiện'}</p>

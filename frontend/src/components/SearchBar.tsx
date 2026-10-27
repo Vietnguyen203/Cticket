@@ -24,7 +24,7 @@ export function SearchBar({
   }
   const large = size === 'lg'
   return (
-    <form onSubmit={submit} role="search" className={`flex items-center gap-2 rounded-card border border-line bg-white shadow-card ${large ? 'p-1.5 sm:p-2' : 'p-1'}`}>
+    <form onSubmit={submit} role="search" className={`flex items-center gap-2 rounded-card border border-line bg-surface shadow-card ${large ? 'p-1.5 sm:p-2' : 'p-1'}`}>
       <SearchIcon size={large ? 22 : 20} className={`shrink-0 text-slate-400 ${large ? 'ml-3' : 'ml-2.5'}`} />
       <input
         value={value}

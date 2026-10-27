@@ -53,7 +53,7 @@ export function EventsPage() {
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6 sm:py-12">
       <PageHeader title="Sự kiện" subtitle="Tìm theo tên, nghệ sĩ, thành phố hoặc danh mục." />
 
-      <form onSubmit={search} role="search" className="grid gap-2 rounded-card border border-line bg-white p-2 shadow-card sm:grid-cols-[2fr_1fr_auto]">
+      <form onSubmit={search} role="search" className="grid gap-2 rounded-card border border-line bg-surface p-2 shadow-card sm:grid-cols-[2fr_1fr_auto]">
         <label className="relative block">
           <span className="sr-only">Từ khóa</span>
           <SearchIcon size={20} className="pointer-events-none absolute inset-y-0 left-3 my-auto text-slate-400" />

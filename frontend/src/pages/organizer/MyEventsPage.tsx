@@ -110,8 +110,8 @@ function SalesCells({ line, eventId }: { line: MyEventLine | undefined; eventId:
   if (!line || line.capacity === 0) {
     return (
       <>
-        <td className="text-slate-400">—</td>
-        <td className="text-slate-400">—</td>
+        <td className="text-slate-500">—</td>
+        <td className="text-slate-500">—</td>
       </>
     )
   }

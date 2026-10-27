@@ -7,7 +7,7 @@ import { Alert, Button } from '../components/ui'
 import { useAsync } from '../utils/useAsync'
 
 const COLORS: Record<string, string> = {
-  AVAILABLE: 'bg-white text-slate-700 ring-slate-300',
+  AVAILABLE: 'bg-surface text-slate-700 ring-slate-300',
   HELD: 'bg-amber-100 text-amber-800 ring-amber-300',
   SOLD: 'bg-slate-300 text-slate-500 ring-slate-300',
   BLOCKED: 'bg-red-100 text-red-700 ring-red-300',
