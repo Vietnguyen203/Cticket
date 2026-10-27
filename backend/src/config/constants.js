@@ -15,6 +15,8 @@ const USER_STATUS = Object.freeze({
   ACTIVE: 'ACTIVE',
   INACTIVE: 'INACTIVE',
   SUSPENDED: 'SUSPENDED',
+  // The user deleted their account: personal data removed, the row kept anonymised (modules/account).
+  DELETED: 'DELETED',
 });
 
 /** Values of the user_token_type enum = purposes of an OTP code. */
@@ -250,7 +252,7 @@ const EVENT_LIMITS = Object.freeze({
 // The terms of sale in force (frontend/src/legal/terms.ts TERMS_VERSION, the
 // /dieu-khoan page). A buyer accepts them at checkout; a new text gets a new
 // version here and there, so a page left open on the old text is refused.
-const TERMS_VERSION = '2026-10-26';
+const TERMS_VERSION = '2026-10-27';
 
 module.exports = {
   ROLES,

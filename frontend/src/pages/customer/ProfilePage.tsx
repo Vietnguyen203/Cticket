@@ -5,6 +5,7 @@ import type { Role } from '../../api/types'
 import { updateMe, type ProfileChanges } from '../../api/users'
 import { useAuth } from '../../auth/AuthContext'
 import { Alert, Button, Card, TextField } from '../../components/ui'
+import { PersonalDataSection } from './PersonalDataSection'
 import { TwoFactorSection } from './TwoFactorSection'
 
 const ROLE_LABELS: Record<Role, string> = {
@@ -167,6 +168,8 @@ export function ProfilePage() {
           Đăng xuất
         </Button>
       </Card>
+
+      <PersonalDataSection />
     </div>
   )
 }

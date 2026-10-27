@@ -53,6 +53,9 @@ Ký hiệu file test tự động:
 | TC-AUTH-08 | Đăng nhập bằng mã khôi phục | 2FA đang bật | Ở bước nhập mã, dùng một mã khôi phục | Vào được; mã đó không dùng lại được; số mã còn lại giảm 1 | P2 | E2E:two-factor, BE:two-factor |
 | TC-AUTH-09 | Admin bắt buộc 2FA (production) | Server production, admin mới | Đăng nhập lần đầu | Bị buộc thiết lập 2FA trước khi vào trang quản trị | P1 | E2E:two-factor, BE:two-factor, BE-unit:env |
 | TC-AUTH-10 | Đồng hồ máy lệch | Điện thoại / máy tính lệch giờ > 1 phút | Nhập mã 2FA | Mã bị từ chối: chỉnh lại giờ tự động của máy (lỗi đã gặp trên máy dev) | P3 | — |
+| TC-AUTH-11 | Tải dữ liệu cá nhân | Đã đăng nhập | Tài khoản → "Tải dữ liệu của tôi" | Tải file `etp-du-lieu-ca-nhan-<ngày>.json` gồm tài khoản, thiết bị, đơn, vé, đánh giá, danh sách chờ, thông báo; không có mật khẩu, mã QR, mã 2FA | P2 | BE:account, E2E:account-data |
+| TC-AUTH-12 | Xóa tài khoản | Không còn vé sắp diễn, đơn dở dang, hoàn tiền đang chờ | Tài khoản → "Xóa tài khoản…" → nhập mật khẩu (thử sai trước) → tích "không hoàn tác được" → xóa | Sai mật khẩu bị báo; đúng thì về trang chủ, báo đã xóa, đăng xuất mọi thiết bị; không đăng nhập lại được; đơn hàng còn (ẩn danh) ở trang admin; email đăng ký lại được | P1 | BE:account, E2E:account-data |
+| TC-AUTH-13 | Chưa xóa được tài khoản | Còn vé cho buổi diễn sắp tới (hoặc đơn đang giữ, hoàn tiền đang chờ, là admin) | Mở trang Tài khoản | Không có nút xóa; liệt kê lý do và việc cần làm | P2 | BE:account, E2E:account-data |
 
 ## 4. Tìm và xem sự kiện (CAT)
 
@@ -274,4 +277,4 @@ cd e2e && npm test
 | LOAD | 3 | 3 | 0 |
 | **Tổng** | **111** | **103** | **8** |
 
-Test tự động hiện có: backend 425 test, web 128 test, E2E 28 kịch bản, k6 5 kịch bản (chi tiết `docs/testing.md`). Những ca "chỉ test tay" cần thiết bị hoặc dịch vụ thật (điện thoại, đồng hồ máy, cài đặt hệ điều hành) hoặc là cảm nhận giao diện.
+Test tự động hiện có: backend 429 test, web 129 test, E2E 29 kịch bản, k6 5 kịch bản (chi tiết `docs/testing.md`). Những ca "chỉ test tay" cần thiết bị hoặc dịch vụ thật (điện thoại, đồng hồ máy, cài đặt hệ điều hành) hoặc là cảm nhận giao diện.

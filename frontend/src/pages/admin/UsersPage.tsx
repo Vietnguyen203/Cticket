@@ -21,6 +21,7 @@ const STATUS_LABELS: Record<string, string> = {
   PENDING_VERIFICATION: 'Chưa xác minh email',
   SUSPENDED: 'Đã khóa',
   INACTIVE: 'Ngừng',
+  DELETED: 'Đã xóa tài khoản',
 }
 
 /** USR-03/04/05: find users, suspend / reactivate, set roles. */
@@ -151,6 +152,9 @@ export function UsersPage() {
                 <td className="whitespace-nowrap text-right">
                   {isMe ? (
                     <span className="text-xs text-slate-400">Bạn</span>
+                  ) : user.status === 'DELETED' ? (
+                    // Deleted by its owner: personal data gone, nothing left to manage.
+                    <span className="text-xs text-slate-400">—</span>
                   ) : (
                     <>
                       <Button variant="ghost" onClick={() => setEditingRoles(user)}>

@@ -196,7 +196,7 @@ export interface AdminUser {
   firstName: string | null
   lastName: string | null
   phone: string | null
-  status: 'PENDING_VERIFICATION' | 'ACTIVE' | 'INACTIVE' | 'SUSPENDED'
+  status: 'PENDING_VERIFICATION' | 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'DELETED'
   emailVerifiedAt: string | null
   roles: Role[]
   twoFactorEnabled: boolean
