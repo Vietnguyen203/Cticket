@@ -1,60 +1,82 @@
 @import 'tailwindcss';
 
 /*
- * Design tokens (docs/ui-redesign.md, section 3). One accent (brand teal, as on
- * the PDF tickets and emails), an ink colour for text and dark panels, a light
- * canvas. Everything in the app uses these names, never raw hex values.
+ * Design tokens (docs/DESIGN.md). Brand violet (buttons, links, selection),
+ * one pink accent for highlights (featured, almost sold out), an ink colour
+ * for text, night for the panels that stay dark (hero, footer, ticket header),
+ * a faintly violet canvas. Everything in the app uses these names, never raw
+ * hex values. Dark mode redefines them (`.dark`, below): class names stay.
  */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: 'Be Vietnam Pro', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
-  --color-brand-50: #effcf9;
-  --color-brand-100: #c9f5ea;
-  --color-brand-200: #96e9d6;
-  --color-brand-300: #5bd6be;
-  --color-brand-400: #2dbaa3;
-  --color-brand-500: #149e89;
-  --color-brand-600: #0c8070;
-  --color-brand-700: #0d665b;
-  --color-brand-800: #0f524a;
-  --color-brand-900: #10443e;
-  --color-brand-950: #032825;
+  /* brand-700 (#7c3aed) is the main colour: buttons, links (5.7:1 on white). */
+  --color-brand-50: #f8f5ff;
+  --color-brand-100: #f1ebff;
+  --color-brand-200: #e4d8fe;
+  --color-brand-300: #d0bcfd;
+  --color-brand-400: #b195fb;
+  --color-brand-500: #9d74f8;
+  --color-brand-600: #8b5cf6;
+  --color-brand-700: #7c3aed;
+  --color-brand-800: #6d28d9;
+  --color-brand-900: #5b21b6;
+  --color-brand-950: #2e1065;
 
-  /* Text and dark surfaces (header band of the home page, footer). */
-  --color-ink: #0b1b24;
-  --color-ink-soft: #1d2f3a;
-  /* Page background, hairlines. */
-  --color-canvas: #f6f8f9;
-  --color-line: #e3e8ec;
+  /* The accent: a little, for what must stand out (badges, the featured mark). */
+  --color-accent-50: #fdf2f8;
+  --color-accent-100: #fce7f3;
+  --color-accent-500: #ec4899;
+  --color-accent-600: #db2777;
+  --color-accent-700: #be185d;
+
+  /* Text. */
+  --color-ink: #160f2e;
+  --color-ink-soft: #2a2245;
+  /* Panels that stay dark in both themes. */
+  --color-night: #0f0a1f;
+  --color-night-soft: #1d1535;
+  /* Page background, cards, hairlines. */
+  --color-canvas: #faf8ff;
+  --color-surface: #ffffff;
+  --color-line: #ece8f6;
 
   --radius-control: 0.5rem; /* buttons, inputs, chips */
   --radius-card: 0.75rem; /* cards, alerts */
   --radius-panel: 1rem; /* large panels, images of the event page */
 
-  --shadow-card: 0 1px 2px rgb(11 27 36 / 0.04), 0 1px 3px rgb(11 27 36 / 0.06);
-  --shadow-raised: 0 8px 24px -6px rgb(11 27 36 / 0.16), 0 2px 6px rgb(11 27 36 / 0.06);
+  --shadow-card: 0 1px 2px rgb(22 15 46 / 0.04), 0 1px 3px rgb(22 15 46 / 0.06);
+  --shadow-raised: 0 10px 28px -8px rgb(22 15 46 / 0.2), 0 2px 6px rgb(22 15 46 / 0.06);
 
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
+  /* docs/DESIGN.md, Motion: strong ease-out for anything entering or pressed;
+     the iOS sheet curve for panels sliding in from an edge. Never ease-in. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 
   /*
-   * Motion (feature/ui-motion): short, purposeful, never on a loop that
-   * competes with reading (the hero glow is slow and faint). All of it stops
-   * with prefers-reduced-motion (below).
+   * Motion: short and purposeful. What happens on every click (a new page)
+   * stays under 200 ms; dialogs and panels 200–300 ms; only the home page's
+   * first view (rare) takes longer. With prefers-reduced-motion, movement
+   * goes and the fades stay (below).
    */
-  --animate-page-in: page-in 0.35s var(--ease-out-soft) both;
-  --animate-fade-up: fade-up 0.6s var(--ease-out-soft) both;
-  --animate-fade-in: fade-in 0.25s ease-out both;
-  --animate-scale-in: scale-in 0.4s var(--ease-out-soft) both;
-  --animate-slide-down: slide-down 0.22s var(--ease-out-soft) both;
-  --animate-slide-up: slide-up 0.35s var(--ease-out-soft) both;
+  --animate-page-in: page-in 0.18s var(--ease-out) both;
+  --animate-fade-up: fade-up 0.45s var(--ease-out) both;
+  --animate-fade-in: fade-in 0.2s var(--ease-out) both;
+  --animate-scale-in: scale-in 0.25s var(--ease-out) both;
+  --animate-slide-down: slide-down 0.2s var(--ease-out) both;
+  --animate-slide-up: slide-up 0.3s var(--ease-drawer) both;
+  --animate-blur-in: blur-in 0.6s var(--ease-out) both;
   --animate-pop: pop 0.28s var(--ease-out-soft);
   --animate-shimmer: shimmer 1.4s linear infinite;
   --animate-glow: glow-drift 18s ease-in-out infinite alternate;
   --animate-urgent: urgent 1s ease-in-out infinite;
 
   @keyframes page-in {
-    from { opacity: 0; transform: translateY(6px); }
+    from { opacity: 0; transform: translateY(4px); }
     to { opacity: 1; transform: none; }
   }
   @keyframes fade-up {
@@ -90,6 +112,11 @@
     from { transform: translate3d(-6%, -4%, 0) scale(1); }
     to { transform: translate3d(8%, 6%, 0) scale(1.15); }
   }
+  /* The home page headline, word by word (components/BlurText.tsx). */
+  @keyframes blur-in {
+    from { opacity: 0; filter: blur(8px); transform: translateY(0.25em); }
+    to { opacity: 1; filter: none; transform: none; }
+  }
   @keyframes urgent {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.55; }
@@ -99,6 +126,34 @@
 @layer base {
   html {
     -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+  }
+  /* Phones: no 300 ms double-tap wait, no text selection on a long press of a control. */
+  a,
+  button,
+  [role='button'],
+  label,
+  summary {
+    touch-action: manipulation;
+  }
+  button,
+  [role='button'] {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  /* Tailwind 4 leaves buttons with the arrow cursor: everything clickable shows the hand. */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  summary,
+  select:not(:disabled),
+  input[type='checkbox']:not(:disabled),
+  input[type='radio']:not(:disabled) {
+    cursor: pointer;
+  }
+  /* Amounts, times and counts line up (tables, totals, countdowns). */
+  table,
+  [role='timer'] {
+    font-variant-numeric: tabular-nums;
   }
   body {
     @apply bg-canvas text-ink antialiased;
@@ -122,6 +177,75 @@
   }
 }
 
+/*
+ * Dark theme (auth/theme.ts sets `dark` on <html>: the user's choice, or the
+ * system's). The same class names, other values: cards and canvas go dark,
+ * the slate scale turns over (light text, dark fills), tinted backgrounds of
+ * badges / alerts darken and their text lightens.
+ */
+.dark {
+  color-scheme: dark;
+  --color-ink: #f1eff8;
+  --color-ink-soft: #d9d4ea;
+  --color-canvas: #0c0818;
+  --color-surface: #161128;
+  --color-line: #2a2342;
+  --color-night: #07040f;
+  --color-night-soft: #1a1430;
+
+  --color-slate-50: #1b1630;
+  --color-slate-100: #221c3a;
+  --color-slate-200: #2e2749;
+  --color-slate-300: #3d355c;
+  --color-slate-400: #6f6890;
+  --color-slate-500: #9790b4;
+  --color-slate-600: #b4aecd;
+  --color-slate-700: #cdc8e0;
+  --color-slate-800: #e3e0ee;
+  --color-slate-900: #f1eff8;
+  --color-slate-950: #faf9fd;
+
+  --color-brand-50: #1f1640;
+  --color-brand-100: #2a1d57;
+  --color-brand-200: #3a2876;
+
+  --color-accent-50: #2b1024;
+  --color-accent-100: #3b1430;
+
+  --color-emerald-50: #0c241c;
+  --color-emerald-100: #0f3326;
+  --color-emerald-200: #14513a;
+  --color-amber-50: #2a1e08;
+  --color-amber-100: #3a2a0b;
+  --color-amber-200: #5c420f;
+  --color-red-50: #2c0f12;
+  --color-red-100: #3d1418;
+  --color-red-200: #6b1f26;
+  --color-sky-50: #0b2030;
+  --color-sky-100: #0f2c42;
+  --color-sky-200: #164666;
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 0 0 1px rgb(255 255 255 / 0.02);
+  --shadow-raised: 0 12px 32px -8px rgb(0 0 0 / 0.6), 0 2px 6px rgb(0 0 0 / 0.4);
+}
+/* Text and icons on the tinted backgrounds: lighter shades in the dark. */
+.dark :is(.text-brand-700, .text-brand-800, .text-brand-900) { color: var(--color-brand-400); }
+.dark :is(.text-accent-600, .text-accent-700) { color: #f9a8d4; }
+.dark :is(.text-emerald-600, .text-emerald-700, .text-emerald-800, .text-emerald-900) { color: #6ee7b7; }
+.dark :is(.text-amber-600, .text-amber-700, .text-amber-800, .text-amber-900, .text-amber-950) { color: #fcd34d; }
+.dark :is(.text-red-600, .text-red-700, .text-red-800, .text-red-900) { color: #fca5a5; }
+.dark :is(.text-sky-600, .text-sky-700, .text-sky-800, .text-sky-900) { color: #7dd3fc; }
+/* Panels that stay dark keep the light theme's greys (their text is light already). */
+.dark :is(.bg-night, .bg-night-soft) {
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+}
+
 /* Scroll reveal (components/Reveal.tsx): hidden until it scrolls into view, then rises in. */
 .reveal {
   opacity: 0;
@@ -134,20 +258,62 @@
   opacity: 1;
   transform: none;
 }
+@media print {
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/*
+ * Press feedback for links styled as buttons and for cards / chips
+ * (components/ui.tsx Button has its own): a small, quick scale on press.
+ */
+.pressable {
+  transition: scale 160ms var(--ease-out);
+}
+.pressable:active {
+  scale: 0.97;
+}
+
+/* Bars pinned to the bottom of a phone screen keep clear of the home indicator. */
+.safe-bottom {
+  padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+}
 
 /* Loading placeholders: a light sweep instead of a blink. */
 .skeleton {
-  background: linear-gradient(90deg, rgb(226 232 240 / 0.7) 25%, rgb(241 245 249) 50%, rgb(226 232 240 / 0.7) 75%);
+  background: linear-gradient(90deg, var(--color-slate-200) 25%, var(--color-slate-100) 50%, var(--color-slate-200) 75%);
   background-size: 200% 100%;
 }
 
+/*
+ * Reduced motion = fewer, gentler animations, not none: movement, scaling
+ * and loops go; short fades (which tell that something appeared) stay.
+ */
 @media (prefers-reduced-motion: reduce) {
+  :root {
+    --animate-page-in: fade-in 0.15s ease-out both;
+    --animate-fade-up: fade-in 0.2s ease-out both;
+    --animate-scale-in: fade-in 0.2s ease-out both;
+    --animate-slide-down: fade-in 0.15s ease-out both;
+    --animate-slide-up: none;
+    --animate-blur-in: fade-in 0.3s ease-out both;
+    --animate-pop: none;
+    --animate-glow: none;
+    --animate-urgent: none;
+    --animate-shimmer: none;
+  }
+  html {
+    scroll-behavior: auto !important;
+  }
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+    transition-property: opacity, color, background-color, border-color, box-shadow !important;
+  }
+  :active {
+    scale: none !important;
   }
   .reveal {
     opacity: 1;

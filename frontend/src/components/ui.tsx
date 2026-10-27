@@ -16,10 +16,10 @@ type Size = 'sm' | 'md' | 'lg'
 
 const VARIANTS: Record<Variant, string> = {
   primary: 'bg-brand-700 text-white shadow-card hover:-translate-y-px hover:bg-brand-800 hover:shadow-raised active:translate-y-0 active:bg-brand-900 disabled:bg-brand-700/45 disabled:shadow-none',
-  secondary: 'border border-line bg-white text-ink shadow-card hover:border-slate-300 hover:bg-slate-50 disabled:text-slate-400',
+  secondary: 'border border-line bg-surface text-ink shadow-card hover:border-slate-300 hover:bg-slate-50 disabled:text-slate-400',
   danger: 'bg-red-600 text-white shadow-card hover:bg-red-700 disabled:bg-red-600/45',
   ghost: 'text-brand-700 hover:bg-brand-50 disabled:text-slate-400',
-  dark: 'bg-ink text-white hover:bg-ink-soft disabled:bg-ink/50',
+  dark: 'bg-night text-white hover:bg-night-soft disabled:bg-night/50',
 }
 
 // Minimum heights (a long label may wrap onto two lines, never clipped).
@@ -42,7 +42,7 @@ export function Button({ variant = 'primary', size = 'md', loading = false, disa
       {...rest}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
-      className={`inline-flex items-center justify-center gap-2 rounded-control text-center font-semibold leading-snug transition duration-150 ease-standard active:scale-[0.98] disabled:cursor-not-allowed disabled:active:scale-100 ${SIZES[size]} ${VARIANTS[variant]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-control text-center font-semibold leading-snug transition duration-150 ease-out active:scale-[0.97] disabled:cursor-not-allowed disabled:active:scale-100 ${SIZES[size]} ${VARIANTS[variant]} ${className}`}
     >
       {loading && <Spinner small />}
       {children}
@@ -55,7 +55,7 @@ export function Button({ variant = 'primary', size = 'md', loading = false, disa
 // ---------------------------------------------------------------------------
 
 const fieldClass = (error?: string) =>
-  `block w-full rounded-control border bg-white px-3.5 text-base text-ink placeholder:text-slate-400 transition duration-150 outline-none sm:text-sm disabled:bg-slate-100 disabled:text-slate-500 focus:ring-4 ${
+  `block w-full rounded-control border bg-surface px-3.5 text-base text-ink placeholder:text-slate-400 transition duration-150 outline-none sm:text-sm disabled:bg-slate-100 disabled:text-slate-500 focus:ring-4 ${
     error ? 'border-red-400 focus:border-red-500 focus:ring-red-100' : 'border-line hover:border-slate-300 focus:border-brand-600 focus:ring-brand-100'
   }`
 
@@ -204,7 +204,7 @@ export function Badge({ tone = 'neutral', children, className = '' }: { tone?: B
 /** Nothing to show: a calm panel with what to do next. */
 export function EmptyState({ icon, title, children, action }: { icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode }) {
   return (
-    <div className="flex animate-fade-up flex-col items-center rounded-panel border border-dashed border-line bg-white px-6 py-12 text-center">
+    <div className="flex animate-fade-up flex-col items-center rounded-panel border border-dashed border-line bg-surface px-6 py-12 text-center">
       {icon && <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-brand-50 text-brand-700">{icon}</div>}
       <p className="font-semibold text-ink">{title}</p>
       {children && <div className="mt-1 max-w-md text-sm text-slate-600">{children}</div>}
@@ -237,7 +237,7 @@ export function Skeleton({ className = '' }: { className?: string }) {
 // ---------------------------------------------------------------------------
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <div className={`rounded-card border border-line bg-white p-5 shadow-card sm:p-6 ${className}`}>{children}</div>
+  return <div className={`rounded-card border border-line bg-surface p-5 shadow-card sm:p-6 ${className}`}>{children}</div>
 }
 
 /** Title of a page, with an optional line under it and actions on the right. */
@@ -245,7 +245,7 @@ export function PageHeader({ title, subtitle, actions }: { title: ReactNode; sub
   return (
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
-        <h1 className="text-2xl font-bold text-ink sm:text-3xl">{title}</h1>
+        <h1 className="text-balance text-2xl font-bold text-ink sm:text-3xl">{title}</h1>
         {subtitle && <p className="mt-1 text-sm text-slate-600 sm:text-base">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
@@ -274,7 +274,7 @@ export function FullPageSpinner() {
 export function FormPage({ title, subtitle, children }: { title: string; subtitle?: ReactNode; children: ReactNode }) {
   return (
     <div className="mx-auto w-full max-w-md px-4 py-10 sm:py-16">
-      <div className="animate-fade-up rounded-panel border border-line bg-white p-6 shadow-card sm:p-8">
+      <div className="animate-fade-up rounded-panel border border-line bg-surface p-6 shadow-card sm:p-8">
         <h1 className="text-2xl font-bold text-ink">{title}</h1>
         {subtitle && <p className="mt-1.5 text-sm text-slate-600">{subtitle}</p>}
         <div className="mt-7">{children}</div>

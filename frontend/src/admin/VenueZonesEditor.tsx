@@ -44,7 +44,7 @@ function ZoneCard({ zone, onChanged }: { zone: LayoutZone; onChanged: () => void
     <Card>
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="font-semibold">
-          {zone.name} <span className="text-slate-400">({zone.code})</span>
+          {zone.name} <span className="text-slate-500">({zone.code})</span>
         </h3>
         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
           {zone.kind === 'SEATED' ? `Khu ngồi · ${zone.seats.length} ghế` : `Khu đứng · ${zone.capacity} chỗ`}
@@ -61,7 +61,7 @@ function ZoneCard({ zone, onChanged }: { zone: LayoutZone; onChanged: () => void
                 <div key={label} className="flex items-center gap-1 whitespace-nowrap">
                   <span className="w-8 shrink-0 font-semibold text-slate-500">{label}</span>
                   {numbers.map((n) => (
-                    <span key={n} className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded bg-white text-[10px] text-slate-600 ring-1 ring-slate-200">
+                    <span key={n} className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded bg-surface text-[10px] text-slate-600 ring-1 ring-slate-200">
                       {n}
                     </span>
                   ))}
@@ -168,7 +168,7 @@ function NewZone({ venueId, onCreated }: { venueId: string; onCreated: () => voi
           <select
             value={form.kind}
             onChange={(e) => setForm({ ...form, kind: e.target.value as ZoneKind })}
-            className="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5"
+            className="block w-full rounded-lg border border-slate-300 bg-surface px-3 py-2.5"
           >
             <option value="SEATED">Khu ngồi (có ghế)</option>
             <option value="STANDING">Khu đứng</option>

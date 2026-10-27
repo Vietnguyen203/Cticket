@@ -40,7 +40,7 @@ export function DateTimeField({
 
   const problem = timeProblem(parts.time, left)
   const box = (bad: boolean) =>
-    `rounded-lg border bg-white px-3 py-2.5 text-base outline-none focus:ring-2 sm:text-sm ${
+    `rounded-lg border bg-surface px-3 py-2.5 text-base outline-none focus:ring-2 sm:text-sm ${
       bad ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:border-brand-600 focus:ring-brand-100'
     }`
 

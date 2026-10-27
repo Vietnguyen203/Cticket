@@ -1,21 +1,24 @@
 import { useState } from 'react'
+import { TicketIcon } from './icons'
 
 /**
  * An event picture. Images are links typed by organizers: when there is none,
  * or it does not load (a web page instead of a picture, a dead link), show a
- * coloured panel with the title instead of a broken image.
+ * calm decorative panel instead of a broken image. No title on it: every place
+ * that shows a picture shows the event's title right beside it (it read twice).
  */
-export function EventImage({ src, title, className = '' }: { src: string | null; title: string; className?: string }) {
+export function EventImage({ src, className = '' }: { src: string | null; className?: string }) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null)
   if (src && failedSrc !== src) {
     return <img src={src} alt="" loading="lazy" onError={() => setFailedSrc(src)} className={`h-full w-full object-cover ${className}`} />
   }
   // One calm style for every event without a picture (ink panel, brand line), not a random colour.
   return (
-    <div className={`relative flex h-full w-full items-end overflow-hidden bg-ink p-4 sm:p-5 ${className}`}>
-      <span aria-hidden="true" className="absolute -right-10 -top-10 h-40 w-40 rounded-full border-[18px] border-brand-500/25" />
-      <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1 bg-brand-500" />
-      <span className="relative line-clamp-2 text-lg font-bold leading-snug text-white sm:text-xl">{title}</span>
+    <div aria-hidden="true" className={`relative flex h-full w-full items-center justify-center overflow-hidden bg-night ${className}`}>
+      <span className="absolute -right-10 -top-10 h-40 w-40 rounded-full border-[18px] border-brand-500/25" />
+      <span className="absolute -bottom-12 -left-8 h-32 w-32 rounded-full border-[14px] border-brand-500/15" />
+      <span className="absolute inset-x-0 top-0 h-1 bg-brand-500" />
+      <TicketIcon size={44} className="relative text-brand-400/70" />
     </div>
   )
 }

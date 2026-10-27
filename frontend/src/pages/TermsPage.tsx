@@ -48,11 +48,11 @@ export function TermsPage() {
             </li>
           ))}
         </ul>
-        <p className="text-xs text-slate-500">Bấm vào tên văn bản để đọc toàn văn trên Thư viện Pháp luật.</p>
+        <p className="text-xs text-slate-500"></p>
         <p>Trên cơ sở tự nguyện, bình đẳng, thiện chí và trung thực, Khách hàng mua vé trên ETP đồng ý với các điều khoản sau.</p>
       </Card>
 
-      <nav aria-label="Mục lục" className="rounded-card border border-line bg-white p-5 text-sm shadow-card">
+      <nav aria-label="Mục lục" className="rounded-card border border-line bg-surface p-5 text-sm shadow-card">
         <p className="mb-2 font-semibold text-ink">Mục lục</p>
         <ol className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
           {ARTICLES.map((article, index) => (
@@ -119,7 +119,7 @@ function RefundTiers() {
               </th>
               <td className="py-2">
                 {policy.tiers.length === 0 ? (
-                  'Khách hàng không tự hủy đơn được.'
+                  'Không Hoàn Tền'
                 ) : (
                   <ul className="space-y-0.5">
                     {policy.tiers.map((tier) => (

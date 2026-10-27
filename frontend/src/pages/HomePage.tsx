@@ -1,31 +1,41 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { listCategories, listEvents } from '../api/events'
-import type { EventSummary } from '../api/types'
 import { useAuth } from '../auth/AuthContext'
+import { BlurText } from '../components/BlurText'
 import { CategoryChips } from '../components/CategoryChips'
 import { EventCard, EventGridSkeleton } from '../components/EventCard'
-import { Reveal } from '../components/Reveal'
-import { stagger } from '../utils/motion'
-import { EventImage } from '../components/EventImage'
+import { HeroCarousel } from '../components/HeroCarousel'
 import { ArrowRightIcon, CalendarIcon, MapPinIcon, QrIcon, ShieldIcon, TicketIcon } from '../components/icons'
+import { Reveal } from '../components/Reveal'
 import { SearchBar } from '../components/SearchBar'
 import { EmptyState, ErrorState, Skeleton } from '../components/ui'
-import { dateParts } from '../utils/format'
+import { stagger } from '../utils/motion'
+import { citiesOf, stockOf } from '../utils/stock'
 import { useAsync } from '../utils/useAsync'
 
-const UPCOMING_COUNT = 9
+/** One request feeds every section of the page (the soonest events on sale). */
+const LOADED = 24
+const FEATURED = 5
+const UPCOMING = 6
 
-/** APP-C02: what is on soon, by category, with a search box. */
+/**
+ * APP-C02, a ticket marketplace's front page: featured events (carousel),
+ * search and categories, what is almost sold out, what is on soon, by city.
+ */
 export function HomePage() {
   const { status, user } = useAuth()
   const navigate = useNavigate()
   const [q, setQ] = useState('')
-  const upcoming = useAsync(() => listEvents({ sort: 'startAt', pageSize: UPCOMING_COUNT }), 'upcoming')
+  const loaded = useAsync(() => listEvents({ sort: 'startAt', pageSize: LOADED }), 'home-events')
   const categories = useAsync(listCategories, 'categories')
-  const events = upcoming.data?.events ?? []
-  // The soonest event that has a picture leads the page (or simply the soonest).
-  const featured = events.find((event) => event.thumbnailUrl) ?? events[0]
+  const events = loaded.data?.events ?? []
+
+  // Featured: the soonest events with a picture (else simply the soonest).
+  const withPicture = events.filter((e) => e.thumbnailUrl)
+  const featured = (withPicture.length > 0 ? withPicture : events).slice(0, FEATURED)
+  const almostGone = events.filter((e) => stockOf(e.places) === 'LOW').slice(0, 4)
+  const cities = citiesOf(events)
 
   function search() {
     navigate(q.trim() ? `/events?q=${encodeURIComponent(q.trim())}` : '/events')
@@ -33,74 +43,91 @@ export function HomePage() {
 
   return (
     <>
-      <section className="relative overflow-hidden bg-ink text-white">
-        {/* A slow, faint glow behind the hero (decorative, still with reduced motion). */}
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-          <div className="absolute -left-32 -top-40 h-[28rem] w-[28rem] animate-glow rounded-full bg-brand-500/25 blur-3xl" />
-          <div className="absolute -bottom-48 right-0 h-[26rem] w-[26rem] animate-glow rounded-full bg-brand-300/10 blur-3xl [animation-delay:-9s]" />
-        </div>
-        <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-4 py-12 sm:px-6 lg:grid-cols-[1.1fr_1fr] lg:py-16">
-          <div>
-            <p className="animate-fade-up text-sm font-semibold uppercase tracking-wider text-brand-300">
-              {status === 'authenticated' && user ? `Chào ${user.firstName}` : 'Vé sự kiện trực tuyến'}
-            </p>
-            <h1 className="mt-3 animate-fade-up text-3xl font-bold leading-tight [animation-delay:80ms] sm:text-5xl">Hôm nay bạn muốn xem gì?</h1>
-            <p className="mt-4 max-w-lg animate-fade-up text-base leading-relaxed text-slate-300 [animation-delay:160ms] sm:text-lg">
-              Chọn ghế trên sơ đồ cập nhật trực tiếp, thanh toán an toàn và nhận vé có mã QR ngay trong email.
-            </p>
-            <div className="mt-8 max-w-xl animate-fade-up text-ink [animation-delay:240ms]">
-              <SearchBar value={q} onChange={setQ} onSubmit={search} size="lg" />
-            </div>
-          </div>
-          <div className="min-w-0">
-            {upcoming.error ? null : !upcoming.data ? (
-              <Skeleton className="aspect-[4/3] w-full !rounded-panel !bg-white/10" />
-            ) : featured ? (
-              <div className="animate-scale-in [animation-delay:200ms]">
-                <FeaturedEvent event={featured} />
-              </div>
-            ) : null}
-          </div>
-        </div>
-      </section>
+      {loaded.error ? null : !loaded.data ? (
+        <Skeleton className="h-[30rem] w-full !rounded-none sm:h-[32rem] lg:h-[34rem]" />
+      ) : featured.length > 0 ? (
+        <HeroCarousel events={featured} />
+      ) : null}
 
-      <div className="mx-auto max-w-6xl space-y-12 px-4 py-10 sm:px-6 sm:py-14">
-        {categories.data && categories.data.length > 0 && (
-          <section className="space-y-4">
-            <h2 className="text-lg font-semibold text-ink">Khám phá theo danh mục</h2>
-            <CategoryChips categories={categories.data} hrefOf={(c) => `/events?categoryId=${c.id}`} />
-          </section>
-        )}
-
-        <section className="space-y-5">
-          <div className="flex items-end justify-between gap-4">
-            <div>
-              <h2 className="text-2xl font-bold text-ink">Sắp diễn ra</h2>
-              <p className="mt-1 text-sm text-slate-600">Những sự kiện gần nhất đang mở bán.</p>
-            </div>
-            <Link to="/events" className="flex shrink-0 items-center gap-1 rounded-control text-sm font-semibold text-brand-700 hover:text-brand-800">
-              Xem tất cả
-              <ArrowRightIcon size={16} />
-            </Link>
+      <div className="mx-auto max-w-6xl space-y-14 px-4 pb-14 sm:px-6">
+        {/* Search, pulled up over the carousel's bottom edge. */}
+        <section
+          aria-labelledby="tim-su-kien"
+          className={`relative z-10 rounded-panel border border-line bg-surface p-5 shadow-raised sm:p-7 ${featured.length > 0 ? '-mt-10' : 'mt-10'}`}
+        >
+          <p className="text-sm font-semibold uppercase tracking-wider text-brand-700">
+            {status === 'authenticated' && user ? `Chào ${user.firstName}` : 'Vé sự kiện trực tuyến'}
+          </p>
+          <h1 id="tim-su-kien" className="mt-1 text-balance text-2xl font-bold text-ink sm:text-3xl">
+            <BlurText text="Hôm nay bạn muốn xem gì?" delayMs={80} />
+          </h1>
+          <div className="mt-4">
+            <SearchBar value={q} onChange={setQ} onSubmit={search} size="lg" />
           </div>
-          {upcoming.error ? (
-            <ErrorState message={upcoming.error.message} onRetry={upcoming.reload} />
-          ) : !upcoming.data ? (
-            <EventGridSkeleton />
-          ) : events.length === 0 ? (
-            <EmptyState icon={<CalendarIcon />} title="Chưa có sự kiện nào sắp diễn ra">
-              Hãy quay lại sau, các ban tổ chức đang chuẩn bị sự kiện mới.
-            </EmptyState>
-          ) : (
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {events.map((event, index) => (
-                <Reveal key={event.id} delay={stagger(index % 3, 90)} className="h-full [&>a]:h-full">
-                  <EventCard event={event} />
-                </Reveal>
-              ))}
+          {categories.data && categories.data.length > 0 && (
+            <div className="mt-4">
+              <CategoryChips categories={categories.data} hrefOf={(c) => `/events?categoryId=${c.id}`} />
             </div>
           )}
         </section>
+
+        {loaded.error ? (
+          <ErrorState message={loaded.error.message} onRetry={loaded.reload} />
+        ) : !loaded.data ? (
+          <EventGridSkeleton />
+        ) : events.length === 0 ? (
+          <EmptyState icon={<CalendarIcon />} title="Chưa có sự kiện nào sắp diễn ra">
+            Hãy quay lại sau, các ban tổ chức đang chuẩn bị sự kiện mới.
+          </EmptyState>
+        ) : (
+          <>
+            {almostGone.length > 0 && (
+              <Rail title="Sắp hết vé" subtitle="Còn ít chỗ: đặt sớm kẻo lỡ." accent>
+                <div className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-4">
+                  {almostGone.map((event) => (
+                    <div key={event.id} className="w-[78%] shrink-0 snap-start sm:w-auto [&>a]:h-full">
+                      <EventCard event={event} />
+                    </div>
+                  ))}
+                </div>
+              </Rail>
+            )}
+
+            <Rail title="Sắp diễn ra" subtitle="Những sự kiện gần nhất đang mở bán." more="/events">
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {events.slice(0, UPCOMING).map((event, index) => (
+                  <Reveal key={event.id} delay={stagger(index % 3, 60)} className="h-full [&>a]:h-full">
+                    <EventCard event={event} />
+                  </Reveal>
+                ))}
+              </div>
+            </Rail>
+
+            {cities.length > 0 && (
+              <Rail title="Theo thành phố" subtitle="Sự kiện gần bạn.">
+                <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
+                  {cities.map(([city, count]) => (
+                    <Link
+                      key={city}
+                      to={`/events?city=${encodeURIComponent(city)}`}
+                      className="pressable group flex items-center gap-3 rounded-card border border-line bg-surface p-4 shadow-card transition hover:border-brand-300 hover:shadow-raised"
+                    >
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-brand-50 text-brand-700">
+                        <MapPinIcon size={20} />
+                      </span>
+                      <span className="min-w-0">
+                        <span title={city} className="line-clamp-2 break-words font-semibold leading-snug text-ink group-hover:text-brand-700">
+                          {city}
+                        </span>
+                        <span className="text-sm text-slate-500">{count} sự kiện</span>
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </Rail>
+            )}
+          </>
+        )}
 
         <section aria-label="Vì sao mua vé ở đây" className="grid gap-4 sm:grid-cols-3">
           {[
@@ -108,7 +135,7 @@ export function HomePage() {
             { icon: <ShieldIcon />, title: 'Thanh toán an toàn', text: 'Thanh toán qua VNPay; đơn chỉ thành công khi cổng thanh toán xác nhận.' },
             { icon: <QrIcon />, title: 'Vé QR tức thì', text: 'Vé có mã QR trong email và trong tài khoản, tải được bản PDF để in.' },
           ].map((item, index) => (
-            <Reveal key={item.title} delay={stagger(index, 90)} className="flex gap-4 rounded-card border border-line bg-white p-5">
+            <Reveal key={item.title} delay={stagger(index, 60)} className="flex gap-4 rounded-card border border-line bg-surface p-5">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-brand-50 text-brand-700">{item.icon}</span>
               <div>
                 <p className="font-semibold text-ink">{item.title}</p>
@@ -122,35 +149,26 @@ export function HomePage() {
   )
 }
 
-/** The lead event of the home page: big picture, the essentials on it. */
-function FeaturedEvent({ event }: { event: EventSummary }) {
-  const when = event.nextStartAt ? dateParts(event.nextStartAt) : null
+/** A titled band of the page, with an optional "see all" link. `accent`: the pink mark for urgency. */
+function Rail({ title, subtitle, more, accent = false, children }: { title: string; subtitle: string; more?: string; accent?: boolean; children: ReactNode }) {
   return (
-    <Link to={`/events/${event.slug}`} className="group block overflow-hidden rounded-panel bg-ink-soft ring-1 ring-white/10">
-      <div className="aspect-video overflow-hidden">
-        <EventImage src={event.thumbnailUrl} title={event.title} className="transition duration-700 ease-out-soft group-hover:scale-[1.03]" />
-      </div>
-      <div className="space-y-2 p-5">
-        <p className="text-xs font-semibold uppercase tracking-wider text-brand-300">Nổi bật</p>
-        <h2 className="line-clamp-2 text-xl font-bold leading-snug text-white">{event.title}</h2>
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-300">
-          {when && (
-            <span className="flex items-center gap-1.5">
-              <CalendarIcon size={16} className="text-slate-400" />
-              {when.weekday}, {when.day}/{when.month.slice(2)} · {when.time}
-            </span>
-          )}
-          {event.cities.length > 0 && (
-            <span className="flex items-center gap-1.5">
-              <MapPinIcon size={16} className="text-slate-400" />
-              {event.cities.join(', ')}
-            </span>
-          )}
+    <section className="space-y-5">
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <h2 className="flex items-center gap-2 text-2xl font-bold text-ink">
+            {accent && <span aria-hidden="true" className="h-6 w-1.5 rounded-full bg-accent-500" />}
+            {title}
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">{subtitle}</p>
         </div>
-        <span className="inline-flex items-center gap-1 pt-1 text-sm font-semibold text-white">
-          Xem chi tiết <ArrowRightIcon size={16} className="transition group-hover:translate-x-0.5" />
-        </span>
+        {more && (
+          <Link to={more} className="flex shrink-0 items-center gap-1 rounded-control text-sm font-semibold text-brand-700 hover:text-brand-800">
+            Xem tất cả
+            <ArrowRightIcon size={16} />
+          </Link>
+        )}
       </div>
-    </Link>
+      {children}
+    </section>
   )
 }

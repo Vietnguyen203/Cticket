@@ -60,7 +60,7 @@ export function ReviewsPage() {
           value={filters.rating}
           onChange={(e) => setFilters({ ...filters, rating: e.target.value, page: 1 })}
           aria-label="Số sao"
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2"
+          className="rounded-lg border border-slate-300 bg-surface px-3 py-2"
         >
           <option value="">Mọi số sao</option>
           {[5, 4, 3, 2, 1].map((n) => (
@@ -73,7 +73,7 @@ export function ReviewsPage() {
           value={filters.status}
           onChange={(e) => setFilters({ ...filters, status: e.target.value, page: 1 })}
           aria-label="Trạng thái"
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2"
+          className="rounded-lg border border-slate-300 bg-surface px-3 py-2"
         >
           <option value="">Mọi trạng thái</option>
           <option value="PUBLISHED">Đang hiện</option>

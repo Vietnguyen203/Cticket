@@ -1,6 +1,8 @@
 # Làm mới giao diện web (UI/UX)
 
 > Trạng thái: **đã làm** (20/10/2026). Nhánh `feature/ui-redesign`. Chỉ sửa web (`frontend/`), không sửa backend, database, đăng nhập, thanh toán hay logic giữ chỗ.
+>
+> **Tài liệu lịch sử.** Từ 27/10/2026, giao diện đổi sang tông **tím #7c3aed + nhấn hồng #ec4899** và có **giao diện tối**; bảng màu teal, `ink` làm nền tối và quầng sáng teal mô tả bên dưới **không còn đúng**. Nguồn sự thật hiện tại là [`DESIGN.md`](DESIGN.md) (token, thành phần, chuyển động, giao diện tối) và `frontend/src/index.css`. Phần audit, thứ tự làm và cách kiểm tra bên dưới vẫn giữ để biết lý do các quyết định.
 
 ## 1. Audit (20/10/2026)
 

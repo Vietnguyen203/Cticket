@@ -33,7 +33,7 @@ export function MyOrdersPage() {
           icon={<TicketIcon />}
           title="Chưa có đơn nào"
           action={
-            <Link to="/events" className="inline-flex h-11 items-center rounded-control bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-800">
+            <Link to="/events" className="pressable inline-flex h-11 items-center rounded-control bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-800">
               Xem sự kiện
             </Link>
           }
@@ -46,7 +46,7 @@ export function MyOrdersPage() {
             <Link
               key={order.id}
               to={`/orders/${order.id}`}
-              className="group flex animate-fade-up items-center gap-4 rounded-card border border-line bg-white p-4 shadow-card transition hover:-translate-y-px hover:border-slate-300 hover:shadow-raised"
+              className="group flex animate-fade-up items-center gap-4 rounded-card border border-line bg-surface p-4 shadow-card transition hover:-translate-y-px hover:border-slate-300 hover:shadow-raised"
             >
               <DateBlock iso={order.schedule.startAt} muted={!LIVE.includes(order.status)} />
               <div className="min-w-0 flex-1">

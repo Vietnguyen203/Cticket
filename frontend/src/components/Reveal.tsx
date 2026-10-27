@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 /**
- * Rises into place the first time it scrolls into view (index.css `.reveal`).
+ * Rises into place the first time it comes near the view (index.css `.reveal`):
+ * it starts a little below the fold, so a fast scroll never meets a blank band.
  * `delay` (ms) staggers items of a grid. Without IntersectionObserver, or with
  * reduced motion (CSS), it is simply shown.
  */
@@ -19,7 +20,7 @@ export function Reveal({ children, delay = 0, className = '' }: { children: Reac
           observer.disconnect()
         }
       },
-      { rootMargin: '0px 0px -8% 0px' },
+      { rootMargin: '0px 0px 15% 0px' },
     )
     observer.observe(element)
     return () => observer.disconnect()

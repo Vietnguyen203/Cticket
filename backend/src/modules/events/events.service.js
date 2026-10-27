@@ -60,6 +60,9 @@ function toEventSummary(row) {
     publishedAt: row.published_at,
     nextStartAt: row.next_start_at,
     cities: row.cities,
+    // For the cards: "from" price and how full the upcoming shows are (null: nothing on sale yet).
+    fromPrice: row.from_price === null || row.from_price === undefined ? null : Number(row.from_price),
+    places: row.places_total ? { total: row.places_total, left: Math.max(0, row.places_left ?? 0) } : null,
     organizer: { id: row.organizer_id, name: row.organizer_name },
     categories: row.categories,
     rating: ratingOf(row),

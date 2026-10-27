@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { ApiError, toApiError } from '../../api/errors'
+import { CheckoutSteps } from '../../components/CheckoutSteps'
 import { getEvent } from '../../api/events'
 import { createOrder, listMyOrders, updateOrderItems } from '../../api/orders'
 import type { Order, Seat, SeatMap, TicketTypeAvailability } from '../../api/types'
@@ -146,6 +147,11 @@ export function SeatSelectPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+      {!editing && (
+        <div className="mb-5 max-w-md">
+          <CheckoutSteps current={0} />
+        </div>
+      )}
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <Link to={`/events/${slug}`} className="inline-flex max-w-full items-center gap-1 rounded-control text-sm font-medium text-slate-600 hover:text-ink">
@@ -221,7 +227,7 @@ export function SeatSelectPage() {
             zone.kind === 'SEATED' ? (
               <Card key={zone.id} className="!p-4 sm:!p-5">
                 <p className="mb-4 font-semibold text-ink">{zone.name}</p>
-                <div className="mx-auto mb-5 max-w-md rounded-b-[2rem] bg-ink py-2 text-center text-[11px] font-semibold uppercase tracking-[0.3em] text-white/80">
+                <div className="mx-auto mb-5 max-w-md rounded-b-[2rem] bg-night py-2 text-center text-[11px] font-semibold uppercase tracking-[0.3em] text-white/80">
                   Sân khấu
                 </div>
                 <SeatRows seats={zone.seats} state={state} ticketTypes={map.ticketTypes} dispatch={dispatch} />
@@ -243,7 +249,7 @@ export function SeatSelectPage() {
 
         {/* Phones: the summary and its button stay at the bottom of the screen while choosing. */}
         <aside className="sticky bottom-0 z-10 -mx-4 sm:-mx-6 lg:top-24 lg:bottom-auto lg:mx-0 lg:self-start">
-          <Card className="space-y-3 !rounded-b-none !p-4 shadow-raised lg:!rounded-card lg:shadow-card">
+          <Card className="space-y-3 !rounded-b-none !p-4 !pb-[calc(1rem+env(safe-area-inset-bottom,0px))] shadow-raised lg:!rounded-card lg:!pb-4 lg:shadow-card">
             <h2 className="font-semibold text-ink">{editing ? `Đơn ${editing.orderCode} sau khi đổi` : 'Bạn đã chọn'}</h2>
             {summary.lines.length === 0 ? (
               <p className="hidden text-sm text-slate-500 lg:block">
@@ -378,60 +384,93 @@ function Legend({ ticketTypes, editing }: { ticketTypes: TicketTypeAvailability[
 function SeatRows({ seats, state, ticketTypes, dispatch }: { seats: Seat[]; state: SeatMapState; ticketTypes: TicketTypeAvailability[]; dispatch: (a: SeatMapAction) => void }) {
   const reserved = ticketTypes.filter((tt) => tt.inventoryMode === 'RESERVED')
   const rows = [...new Set(seats.map((s) => s.rowLabel))].sort()
+  const { ref: rowsRef, update, overflowing, hidden } = useMoreToTheRight()
   return (
-    <div className="space-y-1.5 overflow-x-auto pb-2">
-      {rows.map((rowLabel) => (
-        <div key={rowLabel} className="flex items-center gap-1 whitespace-nowrap">
-          <span className="sticky left-0 z-[1] w-7 shrink-0 bg-white text-xs font-semibold text-slate-500">{rowLabel}</span>
-          {seats
-            .filter((s) => s.rowLabel === rowLabel)
-            .sort((a, b) => a.seatNumber - b.seatNumber)
-            .map((seat) => {
-              const live = state.seats[seat.seatId]?.status ?? seat.status
-              const selected = state.selected.includes(seat.seatId)
-              // BKG-02: a seat my held order holds (HELD on everyone's map), which I may unpick or pick back.
-              const mine = isMine(state, seat.seatId) && live === 'HELD'
-              const typeIndex = reserved.findIndex((tt) => tt.id === seat.ticketTypeId)
-              const typeColor = TYPE_COLORS[typeIndex % TYPE_COLORS.length]
-              const sellable = (live === 'AVAILABLE' || mine) && typeIndex >= 0
-              const color = selected
-                ? 'animate-pop bg-brand-800 text-white ring-2 ring-brand-300'
-                : mine
-                  ? `${typeColor} text-white opacity-60 outline-2 outline-dashed outline-red-500`
-                  : live === 'HELD'
-                    ? 'bg-amber-200 text-amber-800'
-                    : sellable
-                      ? `${typeColor} text-white hover:-translate-y-px hover:brightness-110 hover:shadow-card`
-                      : 'bg-slate-300 text-slate-500'
-              const typeName = reserved[typeIndex]?.name ?? 'không bán'
-              const statusText = mine
-                ? selected
-                  ? 'ghế của bạn'
-                  : 'ghế của bạn, sẽ bỏ ra khi cập nhật'
-                : live === 'AVAILABLE'
-                  ? 'còn trống'
-                  : live === 'HELD'
-                    ? 'đang có người giữ'
-                    : 'không còn'
-              return (
-                <button
-                  key={seat.seatId}
-                  type="button"
-                  disabled={!sellable && !selected}
-                  aria-pressed={selected}
-                  aria-label={`Ghế ${seat.code}, ${typeName}, ${statusText}`}
-                  title={`${seat.code} · ${typeName}${seat.price ? ` · ${formatVnd(seat.price)}` : ''}`}
-                  onClick={() => dispatch({ type: 'toggleSeat', seatId: seat.seatId })}
-                  className={`h-8 w-8 shrink-0 rounded-md text-[11px] font-medium transition duration-150 sm:h-9 sm:w-9 ${color} disabled:cursor-not-allowed`}
-                >
-                  {seat.seatNumber}
-                </button>
-              )
-            })}
-        </div>
-      ))}
-    </div>
+    <>
+      <div
+        ref={rowsRef}
+        onScroll={update}
+        className={`space-y-1.5 overflow-x-auto pb-2 ${hidden ? '[mask-image:linear-gradient(to_right,#000_calc(100%-2.5rem),transparent)]' : ''}`}
+      >
+        {rows.map((rowLabel) => (
+          <div key={rowLabel} className="flex items-center gap-1 whitespace-nowrap">
+            <span className="sticky left-0 z-[1] w-7 shrink-0 bg-surface text-xs font-semibold text-slate-500">{rowLabel}</span>
+            {seats
+              .filter((s) => s.rowLabel === rowLabel)
+              .sort((a, b) => a.seatNumber - b.seatNumber)
+              .map((seat) => {
+                const live = state.seats[seat.seatId]?.status ?? seat.status
+                const selected = state.selected.includes(seat.seatId)
+                // BKG-02: a seat my held order holds (HELD on everyone's map), which I may unpick or pick back.
+                const mine = isMine(state, seat.seatId) && live === 'HELD'
+                const typeIndex = reserved.findIndex((tt) => tt.id === seat.ticketTypeId)
+                const typeColor = TYPE_COLORS[typeIndex % TYPE_COLORS.length]
+                const sellable = (live === 'AVAILABLE' || mine) && typeIndex >= 0
+                const color = selected
+                  ? 'animate-pop bg-brand-800 text-white ring-2 ring-brand-300'
+                  : mine
+                    ? `${typeColor} text-white opacity-60 outline-2 outline-dashed outline-red-500`
+                    : live === 'HELD'
+                      ? 'bg-amber-200 text-amber-800'
+                      : sellable
+                        ? `${typeColor} text-white hover:-translate-y-px hover:brightness-110 hover:shadow-card`
+                        : 'bg-slate-300 text-slate-500'
+                const typeName = reserved[typeIndex]?.name ?? 'không bán'
+                const statusText = mine
+                  ? selected
+                    ? 'ghế của bạn'
+                    : 'ghế của bạn, sẽ bỏ ra khi cập nhật'
+                  : live === 'AVAILABLE'
+                    ? 'còn trống'
+                    : live === 'HELD'
+                      ? 'đang có người giữ'
+                      : 'không còn'
+                return (
+                  <button
+                    key={seat.seatId}
+                    type="button"
+                    disabled={!sellable && !selected}
+                    aria-pressed={selected}
+                    aria-label={`Ghế ${seat.code}, ${typeName}, ${statusText}`}
+                    title={`${seat.code} · ${typeName}${seat.price ? ` · ${formatVnd(seat.price)}` : ''}`}
+                    onClick={() => dispatch({ type: 'toggleSeat', seatId: seat.seatId })}
+                    className={`h-8 w-8 shrink-0 rounded-md text-[11px] font-medium transition duration-150 ease-out enabled:active:scale-90 sm:h-9 sm:w-9 ${color} disabled:cursor-not-allowed`}
+                  >
+                    {seat.seatNumber}
+                  </button>
+                )
+              })}
+          </div>
+        ))}
+      </div>
+      {overflowing && <p className="mt-1 text-xs text-slate-500">Hàng ghế dài hơn màn hình: vuốt ngang để xem hết.</p>}
+    </>
   )
+}
+
+/**
+ * A row of seats wider than the screen: fade its right edge while there is
+ * more to see (the seats would otherwise just look cut off), and say so once.
+ */
+function useMoreToTheRight() {
+  const ref = useRef<HTMLDivElement>(null)
+  const [state, setState] = useState({ overflowing: false, hidden: false })
+  const update = useCallback(() => {
+    const el = ref.current
+    if (!el) return
+    const overflowing = el.scrollWidth - el.clientWidth > 1
+    const hidden = overflowing && el.scrollLeft + el.clientWidth < el.scrollWidth - 4
+    setState((old) => (old.overflowing === overflowing && old.hidden === hidden ? old : { overflowing, hidden }))
+  }, [])
+  useEffect(() => {
+    const el = ref.current
+    if (!el || typeof ResizeObserver === 'undefined') return undefined
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    update()
+    return () => observer.disconnect()
+  }, [update])
+  return { ref, update, ...state }
 }
 
 function StandingZone({ name, ticketTypes, state, dispatch }: { name: string; ticketTypes: TicketTypeAvailability[]; state: SeatMapState; dispatch: (a: SeatMapAction) => void }) {

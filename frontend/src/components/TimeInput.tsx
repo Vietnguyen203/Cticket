@@ -46,7 +46,7 @@ export function TimeInput({
           if (time && time !== value) onChange(time)
         }}
         aria-invalid={Boolean(problem) || undefined}
-        className={`w-24 rounded-lg border bg-white px-3 py-2.5 text-center text-base tabular-nums outline-none focus:ring-2 sm:text-sm ${
+        className={`w-24 rounded-lg border bg-surface px-3 py-2.5 text-center text-base tabular-nums outline-none focus:ring-2 sm:text-sm ${
           problem ? 'border-red-400 focus:ring-red-200' : 'border-slate-300 focus:border-brand-600 focus:ring-brand-100'
         }`}
       />

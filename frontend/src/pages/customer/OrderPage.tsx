@@ -18,6 +18,8 @@ import { Alert, Badge, Button, Card, FullPageSpinner } from '../../components/ui
 import { CalendarIcon, CheckCircleIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, MapPinIcon, ShieldIcon, TicketIcon } from '../../components/icons'
 import { VNPAY_MIN_SECONDS, vnpayReason } from '../../payments/vnpayReasons'
 import { CancelOrderCard } from './CancelOrderCard'
+import { CheckoutSteps } from '../../components/CheckoutSteps'
+import { TicketQrThumb } from '../../components/TicketQrThumb'
 import { realtime } from '../../realtime'
 import { TERMS_VERSION } from '../../legal/terms'
 import { formatDateTime, formatVnd } from '../../utils/format'
@@ -150,6 +152,13 @@ export function OrderPage() {
         </div>
       </div>
 
+      {/* Where the purchase is: paying (held, waiting, failed) or done (paid). */}
+      {(hasActions || o.status === 'PAID') && (
+        <div className="max-w-md">
+          <CheckoutSteps current={o.status === 'PAID' ? 2 : 1} done={o.status === 'PAID'} />
+        </div>
+      )}
+
       {/* What happened: from the API's order and payment status only, never from a click. */}
       {error && <Alert>{messageOf(error)}</Alert>}
       {o.status === 'PAYMENT_FAILED' && (
@@ -196,7 +205,7 @@ export function OrderPage() {
                       }}
                       placeholder="Nhập mã (nếu có)"
                       aria-label="Mã giảm giá"
-                      className="h-11 min-w-0 flex-1 rounded-control border border-line bg-white px-3 uppercase text-ink outline-none transition focus:border-brand-600 focus:ring-4 focus:ring-brand-100"
+                      className="h-11 min-w-0 flex-1 rounded-control border border-line bg-surface px-3 uppercase text-ink outline-none transition focus:border-brand-600 focus:ring-4 focus:ring-brand-100"
                     />
                     <Button type="submit" variant="secondary" disabled={code.trim().length < 3}>
                       Áp dụng
@@ -389,7 +398,12 @@ export function OrderPage() {
                   className="group flex items-center justify-between gap-3 rounded-control border border-line px-4 py-3 text-sm transition hover:border-brand-600 hover:bg-brand-50/40"
                 >
                   <span className="flex min-w-0 items-center gap-3">
-                    <TicketIcon size={20} className="shrink-0 text-brand-700" />
+                    {/* The paid order shows each valid ticket's code right away; the ticket page has it full size. */}
+                    {o.status === 'PAID' && ticket.status === 'VALID' ? (
+                      <TicketQrThumb ticketId={ticket.id} />
+                    ) : (
+                      <TicketIcon size={20} className="shrink-0 text-brand-700" />
+                    )}
                     <span className="min-w-0">
                       <span className="block font-mono font-medium text-ink">{ticket.code}</span>
                       <span className="block truncate text-slate-500">{ticket.seatLabel ?? `${ticket.ticketTypeName} #${ticket.admissionNo}`}</span>

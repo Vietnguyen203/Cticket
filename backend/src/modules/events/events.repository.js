@@ -175,6 +175,7 @@ async function listEvents(db, filters) {
             o.organization_name AS organizer_name,
             s.next_start_at,
             coalesce(s.cities, '{}') AS cities,
+            p.from_price, p.places_total, p.places_left,
             ${CATEGORIES_JSON},
             count(*) OVER () AS total
      FROM events e
@@ -186,6 +187,26 @@ async function listEvents(db, filters) {
        JOIN venues v ON v.id = es.venue_id
        WHERE ${scheduleWhere.join(' AND ')}
      ) s ON true
+     -- For the cards: the lowest price on sale, and how many places are left
+     -- (same count as the availability of a show), over the same shows.
+     LEFT JOIN LATERAL (
+       SELECT min(tt.price) AS from_price,
+              sum(CASE WHEN tt.inventory_mode = 'GENERAL_ADMISSION' THEN g.capacity ELSE seats.total END)::int AS places_total,
+              sum(CASE WHEN tt.inventory_mode = 'GENERAL_ADMISSION'
+                       THEN g.capacity - g.held_quantity - g.sold_quantity - g.blocked_quantity
+                       ELSE seats.available END)::int AS places_left
+       FROM event_schedules es
+       JOIN venues v ON v.id = es.venue_id
+       JOIN ticket_types tt ON tt.schedule_id = es.id AND tt.status = 'ACTIVE'
+       LEFT JOIN ga_inventory g ON g.ticket_type_id = tt.id
+       LEFT JOIN LATERAL (
+         SELECT count(*) AS total,
+                count(*) FILTER (WHERE st.status = 'AVAILABLE' OR (st.status = 'HELD' AND st.hold_expires_at <= now())) AS available
+         FROM schedule_seats st
+         WHERE st.schedule_id = tt.schedule_id AND st.ticket_type_id = tt.id
+       ) seats ON true
+       WHERE ${scheduleWhere.join(' AND ')}
+     ) p ON true
      WHERE ${where.join(' AND ')}
      ORDER BY ${SORT_ORDERS[filters.sort]}
      LIMIT ${param(filters.limit)} OFFSET ${param(filters.offset)}`,

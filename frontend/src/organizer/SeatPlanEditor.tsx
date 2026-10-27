@@ -81,12 +81,12 @@ export function SeatPlanEditor({
                 return (
                   <label key={key} className="flex items-center gap-2 text-sm">
                     <span className="w-14 shrink-0 text-slate-600">
-                      Hàng {rowLabel} <span className="text-xs text-slate-400">({seats})</span>
+                      Hàng {rowLabel} <span className="text-xs text-slate-500">({seats})</span>
                     </span>
                     <select
                       value={choices[key] ?? ''}
                       onChange={(e) => setChoices({ ...choices, [key]: e.target.value })}
-                      className="min-w-0 flex-1 rounded border border-slate-300 bg-white px-1.5 py-1"
+                      className="min-w-0 flex-1 rounded border border-slate-300 bg-surface px-1.5 py-1"
                     >
                       <option value="">không bán</option>
                       {choices[key] === MIXED && <option value={MIXED}>(nhiều hạng, giữ nguyên)</option>}
