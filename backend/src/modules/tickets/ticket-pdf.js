@@ -21,7 +21,10 @@ const loadFonts = () =>
     regular: fs.readFileSync(path.join(FONT_DIR, 'BeVietnamPro-Regular.ttf')),
     bold: fs.readFileSync(path.join(FONT_DIR, 'BeVietnamPro-Bold.ttf')),
   });
-const BRAND = '#0f766e';
+// The web's colours (frontend/src/index.css): brand violet, the pink accent line, ink text.
+const BRAND = '#7c3aed';
+const ACCENT = '#ec4899';
+const INK = '#160f2e';
 const MUTED = '#475569';
 const QR_SIZE = 170; // points: ≈ 6 cm
 const MARGIN = 36;
@@ -92,17 +95,18 @@ async function renderTicketsPdf(rows, { compress = true, title = 'Vé ETP' } = {
     const width = doc.page.width - 2 * MARGIN;
 
     doc.rect(0, 0, doc.page.width, 44).fill(BRAND);
+    doc.rect(0, 44, doc.page.width, 3).fill(ACCENT);
     doc.fillColor('#ffffff').font('bold').fontSize(14).text('ETP Tickets', MARGIN, 15, { width, lineBreak: false });
-    doc.fillColor('#0f172a').font('bold').fontSize(17).text(page.title, MARGIN, 64, { width });
+    doc.fillColor(INK).font('bold').fontSize(17).text(page.title, MARGIN, 64, { width });
     doc.moveDown(0.3).font('regular').fontSize(10.5).fillColor(MUTED).text(page.when, { width });
     doc.text(page.where, { width });
 
-    doc.moveDown(0.8).font('bold').fontSize(14).fillColor('#0f172a').text(page.place, { width, align: 'center' });
+    doc.moveDown(0.8).font('bold').fontSize(14).fillColor(INK).text(page.place, { width, align: 'center' });
     doc.font('regular').fontSize(10).fillColor(MUTED).text(page.ticketType, { width, align: 'center' });
 
     const qrTop = doc.y + 12;
     drawQr(doc, page.qrToken, (doc.page.width - QR_SIZE) / 2, qrTop, QR_SIZE);
-    doc.font('bold').fontSize(13).fillColor('#0f172a').text(page.code, MARGIN, qrTop + QR_SIZE + 8, { width, align: 'center' });
+    doc.font('bold').fontSize(13).fillColor(INK).text(page.code, MARGIN, qrTop + QR_SIZE + 8, { width, align: 'center' });
 
     doc.moveDown(1).font('regular').fontSize(9.5).fillColor(MUTED);
     for (const line of page.footer) doc.text(line, { width, align: 'center' });

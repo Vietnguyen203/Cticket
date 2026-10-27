@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const env = require('../config/env');
+const { brandedLayout } = require('./templates');
 
 let transporter;
 
@@ -20,12 +21,14 @@ function getTransporter() {
  * HTTP requests never wait for SMTP. Callers depend only on this function.
  *
  * `attachments` (Phase 20: the tickets as a PDF) go to nodemailer as they are.
+ * The html part is put in the brand frame (templates.js brandedLayout), the same
+ * for every email; the plain-text part stays as written.
  *
  * @param {{ to: string, subject: string, text: string, html: string,
  *   attachments?: Array<{ filename: string, content: Buffer, contentType: string }> }} message
  */
 async function sendMail({ to, subject, text, html, attachments = [] }) {
-  await getTransporter().sendMail({ from: env.MAIL_FROM, to, subject, text, html, attachments });
+  await getTransporter().sendMail({ from: env.MAIL_FROM, to, subject, text, html: brandedLayout({ subject, html }), attachments });
 }
 
 /** Connect and authenticate to the SMTP server without sending anything. */

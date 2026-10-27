@@ -229,7 +229,36 @@ function ticketQrReissuedEmail({ firstName, code, eventTitle }) {
   };
 }
 
+/**
+ * The brand frame of every email (mailer.sendMail wraps each html part in it):
+ * a violet band with the name, the message on white, a muted footer. The same
+ * colours as the web (frontend/src/index.css: brand-700, accent-500, ink).
+ * Tables and inline styles only: Gmail and Outlook ignore stylesheets.
+ * `subject` is escaped here (it may hold an event's title).
+ */
+const BRAND = { violet: '#7c3aed', pink: '#ec4899', ink: '#160f2e', muted: '#64748b', canvas: '#faf8ff', line: '#ece8f6' };
+
+function brandedLayout({ subject, html }) {
+  return `<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(subject)}</title></head>
+<body style="margin:0;padding:0;background:${BRAND.canvas}">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.canvas}">
+<tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid ${BRAND.line};border-radius:12px;overflow:hidden">
+<tr><td style="background:${BRAND.violet};padding:16px 24px;font-family:Arial,Helvetica,sans-serif;font-size:18px;font-weight:bold;color:#ffffff">ETP Tickets</td></tr>
+<tr><td style="height:3px;background:${BRAND.pink};line-height:3px;font-size:0">&nbsp;</td></tr>
+<tr><td style="padding:24px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:${BRAND.ink}">
+${html}
+</td></tr>
+<tr><td style="padding:16px 24px;border-top:1px solid ${BRAND.line};font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${BRAND.muted}">ETP Tickets · Email tự động, vui lòng không trả lời.</td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`;
+}
+
 module.exports = {
+  brandedLayout,
   ticketQrReissuedEmail,
   reviewInviteEmail,
   waitlistOfferEmail,
