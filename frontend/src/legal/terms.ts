@@ -4,8 +4,8 @@
  * TERMS_VERSION: a changed text gets a new version in both places, so a buyer
  * whose page still shows the old text is asked to read the new one.
  */
-export const TERMS_VERSION = '2026-10-26'
-export const TERMS_EFFECTIVE_DATE = '26/10/2026'
+export const TERMS_VERSION = '2026-10-27'
+export const TERMS_EFFECTIVE_DATE = '27/10/2026'
 
 export interface LegalBasis {
   law: string
@@ -150,6 +150,7 @@ export const ARTICLES: Article[] = [
       'ETP thu thập họ tên, email, số điện thoại (nếu có) và lịch sử mua vé chỉ để thực hiện hợp đồng: giữ chỗ, thanh toán, gửi vé và thông báo, soát vé, hoàn tiền; tôn trọng quyền về đời sống riêng tư, bí mật cá nhân (Điều 21 Hiến pháp 2013).',
       'ETP không bán dữ liệu cá nhân của Khách hàng. Ban tổ chức chỉ nhận thông tin cần cho việc tổ chức và soát vé sự kiện của mình. Việc xử lý dữ liệu tuân thủ Luật Bảo vệ dữ liệu cá nhân 2025.',
       'Thông tin thẻ, tài khoản ngân hàng do VNPay xử lý; ETP không lưu số thẻ của Khách hàng.',
+      'Tại trang "Tài khoản", Khách hàng tự tải toàn bộ dữ liệu cá nhân ETP đang lưu về mình và tự xóa tài khoản. Khi xóa, thông tin cá nhân (họ tên, email, số điện thoại, thiết bị đăng nhập, nội dung đánh giá) bị xóa vĩnh viễn; đơn hàng, thanh toán và hoàn tiền được giữ ở dạng ẩn danh để thực hiện nghĩa vụ kế toán, thuế và giải quyết khiếu nại. Tài khoản chưa xóa được khi còn vé cho buổi diễn chưa diễn ra, đơn chưa hoàn tất hoặc khoản hoàn tiền đang xử lý.',
     ],
   },
   {

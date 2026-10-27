@@ -54,6 +54,8 @@ const MESSAGES: Record<string, string> = {
   ACTIVE_ORDER_EXISTS: 'Bạn đang có một đơn chưa hoàn tất ở suất diễn này.',
   SEATS_UNAVAILABLE: 'Một số ghế vừa có người khác giữ.',
   ORDER_EXPIRED: 'Đơn hàng đã hết thời gian giữ chỗ.',
+  ACCOUNT_DELETION_BLOCKED: 'Tài khoản chưa xóa được lúc này. Xem lý do bên dưới.',
+  ACCOUNT_DELETED: 'Tài khoản này đã bị chủ tài khoản xóa.',
   TERMS_OUTDATED: 'Điều kiện giao dịch chung vừa được cập nhật. Tải lại trang, đọc bản mới rồi đồng ý lại.',
   ORDER_NOT_PAYABLE: 'Đơn hàng này không thể thanh toán ở trạng thái hiện tại.',
   ORDER_ALREADY_PAID: 'Đơn hàng đã được thanh toán.',

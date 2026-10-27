@@ -57,6 +57,7 @@ async function changeStatus(context, adminId, userId, { status, reason }) {
   return withTransaction(async (client) => {
     const user = await adminUsersRepository.findForUpdate(client, userId);
     if (!user) throw userNotFound();
+    if (user.status === USER_STATUS.DELETED) throw new AppError('ACCOUNT_DELETED');
     if (user.status === USER_STATUS.SUSPENDED && status === USER_STATUS.SUSPENDED) return toAdminUser(user);
 
     let next = status;
@@ -96,6 +97,7 @@ async function setRoles(context, adminId, userId, { roles }) {
   return withTransaction(async (client) => {
     const user = await adminUsersRepository.findForUpdate(client, userId);
     if (!user) throw userNotFound();
+    if (user.status === USER_STATUS.DELETED) throw new AppError('ACCOUNT_DELETED');
     const losesAdmin = user.roles.includes(ROLES.ADMIN) && !wanted.includes(ROLES.ADMIN);
     if (losesAdmin) {
       if (userId === adminId) throw new AppError('CANNOT_CHANGE_SELF', 'You cannot remove your own administrator role.');

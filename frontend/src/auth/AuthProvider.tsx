@@ -118,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [completeLogin],
   )
 
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (afterwards?: string) => {
     loggingOut.current = true
     try {
       await authApi.logout()
@@ -129,6 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setRemembered(false)
       setUser(null)
       setStatus('anonymous')
+      if (afterwards) setNotice(afterwards)
       loggingOut.current = false
       channel?.postMessage({ type: 'logout' } satisfies TabMessage)
     }
