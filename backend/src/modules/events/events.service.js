@@ -22,13 +22,11 @@ const SLUG_CONSTRAINT = 'events_slug_key';
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Fields an organizer may still change after the event is PUBLISHED. */
-// Phase 18.3: the refund policy too (an order cancelled later follows the policy of that moment).
 // Phase 21: and the purchase queue, which is switched on for the rush of a sale.
 const EDITABLE_WHEN_PUBLISHED = [
   'description',
   'bannerUrl',
   'thumbnailUrl',
-  'refundPolicy',
   'queueEnabled',
   'queueCapacity',
   'queueSessionMinutes',
@@ -78,7 +76,6 @@ function toEventDetail(row, schedules) {
     bannerUrl: row.banner_url,
     thumbnailUrl: row.thumbnail_url,
     ageRestriction: row.age_restriction,
-    refundPolicy: row.refund_policy, // Phase 18.3
     queue: queueOf(row), // Phase 21
     // The performance programme. jsonb reorders object keys: give them back in a fixed order.
     lineup: (row.lineup ?? []).map(({ artist, time, note }) => ({ artist, time: time ?? null, note: note ?? null })),

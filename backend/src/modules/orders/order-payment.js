@@ -88,11 +88,6 @@ async function refundPaidOrder(client, orderId, { refundAmount } = {}) {
   return changed;
 }
 
-/** Phase 10: the customer has been in (a ticket is USED), so the order can no longer be refunded on request. */
-function hasCheckedInTickets(client, orderId) {
-  return ordersRepository.lockTicketsHasUsed(client, orderId);
-}
-
 /** Lock an order for a payment or a refund (the first lock of those flows). */
 function lockOrder(client, orderId) {
   return ordersRepository.findById(client, orderId, { forUpdate: true });
@@ -107,7 +102,6 @@ module.exports = {
   markOrderPaid,
   markPaymentFailed,
   refundPaidOrder,
-  hasCheckedInTickets,
   lockOrder,
   lockPaidOrders,
   PAYABLE,

@@ -4,7 +4,7 @@ const { createApp } = require('../../src/app');
 const { query, closePool } = require('../../src/database/pool');
 const { useFakeMailbox, createLoggedInUser, login, DEFAULT_PASSWORD } = require('../helpers/auth');
 const { bearer, createAdmin, createOrganizer, createCategory, createVenue, createPublishedEvent } = require('../helpers/catalog');
-const { createCustomers, book } = require('../helpers/orders');
+const { createCustomers, book, refundOrder } = require('../helpers/orders');
 const { TERMS_VERSION } = require('../../src/config/constants');
 
 const app = createApp();
@@ -202,7 +202,7 @@ describe('orders and tickets (ORD-05, TKT-03)', () => {
     expect(after.split('.')[1]).toBe('2');
     await request(app).post(`/api/v1/admin/tickets/${ticket.id}/reissue-qr`).set(bearer(buyer.token)).expect(403);
 
-    await asAdmin(request(app).post(`/api/v1/payments/${payment.id}/refund`)).send({ reason: 'Khách hủy' }).expect(200);
+    await refundOrder(payment.id);
     const res = await asAdmin(request(app).post(`/api/v1/admin/tickets/${ticket.id}/reissue-qr`)).expect(409);
     expect(res.body.error.code).toBe('TICKET_NOT_REISSUABLE');
   });

@@ -1350,137 +1350,7 @@
       ]
     },
     {
-      "name": "5. Hoàn tiền → vé hết hiệu lực + email + thông báo",
-      "item": [
-        {
-          "name": "Admin hoàn tiền",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "(function () {",
-                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
-                  "})();"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{host}}/api/v1/payments/{{paymentId}}/refund",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"reason\": \"Thử luồng hoàn tiền Phase 9\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{adminToken}}",
-                  "type": "string"
-                }
-              ]
-            }
-          }
-        },
-        {
-          "name": "Vé đã chuyển REFUNDED",
-          "event": [
-            {
-              "listen": "prerequest",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "(function () {",
-                  "  // Chờ worker xử lý job (chạy nền).",
-                  "  setTimeout(() => {}, 2000);",
-                  "})();"
-                ]
-              }
-            },
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "(function () {",
-                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
-                  "  const json = pm.response.json() || {};",
-                  "  const data = json.data || {};",
-                  "  pm.test('Tất cả vé REFUNDED', () => pm.expect(data.order.tickets.every((t) => t.status === 'REFUNDED')).to.eql(true));",
-                  "})();"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{host}}/api/v1/orders/{{orderId}}",
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{userToken}}",
-                  "type": "string"
-                }
-              ]
-            }
-          }
-        },
-        {
-          "name": "Thông báo \"Đã hoàn tiền\"",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "(function () {",
-                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
-                  "  const json = pm.response.json() || {};",
-                  "  const data = json.data || {};",
-                  "  pm.test('Có ORDER_REFUNDED', () => pm.expect(data.notifications.map((n) => n.type)).to.include('ORDER_REFUNDED'));",
-                  "})();"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{host}}/api/v1/notifications?unread=true",
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{userToken}}",
-                  "type": "string"
-                }
-              ]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "6. Hủy đơn → thông báo",
+      "name": "5. Hủy đơn → thông báo",
       "item": [
         {
           "name": "Giữ ghế VIP A02",
@@ -1586,6 +1456,136 @@
                   "  const json = pm.response.json() || {};",
                   "  const data = json.data || {};",
                   "  pm.test('Có ORDER_CANCELLED', () => pm.expect(data.notifications.map((n) => n.type)).to.include('ORDER_CANCELLED'));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/notifications?unread=true",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Hủy sự kiện → hoàn tiền, vé hết hiệu lực + email + thông báo",
+      "item": [
+        {
+          "name": "Hủy sự kiện (đơn đã trả được hoàn 100%)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{host}}/api/v1/events/{{eventId}}/status",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"CANCELLED\",\n  \"reason\": \"Thử luồng hoàn tiền khi hủy sự kiện\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Vé đã chuyển REFUNDED",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  // Chờ worker xử lý job (chạy nền).",
+                  "  setTimeout(() => {}, 2000);",
+                  "})();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  pm.test('Tất cả vé REFUNDED', () => pm.expect(data.order.tickets.every((t) => t.status === 'REFUNDED')).to.eql(true));",
+                  "})();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{host}}/api/v1/orders/{{orderId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{userToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Thông báo \"Đã hoàn tiền\"",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "(function () {",
+                  "  pm.test('Status 200', () => pm.expect(pm.response.code).to.be.oneOf([200]));",
+                  "  const json = pm.response.json() || {};",
+                  "  const data = json.data || {};",
+                  "  pm.test('Có ORDER_REFUNDED', () => pm.expect(data.notifications.map((n) => n.type)).to.include('ORDER_REFUNDED'));",
                   "})();"
                 ]
               }

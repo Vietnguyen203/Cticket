@@ -36,7 +36,6 @@ export interface EventInput {
   thumbnailUrl?: string | null
   ageRestriction?: number | null
   /** Phase 18.3 */
-  refundPolicy?: 'NONE' | 'STANDARD' | 'FLEXIBLE'
   categoryIds: string[]
   /** Phase 21: purchase queue (PATCH only) */
   queueEnabled?: boolean

@@ -5,7 +5,7 @@ import { createAdminAccount } from './db'
 import { totpCode } from './totp'
 
 /** The terms of sale a buyer accepts at checkout (backend/src/config/constants.js TERMS_VERSION). */
-export const TERMS_VERSION = '2026-10-27'
+export const TERMS_VERSION = '2026-10-27.2'
 
 /**
  * Background data made through the API (fast, stable); the part a test is

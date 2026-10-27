@@ -7,7 +7,7 @@ const { qrToken, qrTokenHash } = require('../../src/modules/tickets/qr');
 const { useFakeMailbox } = require('../helpers/auth');
 const { bearer, createAdmin, createOrganizer, createCategory, changeStatus } = require('../helpers/catalog');
 const { createConfiguredEvent, publishEvent } = require('../helpers/inventory');
-const { createCustomers, book } = require('../helpers/orders');
+const { createCustomers, book, refundOrder } = require('../helpers/orders');
 const { startServer, connect } = require('../helpers/ws');
 const { findInventoryMismatches } = require('../../src/modules/orders');
 const { TERMS_VERSION } = require('../../src/config/constants');
@@ -157,7 +157,7 @@ describe('my tickets (TKT-01, TKT-02)', () => {
 
   test('a refunded ticket has no QR any more', async () => {
     const { buyer, payment, tickets } = await paidTickets();
-    await request(app).post(`/api/v1/payments/${payment.id}/refund`).set(bearer(admin.token)).send({ reason: 'Ill' }).expect(200);
+    await refundOrder(payment.id);
 
     const detail = await request(app).get(`/api/v1/tickets/${tickets[0].id}`).set(bearer(buyer.token)).expect(200);
     expect(detail.body.data.ticket).toMatchObject({ status: 'REFUNDED', qrToken: null });
@@ -359,7 +359,7 @@ describe('check-in (CHK-01)', () => {
   test('a refunded ticket does not get in', async () => {
     const { buyer, staff, tickets, schedule, payment } = await atTheGate();
     const qr = await qrOf(buyer.token, tickets[0].id); // saved before the refund (a screenshot)
-    await request(app).post(`/api/v1/payments/${payment.id}/refund`).set(bearer(admin.token)).send({ reason: 'Ill' }).expect(200);
+    await refundOrder(payment.id);
 
     const res = await scan(staff.token, { qrToken: qr, scheduleId: schedule.id }).expect(409);
     expect(res.body.error).toMatchObject({ code: 'TICKET_NOT_VALID', details: { status: 'REFUNDED' } });
@@ -430,12 +430,9 @@ describe('check-in history and stats (CHK-02, CHK-03)', () => {
 // ---------------------------------------------------------------------------
 
 describe('refunds after check-in', () => {
-  test('an order with a checked-in ticket is not refundable; cancelling the event still refunds it', async () => {
-    const { buyer, staff, tickets, schedule, payment, order, event } = await atTheGate();
+  test('cancelling the event refunds an order even with a checked-in ticket', async () => {
+    const { buyer, staff, tickets, schedule, order, event } = await atTheGate();
     await scan(staff.token, { qrToken: await qrOf(buyer.token, tickets[0].id), scheduleId: schedule.id }).expect(201);
-
-    const res = await request(app).post(`/api/v1/payments/${payment.id}/refund`).set(bearer(admin.token)).send({ reason: 'Asked' }).expect(409);
-    expect(res.body.error.code).toBe('PAYMENT_NOT_REFUNDABLE');
     expect(await orderStatus(order.id)).toBe('PAID');
 
     await changeStatus(app, organizer.token, event.id, 'CANCELLED', 'Storm warning').expect(200);

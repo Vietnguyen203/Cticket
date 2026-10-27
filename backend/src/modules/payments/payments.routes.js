@@ -63,27 +63,8 @@ router.get(
   validate({ params: schemas.idParams }),
   controller.get,
 );
-router.post(
-  '/:id/refund',
-  authenticate,
-  authorize('refund:create'),
-  validate({ params: schemas.idParams, body: schemas.refund }),
-  controller.refund,
-);
-
-/**
- * Phase 18.3, mounted at /api/v1/orders (next to the orders module's router):
- * a buyer cancels their paid order under the event's refund policy.
- */
-const cancellationRouter = Router();
-const buyer = [authenticate, authorize('payment:create')];
-cancellationRouter.get('/:id/cancellation', ...buyer, validate({ params: schemas.idParams }), controller.previewCancellation);
-cancellationRouter.post(
-  '/:id/cancellation',
-  ...buyer,
-  validate({ params: schemas.idParams, body: schemas.cancelOrder }),
-  controller.cancelOrder,
-);
+// No refund on request (neither the buyer nor an admin): paid orders are
+// refunded only when their event or show is cancelled (payments.service
+// refundPaidOrders). Terms of sale, Điều 5.
 
 module.exports = router;
-module.exports.cancellationRouter = cancellationRouter;

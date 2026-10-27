@@ -327,22 +327,22 @@ describe('refunds (PAY-05, EVT-08)', () => {
     return { ...world, buyer, order, payment };
   }
 
-  test('a refund puts seats and GA tickets back on sale, once, audited', async () => {
-    const { buyer, order, payment, schedule, seat, standing } = await paidOrder();
-    await request(app).post(`/api/v1/payments/${payment.id}/refund`).set(bearer(buyer.token)).send({ reason: 'I want it' }).expect(403);
+  test('no refund on request: neither the buyer nor an admin can ask for one', async () => {
+    const { buyer, order, payment } = await paidOrder();
+    for (const token of [buyer.token, admin.token]) {
+      await request(app).post(`/api/v1/payments/${payment.id}/refund`).set(bearer(token)).send({ reason: 'Asked' }).expect(404);
+      await request(app).post(`/api/v1/orders/${order.id}/cancellation`).set(bearer(token)).send({ refundAmount: 0 }).expect(404);
+    }
+    expect((await orderRow(order.id)).status).toBe('PAID');
+  });
 
-    const res = await request(app)
-      .post(`/api/v1/payments/${payment.id}/refund`)
-      .set(bearer(admin.token))
-      .send({ reason: 'Customer is ill' })
-      .expect(200);
-    expect(res.body.data.payment.status).toBe('REFUNDED');
+  test('a cancelled event puts seats and GA tickets back on sale, the payment refunded in full, audited', async () => {
+    const { event, order, payment, schedule, seat, standing } = await paidOrder();
+    await changeStatus(app, organizer.token, event.id, 'CANCELLED', 'Storm warning').expect(200);
+    expect((await query(`SELECT status FROM payments WHERE id = $1`, [payment.id])).rows[0].status).toBe('REFUNDED');
     expect((await orderRow(order.id)).status).toBe('REFUNDED');
     expect(await seatStatus(schedule.id, seat.A01)).toBe('AVAILABLE');
     expect(await gaCounters(standing.id)).toEqual({ held_quantity: 0, sold_quantity: 0 });
-
-    const again = await request(app).post(`/api/v1/payments/${payment.id}/refund`).set(bearer(admin.token)).send({ reason: 'Twice' });
-    expect(again.body.error.code).toBe('PAYMENT_NOT_REFUNDABLE');
     const { rows } = await query(`SELECT action, new_value FROM audit_logs WHERE entity_id = $1`, [order.id]);
     expect(rows).toEqual([expect.objectContaining({ action: 'PAYMENT_REFUNDED', new_value: expect.objectContaining({ amount: 3_500_000 }) })]);
   });

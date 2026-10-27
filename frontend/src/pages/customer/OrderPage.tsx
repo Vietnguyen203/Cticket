@@ -17,7 +17,6 @@ import { OrderStatusBadge } from '../../admin/OrderStatusBadge'
 import { Alert, Badge, Button, Card, FullPageSpinner } from '../../components/ui'
 import { CalendarIcon, CheckCircleIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, MapPinIcon, ShieldIcon, TicketIcon } from '../../components/icons'
 import { VNPAY_MIN_SECONDS, vnpayReason } from '../../payments/vnpayReasons'
-import { CancelOrderCard } from './CancelOrderCard'
 import { CheckoutSteps } from '../../components/CheckoutSteps'
 import { TicketQrThumb } from '../../components/TicketQrThumb'
 import { realtime } from '../../realtime'
@@ -234,7 +233,7 @@ export function OrderPage() {
                     <Link to="/dieu-khoan" target="_blank" className="font-semibold text-brand-700 hover:underline">
                       Điều kiện giao dịch chung
                     </Link>
-                    , gồm chính sách hủy và hoàn tiền của sự kiện.
+                    . Vé đã mua không hủy, không hoàn; chỉ hoàn tiền khi sự kiện bị hủy.
                   </span>
                 </label>
                 <div className="space-y-2">
@@ -372,7 +371,6 @@ export function OrderPage() {
           </Card>
 
           {/* Phase 18.3: cancel under the event's refund policy (keyed so a new status reloads the terms). */}
-          {o.status === 'PAID' && <CancelOrderCard key={o.status} orderId={o.id} onCancelled={reload} />}
 
           {(o.tickets ?? []).length > 0 && (
             <Card className="space-y-3">

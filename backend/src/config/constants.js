@@ -53,21 +53,6 @@ const LOGIN_LOCK = Object.freeze({
   STREAK_RESET_SECONDS: 24 * 60 * 60, // a day without a failure starts over
 });
 
-// Phase 18.3: what a customer gets back when cancelling a paid order. Tiers
-// from the earliest: cancelling at least `hoursBefore` the show refunds `percent`.
-const REFUND_POLICY = Object.freeze({ NONE: 'NONE', STANDARD: 'STANDARD', FLEXIBLE: 'FLEXIBLE' });
-const REFUND_POLICY_TIERS = Object.freeze({
-  [REFUND_POLICY.NONE]: [],
-  [REFUND_POLICY.STANDARD]: [
-    { hoursBefore: 7 * 24, percent: 80 },
-    { hoursBefore: 3 * 24, percent: 50 },
-  ],
-  [REFUND_POLICY.FLEXIBLE]: [
-    { hoursBefore: 48, percent: 100 },
-    { hoursBefore: 24, percent: 50 },
-  ],
-});
-
 // Phase 18.4: the waiting list of a sold-out ticket type.
 const WAITLIST_STATUS = Object.freeze({
   WAITING: 'WAITING',
@@ -252,7 +237,7 @@ const EVENT_LIMITS = Object.freeze({
 // The terms of sale in force (frontend/src/legal/terms.ts TERMS_VERSION, the
 // /dieu-khoan page). A buyer accepts them at checkout; a new text gets a new
 // version here and there, so a page left open on the old text is refused.
-const TERMS_VERSION = '2026-10-27';
+const TERMS_VERSION = '2026-10-27.2';
 
 module.exports = {
   ROLES,
@@ -261,8 +246,6 @@ module.exports = {
   OTP,
   TWO_FACTOR,
   LOGIN_LOCK,
-  REFUND_POLICY,
-  REFUND_POLICY_TIERS,
   WAITLIST_STATUS,
   WAITLIST,
   REVIEW_STATUS,

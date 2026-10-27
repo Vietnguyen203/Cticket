@@ -2055,60 +2055,7 @@
       ]
     },
     {
-      "name": "8. Không hoàn tiền đơn đã check-in",
-      "item": [
-        {
-          "name": "Admin hoàn tiền đơn có vé đã dùng → 409",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "(function () {",
-                  "  pm.test('Status 409', () => pm.expect(pm.response.code).to.be.oneOf([409]));",
-                  "  const json = (pm.response.headers.get('Content-Type') || '').includes('json') ? pm.response.json() : {};",
-                  "  const data = json.data || {};",
-                  "  pm.test('Mã lỗi PAYMENT_NOT_REFUNDABLE', () => pm.expect(json.error.code).to.eql('PAYMENT_NOT_REFUNDABLE'));",
-                  "})();"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{host}}/api/v1/payments/{{paymentId}}/refund",
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"reason\": \"Khách xin hoàn tiền sau khi đã vào\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{adminToken}}",
-                  "type": "string"
-                }
-              ]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "9. Gỡ nhân viên → không quét được nữa",
+      "name": "8. Gỡ nhân viên → không quét được nữa",
       "item": [
         {
           "name": "Gỡ bạn khỏi sự kiện",

@@ -1,5 +1,4 @@
 import { describe, expect, test } from 'vitest'
-import { REFUND_POLICIES } from '../payments/refundPolicy'
 import { ARTICLES, articleNumber, LEGAL_BASES, TERMS_VERSION } from './terms'
 
 describe('the terms of sale', () => {
@@ -16,15 +15,13 @@ describe('the terms of sale', () => {
     for (const basis of LEGAL_BASES) expect(basis.url, basis.law).toMatch(/^https:\/\/thuvienphapluat\.vn\/van-ban\/.+\.aspx$/)
   })
 
-  test('the version is a date (the backend accepts only the same string)', () => {
-    expect(TERMS_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  test('the version is a date, with .N for a second text the same day (the backend accepts only the same string)', () => {
+    expect(TERMS_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}(\.\d+)?$/)
   })
 
-  test('every refund policy has its tiers, the earliest first, as the API computes them', () => {
-    expect(REFUND_POLICIES.map((p) => [p.value, p.tiers.map((t) => t.percent)])).toEqual([
-      ['NONE', []],
-      ['STANDARD', [80, 50]],
-      ['FLEXIBLE', [100, 50]],
-    ])
+  test('the refund article says tickets are refunded only when the event is cancelled', () => {
+    const refunds = ARTICLES.find((a) => a.id === 'huy-va-hoan-tien')!
+    expect(refunds.clauses.join(' ')).toContain('chỉ được hoàn khi sự kiện hoặc suất diễn bị hủy')
+    expect(ARTICLES.flatMap((a) => a.clauses).join(' ')).not.toContain('Chính sách hủy')
   })
 })

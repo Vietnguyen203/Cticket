@@ -1,13 +1,17 @@
 import { buy, createCustomer, createOrganizer, createPublishedEvent } from '../support/api'
 import { expect, signIn, signInAdmin, test } from '../support/fixtures'
 
-test('an admin refund: the ticket is void and the organizer’s sales report moves it from revenue to refunds', async ({ browser, api, admin }) => {
+test('a cancelled event: every paid order refunded, tickets void, the sales report moves them from revenue to refunds', async ({ browser, api, admin }) => {
   const organizer = await createOrganizer(api, admin)
   const world = await createPublishedEvent(api, { admin, organizer })
-  const kept = await buy(api, await createCustomer(api), world.schedule.id, {
-    seatIds: [world.seat.A01],
-    items: [{ ticketTypeId: world.standing.id, quantity: 1 }],
-  }) // 2.000.000 + 500.000
+  const keptBuyer = await createCustomer(api)
+  const kept = {
+    buyer: keptBuyer,
+    ...(await buy(api, keptBuyer, world.schedule.id, {
+      seatIds: [world.seat.A01],
+      items: [{ ticketTypeId: world.standing.id, quantity: 1 }],
+    })), // 2.000.000 + 500.000
+  }
   const buyer = await createCustomer(api)
   const refunded = await buy(api, buyer, world.schedule.id, { seatIds: [world.seat.B01] }) // 1.000.000
 
@@ -19,27 +23,31 @@ test('an admin refund: the ticket is void and the organizer’s sales report mov
   await expect(stat('Doanh thu')).toContainText('3.500.000')
   await expect(stat('Vé đã bán')).toContainText('3')
 
-  // The admin refunds the B01 order, with a reason.
+  // No refund on request: the admin's order page has no refund button.
   const adminContext = await browser.newContext()
   const adminPage = await adminContext.newPage()
   await signInAdmin(adminPage, `/admin/orders/${refunded.order.id}`)
-  await adminPage.getByRole('button', { name: 'Hoàn tiền' }).click()
-  const dialog = adminPage.getByRole('dialog')
-  await dialog.getByLabel('Lý do').fill('Khách xin hủy (E2E)')
-  await dialog.getByRole('button', { name: 'Hoàn tiền' }).click()
-  await expect(adminPage.getByText('Đã hoàn tiền').first()).toBeVisible()
+  await expect(adminPage.getByText('Thanh toán', { exact: true })).toBeVisible()
+  await expect(adminPage.getByRole('button', { name: 'Hoàn tiền' })).toHaveCount(0)
   await adminContext.close()
 
-  // The buyer's ticket is no longer valid (no QR).
-  const ticket = await api.get(`tickets/${refunded.tickets[0].id}`, { headers: { Authorization: `Bearer ${buyer.token}` } })
-  expect((await ticket.json()).data.ticket).toMatchObject({ status: 'REFUNDED', qrToken: null })
+  // The organizer cancels the event, with a reason: every paid order is refunded.
+  await orgPage.getByRole('button', { name: 'Hủy sự kiện' }).click()
+  const dialog = orgPage.getByRole('dialog')
+  await dialog.getByLabel('Lý do').fill('Mưa bão (E2E)')
+  await dialog.getByRole('button', { name: 'Hủy sự kiện' }).click()
+  await expect(orgPage.getByText('Đã hủy').first()).toBeVisible()
 
-  // The organizer's report: revenue down, the refund shown apart.
-  await orgPage.reload()
-  await expect(stat('Doanh thu')).toContainText('2.500.000')
-  await expect(stat('Vé đã bán')).toContainText('2')
-  await expect(stat('Hoàn tiền')).toContainText('1.000.000')
-  await expect(orgPage.getByRole('row', { name: /CAT 2/ })).toContainText('0 / 10')
-  expect(kept.tickets).toHaveLength(2)
+  // The buyers' tickets are no longer valid (no QR).
+  for (const [owner, ticketId] of [[buyer, refunded.tickets[0].id], [kept.buyer, kept.tickets[0].id]] as const) {
+    const ticket = await api.get(`tickets/${ticketId}`, { headers: { Authorization: `Bearer ${owner.token}` } })
+    expect((await ticket.json()).data.ticket).toMatchObject({ status: 'REFUNDED', qrToken: null })
+  }
+
+  // The organizer's report: the revenue moves to refunds.
+  await orgPage.goto(`/organizer/events/${world.event.id}?tab=sales`)
+  await expect(stat('Hoàn tiền')).toContainText('3.500.000')
+  await expect(stat('Vé đã bán')).toContainText('0')
+  await expect(stat('Doanh thu')).not.toContainText('3.500.000')
   await orgContext.close()
 })

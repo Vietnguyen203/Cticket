@@ -125,8 +125,6 @@ const MESSAGES: Record<string, string> = {
   WAITLIST_ALREADY_JOINED: 'Bạn đã ở trong danh sách chờ của hạng vé này.',
   QUEUE_TURN_REQUIRED: 'Đang có nhiều người mua cùng lúc. Bạn cần chờ tới lượt trong hàng chờ mới giữ chỗ được.',
   WAITLIST_RESERVED: 'Số vé còn lại đang được giữ cho người trong danh sách chờ. Vào danh sách chờ hoặc thử lại sau.',
-  ORDER_NOT_CANCELLABLE: 'Đơn này không hủy được.',
-  REFUND_TERMS_CHANGED: 'Mức hoàn tiền vừa thay đổi, vui lòng kiểm tra lại.',
   LOGIN_LOCKED: 'Email này đã nhập sai mật khẩu quá nhiều lần nên tạm khóa đăng nhập.',
   SERVICE_UNAVAILABLE: 'Dịch vụ tạm thời gián đoạn, vui lòng thử lại.',
   INTERNAL_ERROR: 'Có lỗi xảy ra, vui lòng thử lại.',

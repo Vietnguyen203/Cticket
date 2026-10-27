@@ -3,7 +3,6 @@ import { useLocation } from 'react-router'
 import { ExternalLinkIcon } from '../components/icons'
 import { Card, PageHeader } from '../components/ui'
 import { ARTICLES, LEGAL_BASES, TERMS_EFFECTIVE_DATE, TERMS_VERSION, type Article } from '../legal/terms'
-import { REFUND_POLICIES } from '../payments/refundPolicy'
 
 /**
  * The terms of sale ("Điều kiện giao dịch chung"), public: read before buying,
@@ -89,52 +88,7 @@ function ArticleCard({ article, number }: { article: Article; number: number }) 
             </li>
           ))}
         </ol>
-        {article.extra === 'refund-tiers' && <RefundTiers />}
       </Card>
     </section>
-  )
-}
-
-/** The three policies an organizer can choose, from the same data as the event page. */
-function RefundTiers() {
-  return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full border-collapse text-left text-sm">
-        <caption className="sr-only">Các mức hoàn tiền khi Khách hàng tự hủy đơn</caption>
-        <thead>
-          <tr className="border-b border-line text-slate-500">
-            <th scope="col" className="py-2 pr-4 font-medium">
-              Chính sách
-            </th>
-            <th scope="col" className="py-2 font-medium">
-              Hủy trước giờ diễn
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {REFUND_POLICIES.map((policy) => (
-            <tr key={policy.value} className="border-b border-line align-top last:border-0">
-              <th scope="row" className="py-2 pr-4 font-semibold text-ink">
-                {policy.label}
-              </th>
-              <td className="py-2">
-                {policy.tiers.length === 0 ? (
-                  'Không Hoàn Tền'
-                ) : (
-                  <ul className="space-y-0.5">
-                    {policy.tiers.map((tier) => (
-                      <li key={tier.before}>
-                        Từ {tier.before} trở lên: hoàn {tier.percent}%
-                      </li>
-                    ))}
-                    <li className="text-slate-500">Sau mốc cuối: không hủy được</li>
-                  </ul>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
   )
 }

@@ -65,7 +65,7 @@ Ký hiệu file test tự động:
 | TC-CAT-02 | Tìm theo từ khóa | — | Gõ một phần tên sự kiện → Tìm | Chỉ hiện sự kiện khớp; dòng "N sự kiện cho …" đúng | P1 | BE:events, BE:catalog |
 | TC-CAT-03 | Lọc thành phố và danh mục | — | Nhập thành phố; bấm một danh mục; "Xóa bộ lọc" | Kết quả lọc đúng; bộ lọc nằm trên URL (gửi link cho người khác thấy cùng kết quả); "Xóa bộ lọc" về lại tất cả | P2 | BE:events |
 | TC-CAT-04 | Không có kết quả | — | Tìm một từ không có | "Không có sự kiện nào phù hợp" và nút "Xem tất cả sự kiện" | P3 | — |
-| TC-CAT-05 | Chi tiết sự kiện | Sự kiện đang bán | Mở sự kiện | Ảnh, tên, thời gian, địa điểm, ban tổ chức, "Giá vé từ …" (giá thấp nhất còn vé của suất đang bán), lịch diễn có giá từng hạng, chính sách hủy | P1 | E2E:booking, E2E:cancel-waitlist |
+| TC-CAT-05 | Chi tiết sự kiện | Sự kiện đang bán | Mở sự kiện | Ảnh, tên, thời gian, địa điểm, ban tổ chức, "Giá vé từ …" (giá thấp nhất còn vé của suất đang bán), lịch diễn có giá từng hạng, "Vé không hủy, không hoàn" | P1 | E2E:booking, E2E:cancel-waitlist |
 | TC-CAT-06 | Chi tiết trên điện thoại | Điện thoại | Mở sự kiện, cuộn xuống | Lịch diễn nằm ngay sau thông tin chính; thanh "Chọn suất diễn" cố định ở đáy | P2 | — |
 | TC-CAT-07 | Sự kiện chưa đăng / không tồn tại | — | Mở link sự kiện nháp của người khác, hoặc link sai | "Không tìm thấy sự kiện" (không lộ là có tồn tại) | P2 | E2E:permissions, BE:events |
 
@@ -115,19 +115,17 @@ Ký hiệu file test tự động:
 | TC-PAY-11 | Đơn 0 đồng | Mã giảm 100% | Áp mã → "Tiếp tục thanh toán" | Đơn thành đã thanh toán ngay, có vé, không qua cổng thanh toán | P3 | BE:payments |
 | TC-PAY-12 | Phải đồng ý Điều kiện giao dịch chung | Đơn đang giữ | Xem nút "Tiếp tục thanh toán" → tích "Tôi đã đọc và đồng ý…" → bấm | Nút mờ cho tới khi tích; đơn lưu phiên bản điều khoản và thời điểm đồng ý (admin thấy ở chi tiết đơn); trang mở trên bản cũ bị từ chối, báo tải lại | P1 | BE:payments, E2E:booking |
 
-## 8. Hủy đơn và hoàn tiền (REF)
+## 8. Không hủy vé, hoàn tiền khi sự kiện bị hủy (REF)
+
+Vé đã thanh toán không hủy, không hoàn theo yêu cầu của khách hay admin; tiền chỉ được hoàn khi sự kiện hoặc suất diễn bị hủy (Điều kiện giao dịch chung, Điều 5).
 
 | Mã | Kịch bản | Tiền điều kiện | Các bước | Kết quả mong đợi | Ưu tiên | Tự động |
 |---|---|---|---|---|---|---|
-| TC-REF-01 | Khách hủy theo chính sách Tiêu chuẩn | Sự kiện chính sách "Tiêu chuẩn", còn ≥ 7 ngày | Trang đơn → xem số được hoàn → xác nhận hủy | Hoàn 80% (từ 3 đến 7 ngày: 50%, dưới 3 ngày: không hủy được); phần còn lại là phí; vé hết hiệu lực; mục Hoàn tiền "Đã hoàn" | P1 | E2E:cancel-waitlist, BE:cancellation, BE-unit:refund-policy |
-| TC-REF-02 | Chính sách Linh hoạt / Không hoàn | — | Như trên với 2 chính sách còn lại | Linh hoạt: ≥ 48 giờ 100%, ≥ 24 giờ 50%; Không hoàn: không có nút hủy | P2 | BE:cancellation, BE-unit:refund-policy |
-| TC-REF-03 | Mốc hoàn tiền đổi trong lúc xem | Đang xem số được hoàn, mốc vừa qua | Bấm hủy | Không hủy; báo điều kiện đã đổi kèm số tiền mới | P3 | BE:cancellation |
-| TC-REF-04 | Đã vào cổng thì không hủy được | Vé đã quét | Xem trang đơn | Không cho hủy, ghi lý do | P2 | BE:cancellation |
-| TC-REF-05 | Admin hoàn tiền | Đơn đã thanh toán | Admin → Đơn hàng → "Hoàn tiền" | Vé hết hiệu lực; báo cáo doanh thu ban tổ chức chuyển sang mục hoàn tiền; có audit | P1 | E2E:refund-report, BE:payments |
-| TC-REF-06 | Hủy cả sự kiện | Sự kiện có đơn đã trả và đơn đang giữ | Ban tổ chức "Hủy sự kiện" (nhập lý do) | Đơn đang giữ bị hủy, đơn đã trả được hoàn hết; khách nhận email | P2 | BE:events, BE:payments-vnpay |
+| TC-REF-01 | Khách không hủy được đơn đã trả | Đơn đã thanh toán | Mở trang đơn | Không có nút hủy đơn; trang sự kiện ghi "Vé không hủy, không hoàn" | P1 | E2E:cancel-waitlist |
+| TC-REF-02 | Không có hoàn tiền theo yêu cầu | Đơn đã thanh toán | Gọi `POST /payments/:id/refund`, `POST /orders/:id/cancellation` (khách và admin) | 404; đơn vẫn PAID; trang đơn của admin không có nút "Hoàn tiền" | P1 | BE:payments, E2E:refund-report |
+| TC-REF-06 | Hủy cả sự kiện | Sự kiện có đơn đã trả và đơn đang giữ | Ban tổ chức "Hủy sự kiện" (nhập lý do) | Đơn đang giữ bị hủy, đơn đã trả được hoàn 100% (kể cả đơn đã có vé vào cổng); vé hết hiệu lực; báo cáo doanh thu chuyển sang mục hoàn tiền; khách nhận email | P1 | E2E:refund-report, BE:payments, BE:payments-vnpay, BE:checkins |
 | TC-REF-07 | VNPay từ chối hoàn | — | (Test tự động mô phỏng) | Hoàn tiền "Thất bại", admin gửi lại được | P3 | BE:payments-vnpay |
-| TC-REF-08 | Chính sách lúc mua được giữ | Đơn mua lúc sự kiện "Linh hoạt" | Ban tổ chức đổi sang "Không hoàn" → khách xem trang đơn | Vẫn hủy được theo "Linh hoạt"; ngược lại, đổi sang chính sách có lợi hơn thì khách được hưởng chính sách mới | P1 | BE:cancellation |
-| TC-REF-09 | Trang Điều kiện giao dịch chung | — | Trang sự kiện → "Điều kiện hủy và hoàn tiền"; chân trang → "Điều kiện giao dịch" | Mở /dieu-khoan đúng Điều 5, có bảng mức hoàn và căn cứ pháp lý | P2 | E2E:terms |
+| TC-REF-09 | Trang Điều kiện giao dịch chung | — | Trang sự kiện → "Điều kiện hoàn tiền"; chân trang → "Điều kiện giao dịch" | Mở /dieu-khoan đúng Điều 5 "Không hủy vé, hoàn tiền khi sự kiện bị hủy", có căn cứ pháp lý | P2 | E2E:terms |
 
 ## 9. Danh sách chờ khi hết vé (WTL)
 
@@ -179,7 +177,7 @@ Ký hiệu file test tự động:
 | TC-ORG-04 | Tải file không phải ảnh | — | Đổi tên file .html thành .png rồi tải | Bị từ chối | P2 | BE:uploads |
 | TC-ORG-05 | Buổi diễn, hạng vé theo khu | Sự kiện nháp | Tab "Buổi diễn & vé": lưu buổi diễn (địa điểm, ngày, giờ 24 giờ); lưu tổng số người tham dự; gán hạng cho từng khu có sẵn (khu ngồi: toàn bộ ghế; khu đứng: số vé) | Danh sách kiểm tra "sẵn sàng gửi duyệt" ở đầu trang không còn mục đỏ | P1 | E2E:organizer, BE:inventory, WEB:readiness, WEB:allocation |
 | TC-ORG-06 | Gửi duyệt → admin duyệt → mở bán | Đủ điều kiện | "Gửi duyệt"; admin "Duyệt và mở bán" | Sự kiện xuất hiện công khai, chọn chỗ được | P1 | E2E:organizer, BE:events |
-| TC-ORG-07 | Sửa khi đang bán | Sự kiện đang bán | Sửa mô tả / ảnh / chính sách hủy / hàng chờ | Lưu được, kể cả sự kiện không có danh mục; tên, giờ, danh mục bị khóa; "Có thay đổi chưa lưu" khi chưa lưu | P2 | BE:events |
+| TC-ORG-07 | Sửa khi đang bán | Sự kiện đang bán | Sửa mô tả / ảnh / hàng chờ | Lưu được, kể cả sự kiện không có danh mục; tên, giờ, danh mục bị khóa; "Có thay đổi chưa lưu" khi chưa lưu | P2 | BE:events |
 | TC-ORG-08 | Báo cáo bán hàng | Có đơn | Tab "Doanh thu" | Số vé, doanh thu, hoàn tiền, phí hủy đúng | P2 | E2E:refund-report, BE:reports, WEB:reports |
 | TC-ORG-09 | Xóa sự kiện | Sự kiện có đơn | "Xóa" → gõ lại đúng tên | Chỉ xóa khi gõ đúng tên; có audit | P3 | BE:event-deletion |
 | TC-ORG-10 | Đề xuất địa điểm mới | — | Đề xuất địa điểm khi tạo suất | Admin duyệt sự kiện thì địa điểm được duyệt theo | P3 | BE:venue-proposals |

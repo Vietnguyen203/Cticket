@@ -110,27 +110,3 @@ export async function confirmVnpayReturn(search: string): Promise<VnpayResult> {
   const params = Object.fromEntries(new URLSearchParams(search))
   return (await api.get('/payments/vnpay/return', { params })).data.data.payment
 }
-
-// --- Phase 18.3: a buyer cancels a paid order under the event's refund policy ------
-
-export interface CancellationTerms {
-  allowed: boolean
-  /** Why not: NO_REFUND_POLICY, TOO_LATE, CHECKED_IN, SHOW_NOT_ON_SALE, NOT_PAID */
-  reason?: string
-  policy: string
-  paidAmount: number
-  percent?: number
-  refundAmount?: number
-  fee?: number
-  /** After this moment the next (smaller) tier applies, or no cancelling */
-  tierEndsAt?: string
-}
-
-export async function getCancellationTerms(orderId: string): Promise<CancellationTerms> {
-  return (await api.get(`/orders/${orderId}/cancellation`)).data.data.cancellation
-}
-
-/** `refundAmount`: the amount the customer saw; the API refuses (REFUND_TERMS_CHANGED) if it moved. */
-export async function cancelPaidOrder(orderId: string, refundAmount: number) {
-  return (await api.post(`/orders/${orderId}/cancellation`, { refundAmount })).data.data.cancellation
-}

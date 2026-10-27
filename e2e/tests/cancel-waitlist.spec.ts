@@ -4,28 +4,21 @@ import { expect, signIn, test } from '../support/fixtures'
 const bearer = (token: string) => ({ Authorization: `Bearer ${token}` })
 
 /**
- * Phase 18.3: a buyer cancels a paid order under the event's refund policy
- * ("Tiêu chuẩn": 30 days before the show → 80% back).
+ * Terms of sale, Điều 5: a paid ticket is not cancelled or refunded on
+ * request (only a cancelled event refunds: refund-report.spec.ts).
  */
-test('cancel a paid order: the refund shown is the refund made, the fee is kept', async ({ page, api, admin }) => {
+test('a paid order cannot be cancelled by its buyer; the event page says so before buying', async ({ page, api, admin }) => {
   const organizer = await createOrganizer(api, admin)
   const world = await createPublishedEvent(api, { admin, organizer })
-  expect((await api.patch(`events/${world.event.id}`, { headers: bearer(organizer.token), data: { refundPolicy: 'STANDARD' } })).ok()).toBe(true)
   const buyer = await createCustomer(api)
   const { order } = await buy(api, buyer, world.schedule.id, { seatIds: [world.seat.A01] })
 
   await page.goto(`/events/${world.event.slug}`)
-  await expect(page.getByText('Chính sách hủy: Tiêu chuẩn')).toBeVisible()
+  await expect(page.getByText('Vé không hủy, không hoàn')).toBeVisible()
 
   await signIn(page, buyer.email, undefined, `/orders/${order.id}`)
-  await expect(page.getByText(/hủy bây giờ được hoàn 1\.600\.000.*\(80%\), phí hủy 400\.000/)).toBeVisible()
-  await page.getByRole('button', { name: 'Hủy đơn và hoàn tiền' }).click()
-  await page.getByRole('dialog').getByRole('button', { name: 'Hủy đơn' }).click()
-
-  await expect(page.getByText('Đã hoàn tiền', { exact: true })).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Hoàn tiền' })).toBeVisible()
-  await expect(page.getByText(/^1\.600\.000/)).toBeVisible()
-  await expect(page.getByText('Đã hoàn', { exact: true })).toBeVisible()
+  await expect(page.getByText('Đã thanh toán').first()).toBeVisible()
+  await expect(page.getByRole('button', { name: /Hủy đơn/ })).toHaveCount(0)
 })
 
 /**

@@ -65,6 +65,8 @@ Ai biết email của bạn có thể cố tình khóa bạn (sai mật khẩu 5
 
 ## 4. 18.3 Hủy đơn có chính sách hoàn tiền
 
+> **Đã bỏ (27/10/2026).** Khách không còn tự hủy đơn, admin không còn hoàn tiền thủ công: vé đã trả chỉ được hoàn khi sự kiện hoặc suất diễn bị hủy (Điều kiện giao dịch chung, Điều 5). Phần dưới giữ lại làm lịch sử; cột `events.refund_policy` và `orders.refund_policy` vẫn còn trong cơ sở dữ liệu cho các đơn cũ nhưng không còn được đọc hay ghi.
+
 ### Chính sách
 Ban tổ chức chọn **một chính sách cho mỗi sự kiện**, trong trang chỉnh sửa sự kiện (đổi được cả sau khi đã bán; đơn đã mua áp dụng chính sách **lúc khách hủy**, trang sự kiện ghi rõ). Chính sách là các mẫu cố định trong code, không cho tự gõ % (tránh nhập sai và dễ hiển thị):
 

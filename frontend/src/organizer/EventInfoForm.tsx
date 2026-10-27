@@ -9,11 +9,10 @@ import { Alert, Button, TextField } from '../components/ui'
 import { hasAny } from '../admin/permissions'
 import { useAuth } from '../auth/AuthContext'
 import { useAsync } from '../utils/useAsync'
-import { REFUND_POLICIES, refundPolicyOf, type RefundPolicy } from '../payments/refundPolicy'
 import { missingForEvent } from './missing'
 
 /** Once PUBLISHED, only these may still change (backend EDITABLE_WHEN_PUBLISHED). */
-const EDITABLE_WHEN_PUBLISHED = new Set(['description', 'bannerUrl', 'thumbnailUrl', 'refundPolicy'])
+const EDITABLE_WHEN_PUBLISHED = new Set(['description', 'bannerUrl', 'thumbnailUrl'])
 
 function initialForm(event?: EventDetail) {
   return {
@@ -22,7 +21,6 @@ function initialForm(event?: EventDetail) {
     bannerUrl: event?.bannerUrl ?? '',
     thumbnailUrl: event?.thumbnailUrl ?? '',
     ageRestriction: event?.ageRestriction != null ? String(event.ageRestriction) : '',
-    refundPolicy: refundPolicyOf(event?.refundPolicy).value as RefundPolicy,
     categoryIds: event?.categories.map((c) => c.id) ?? [],
   }
 }
@@ -49,7 +47,6 @@ export function EventInfoForm({ event, onSubmit, submitLabel }: { event?: EventD
       bannerUrl: form.bannerUrl.trim() || null,
       thumbnailUrl: form.thumbnailUrl.trim() || null,
       ageRestriction: form.ageRestriction ? Number(form.ageRestriction) : null,
-      refundPolicy: form.refundPolicy,
       categoryIds: form.categoryIds,
     }
     if (!event) return all
@@ -92,7 +89,7 @@ export function EventInfoForm({ event, onSubmit, submitLabel }: { event?: EventD
     <form onSubmit={submit} className="space-y-4" noValidate>
       {error && <Alert>{error.message}</Alert>}
       {saved && nothingToSave && <Alert tone="success">Đã lưu.</Alert>}
-      {status === 'PUBLISHED' && <Alert tone="info">Sự kiện đang bán: chỉ sửa được mô tả, hình ảnh và chính sách hủy.</Alert>}
+      {status === 'PUBLISHED' && <Alert tone="info">Sự kiện đang bán: chỉ sửa được mô tả và hình ảnh.</Alert>}
       {status === 'PENDING_APPROVAL' && <Alert tone="info">Đang chờ duyệt: muốn sửa thì rút lại về nháp trước.</Alert>}
       <TextField label="Tên sự kiện" name="title" value={form.title} disabled={locked('title')} onChange={(e) => setForm({ ...form, title: e.target.value })} error={fieldErrors.title} />
       <label className="block text-sm">
@@ -137,26 +134,8 @@ export function EventInfoForm({ event, onSubmit, submitLabel }: { event?: EventD
         error={fieldErrors.ageRestriction}
         className="sm:w-1/2"
       />
-      <label className="block text-sm">
-        <span className="mb-1 block font-medium text-slate-700">Chính sách hủy đơn của khách</span>
-        <select
-          value={form.refundPolicy}
-          disabled={locked('refundPolicy')}
-          onChange={(e) => setForm({ ...form, refundPolicy: e.target.value as RefundPolicy })}
-          className="block w-full rounded-lg border border-slate-300 bg-surface px-3 py-2.5 sm:w-1/2"
-        >
-          {REFUND_POLICIES.map((policy) => (
-            <option key={policy.value} value={policy.value}>
-              {policy.label}
-            </option>
-          ))}
-        </select>
-        <span className="mt-1 block text-slate-500">
-          {refundPolicyOf(form.refundPolicy).summary} Phần không hoàn là phí hủy, tính vào doanh thu. Đổi chính sách chỉ áp dụng cho đơn mua sau đó; đơn đã
-          mua giữ chính sách lúc mua, trừ khi chính sách mới có lợi hơn cho khách.
-        </span>
-      </label>
-      <p className="-mt-2 text-sm">
+      <p className="text-sm text-slate-500">
+        Khách không hủy, không trả vé đã mua. Hủy sự kiện hoặc suất diễn thì mọi đơn đã thanh toán được hoàn 100% tự động.{' '}
         <Link to="/dieu-khoan#huy-va-hoan-tien" target="_blank" className="font-semibold text-brand-700 hover:underline">
           Xem Điều kiện giao dịch chung (Điều 5, Điều 6)
         </Link>

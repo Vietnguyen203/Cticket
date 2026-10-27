@@ -101,8 +101,6 @@ const ERROR_CODES = Object.freeze({
   REVIEW_NOT_ALLOWED: { status: 403, message: 'Only people who attended this event can review it.' },
   REVIEW_CLOSED: { status: 409, message: 'Reviews of this event can no longer be written or changed.' },
   REVIEW_HIDDEN: { status: 409, message: 'This review was hidden by an administrator and cannot be changed.' },
-  ORDER_NOT_CANCELLABLE: { status: 409, message: 'This order cannot be cancelled by its buyer.' },
-  REFUND_TERMS_CHANGED: { status: 409, message: 'The refund for this order has changed. Check the new amount.' },
   RATE_LIMITED: { status: 429, message: 'Too many requests. Please slow down.' },
   LOGIN_LOCKED: { status: 429, message: 'Too many failed sign-ins for this email. Try again later or reset the password.' },
   INTERNAL_ERROR: { status: 500, message: 'An unexpected error occurred.' },

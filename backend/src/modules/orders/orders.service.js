@@ -116,7 +116,6 @@ function toOrder(row, items, payments, tickets, refunds) {
     // The terms of sale accepted at checkout (null before checkout).
     termsVersion: row.terms_version,
     termsAcceptedAt: row.terms_accepted_at,
-    refundPolicy: row.refund_policy,
     paidAt: row.paid_at,
     cancelledAt: row.cancelled_at,
     cancelReason: row.cancel_reason,

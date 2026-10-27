@@ -74,7 +74,7 @@ function orderConfirmedEmail({ order, tickets }) {
 /** Sent after a refund (Q-02). */
 function orderRefundedEmail({ order }) {
   const greeting = order.first_name ? `Xin chào ${order.first_name},` : 'Xin chào,';
-  // Phase 18.3: a customer's cancellation refunds part of it; the rest is the fee of the event's policy.
+  // Orders cancelled by their buyer under the old refund policies (Phase 18.3, removed) got part back.
   const refunded = order.refunded_amount ?? order.total_amount;
   const fee = order.total_amount - refunded;
   const feeNote = fee > 0 ? ` Phí hủy theo chính sách của sự kiện: ${formatVnd(fee)}.` : '';

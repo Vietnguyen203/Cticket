@@ -1,17 +1,15 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { getOrderDetail, refundPayment, reissueTicketQr, retryRefund } from '../../api/admin'
+import { getOrderDetail, reissueTicketQr, retryRefund } from '../../api/admin'
 import { toApiError } from '../../api/errors'
 import { ConfirmDialog, PageHeader } from '../../admin/components'
 import { OrderStatusBadge } from '../../admin/OrderStatusBadge'
 import { Alert, Button, Card, FullPageSpinner } from '../../components/ui'
-import { refundPolicyOf } from '../../payments/refundPolicy'
 import { vnpayReason } from '../../payments/vnpayReasons'
 import { formatDateTime, formatVnd } from '../../utils/format'
 import { useAsync } from '../../utils/useAsync'
 
 type Action =
-  | { kind: 'refund'; paymentId: string; provider: string }
   | { kind: 'retry-refund'; refundId: string }
   | { kind: 'reissue'; ticketId: string; code: string }
 
@@ -24,7 +22,7 @@ const REFUND_STATUS: Record<string, [string, string]> = {
   FAILED: ['Hoàn lỗi', 'text-red-700'],
 }
 
-/** One order for an admin: lines, payments (refund), refunds (send again), tickets (new QR). */
+/** One order for an admin: lines, payments, refunds (send again), tickets (new QR). Refunds come only from a cancelled event. */
 export function OrderDetailPage() {
   const { id = '' } = useParams()
   const order = useAsync(() => getOrderDetail(id), `order:${id}`)
@@ -63,7 +61,6 @@ export function OrderDetailPage() {
           {o.termsAcceptedAt && (
             <p className="text-slate-600">
               Đồng ý Điều kiện giao dịch chung phiên bản {o.termsVersion} lúc {formatDateTime(o.termsAcceptedAt)}
-              {o.refundPolicy && <> · chính sách hủy lúc mua: {refundPolicyOf(o.refundPolicy).label}</>}
             </p>
           )}
           <table className="mt-3 min-w-full">
@@ -111,11 +108,6 @@ export function OrderDetailPage() {
                   {payment.bankCode && ` · ${payment.bankCode}`}
                   {payment.status === 'FAILED' && ` · ${vnpayReason(payment.failureCode)}`}
                 </p>
-              )}
-              {payment.status === 'SUCCESS' && o.status === 'PAID' && (
-                <Button variant="danger" className="mt-2 w-full" onClick={() => setAction({ kind: 'refund', paymentId: payment.id, provider: payment.provider })}>
-                  Hoàn tiền
-                </Button>
               )}
             </div>
           ))}
@@ -175,28 +167,6 @@ export function OrderDetailPage() {
         </table>
       </Card>
 
-      {action?.kind === 'refund' && (
-        <ConfirmDialog
-          open
-          title="Hoàn tiền toàn bộ đơn?"
-          message={`Vé của đơn hết hiệu lực, ghế được mở bán lại, khách nhận email báo hoàn tiền. Đơn đã có vé vào cổng thì không hoàn được.${
-            action.provider === 'VNPAY' ? ' Tiền được gửi trả qua VNPay ngay sau đó; theo dõi ở mục Hoàn tiền.' : ''
-          }`}
-          confirmLabel="Hoàn tiền"
-          danger
-          askReason
-          onClose={() => setAction(null)}
-          onConfirm={async (reason) => {
-            try {
-              await refundPayment(action.paymentId, reason)
-            } catch (err) {
-              throw toApiError(err)
-            }
-            setDone(action.provider === 'VNPAY' ? 'Đã hoàn đơn; yêu cầu hoàn tiền đã gửi tới VNPay.' : 'Đã hoàn tiền.')
-            order.reload()
-          }}
-        />
-      )}
       {action?.kind === 'retry-refund' && (
         <ConfirmDialog
           open

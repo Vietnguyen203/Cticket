@@ -274,11 +274,6 @@ export async function getOrderDetail(id: string): Promise<Order> {
   return (await api.get(`/orders/${id}`)).data.data.order
 }
 
-/** Full refund of a successful payment (the order's tickets stop being valid). */
-export async function refundPayment(paymentId: string, reason: string) {
-  return (await api.post(`/payments/${paymentId}/refund`, { reason })).data.data.payment
-}
-
 /** Phase 17: send a VNPay refund again after VNPay refused it or did not answer. */
 export async function retryRefund(refundId: string) {
   return (await api.post(`/payments/refunds/${refundId}/retry`)).data.data.refund
