@@ -68,9 +68,12 @@ export function EventReviews({ eventId, slug }: { eventId: string; slug: string 
                 <button
                   key={stars}
                   type="button"
+                  // A rating nobody gave has nothing to show: not a filter (it would only lead to an empty list).
+                  disabled={n === 0 && query.rating !== stars}
                   onClick={() => setQuery({ ...query, rating: query.rating === stars ? undefined : stars, page: 1 })}
-                  className={`flex w-full items-center gap-2 text-xs ${query.rating === stars ? 'font-semibold text-brand-800' : 'text-slate-600'}`}
+                  className={`flex w-full items-center gap-2 rounded-control text-xs disabled:cursor-default ${query.rating === stars ? 'font-semibold text-brand-800' : 'text-slate-600 enabled:hover:text-ink'}`}
                   aria-pressed={query.rating === stars}
+                  title={n > 0 ? (query.rating === stars ? 'Bỏ lọc' : `Chỉ xem đánh giá ${stars} sao`) : undefined}
                 >
                   <span className="w-8 text-right">{stars} ★</span>
                   <span className="h-2 flex-1 overflow-hidden rounded bg-slate-100">
@@ -106,7 +109,20 @@ export function EventReviews({ eventId, slug }: { eventId: string; slug: string 
         </div>
       )}
       {list.error && <Alert>{list.error.message}</Alert>}
-      {data && data.reviews.length === 0 && <p className="text-sm text-slate-500">Chưa có đánh giá nào{query.rating ? ` ${query.rating} sao` : ''}.</p>}
+      {data && data.reviews.length === 0 && (
+        <p className="text-sm text-slate-500">
+          {query.rating ? (
+            <>
+              Không có đánh giá {query.rating} sao.{' '}
+              <button type="button" onClick={() => setQuery({ ...query, rating: undefined, page: 1 })} className="font-semibold text-brand-700 hover:underline">
+                Xem tất cả đánh giá
+              </button>
+            </>
+          ) : (
+            'Chưa có đánh giá nào. Người đã vào cổng xem sự kiện có thể chấm sao và viết đánh giá sau buổi diễn.'
+          )}
+        </p>
+      )}
       <div className="space-y-3">
         {data?.reviews.map((review) => (
           <ReviewItem key={review.id} review={review} canReply={data.canReply} onChanged={reload} />
