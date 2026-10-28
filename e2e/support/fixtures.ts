@@ -1,11 +1,45 @@
-import { test as base, expect, type APIRequestContext, type Page } from '@playwright/test'
+import { test as base, expect, type APIRequestContext, type BrowserContext, type Page, type Video } from '@playwright/test'
 import { API_URL, E2E_TOTP_SECRET } from '../stack.mjs'
 import { loginAdmin, PASSWORD, type Account } from './api'
 import { createAdminAccount } from './db'
 import { totpCode } from './totp'
 
-/** `api`: requests to the E2E API (base /api/v1/); `admin`: an admin of this test, signed in (API). */
-export const test = base.extend<{ api: APIRequestContext; admin: Account }>({
+/**
+ * `api`: requests to the E2E API (base /api/v1/); `admin`: an admin of this test, signed in (API).
+ * `filmWindows` (automatic): with E2E_VIDEO=1, the windows a test opens itself
+ * (browser.newContext: buyer, organizer, admin side by side) are filmed too and
+ * attached to the report as "cửa sổ 1", "cửa sổ 2"… The `page` fixture is
+ * filmed by the `video` option of playwright.config.ts.
+ */
+export const test = base.extend<{ api: APIRequestContext; admin: Account; filmWindows: void }>({
+  filmWindows: [
+    async ({ browser }, use, testInfo) => {
+      if (!process.env.E2E_VIDEO) return use()
+      const newContext = browser.newContext.bind(browser)
+      const contexts: BrowserContext[] = []
+      const videos: Video[] = []
+      browser.newContext = async (options = {}) => {
+        const context = await newContext({ ...options, recordVideo: { dir: testInfo.outputPath('videos') } })
+        context.on('page', (page) => {
+          const video = page.video()
+          if (video) videos.push(video)
+        })
+        contexts.push(context)
+        return context
+      }
+      try {
+        await use()
+      } finally {
+        browser.newContext = newContext
+        // A video is written when its window closes.
+        await Promise.all(contexts.map((context) => context.close().catch(() => {})))
+        for (const [index, video] of videos.entries()) {
+          await testInfo.attach(`cửa sổ ${index + 1}`, { path: await video.path(), contentType: 'video/webm' })
+        }
+      }
+    },
+    { auto: true },
+  ],
   api: async ({ playwright }, use) => {
     const api = await playwright.request.newContext({ baseURL: `${API_URL}/api/v1/` })
     await use(api)
