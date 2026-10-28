@@ -55,6 +55,8 @@ async function claimStep(db, userId, step) {
 async function deleteTwoFactor(db, userId) {
   const { rowCount } = await db.query(`DELETE FROM user_totp WHERE user_id = $1`, [userId]);
   await db.query(`DELETE FROM user_recovery_codes WHERE user_id = $1`, [userId]);
+  // The browsers that skipped the code ("Ghi nhớ đăng nhập") must not skip a new one.
+  await db.query(`DELETE FROM trusted_devices WHERE user_id = $1`, [userId]);
   return rowCount === 1;
 }
 

@@ -9,6 +9,7 @@ const { sendOtpEmail } = require('./otp.service');
 const { revokeAllRefreshTokensOfUser } = require('./auth.repository');
 const twoFactor = require('./two-factor.service');
 const loginGuard = require('./login-guard');
+const trustedDevices = require('./trusted-devices');
 const mailer = require('../../mail/mailer');
 const { loginLockedEmail } = require('../../mail/templates');
 
@@ -26,6 +27,8 @@ module.exports = {
   enableKnownTotpSecret: twoFactor.enableKnownSecret,
   /** Queue the "two-factor was reset" email for a user row (email, first_name). */
   alertTwoFactorReset: (user) => twoFactor.queueAlert(user, twoFactor.ALERT.RESET),
+  /** "Ghi nhớ đăng nhập": every browser of the user asks for the code again (caller's transaction). */
+  forgetTrustedDevices: trustedDevices.forgetDevices,
   // Phase 18.1
   clearLoginLock: loginGuard.clear,
   loginLockedUntilOf: loginGuard.lockedUntilOf,

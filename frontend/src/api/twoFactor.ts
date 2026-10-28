@@ -1,7 +1,6 @@
 import { COOKIE_TRANSPORT } from '../auth/session'
-import { isRemembered } from '../auth/remember'
 import { api, unwrap } from './client'
-import type { LoginResult, TwoFactorSetup, TwoFactorStatus } from './types'
+import type { LoginResult, TrustedDevice, TwoFactorSetup, TwoFactorStatus } from './types'
 
 /** Phase 15: my two-factor settings (/users/me/2fa). */
 
@@ -16,12 +15,20 @@ export async function startTwoFactorSetup(password: string): Promise<TwoFactorSe
 
 /**
  * The first code: two-factor on. The API ends every other session and opens
- * a new one for this browser: a new access token, and a new refresh cookie
- * (kept for 7 days again if "remember me" was chosen).
+ * a new one for this browser: a new access token, and a new refresh cookie.
  */
 export function confirmTwoFactorSetup(code: string): Promise<LoginResult & { recoveryCodes: string[] }> {
-  const headers = isRemembered() ? { ...COOKIE_TRANSPORT, 'X-Auth-Remember': '1' } : COOKIE_TRANSPORT
-  return unwrap(api.post('/users/me/2fa/confirm', { code }, { headers }))
+  return unwrap(api.post('/users/me/2fa/confirm', { code }, { headers: COOKIE_TRANSPORT }))
+}
+
+/** "Ghi nhớ đăng nhập": the browsers that skip the code. */
+export async function listTrustedDevices(): Promise<TrustedDevice[]> {
+  return (await api.get('/users/me/2fa/trusted-devices')).data.data.devices
+}
+
+/** Every browser asks for the code again (this one's cookie is cleared too). */
+export async function forgetTrustedDevices(): Promise<void> {
+  await api.delete('/users/me/2fa/trusted-devices', { headers: COOKIE_TRANSPORT })
 }
 
 export async function disableTwoFactor(password: string, code: string): Promise<TwoFactorStatus> {

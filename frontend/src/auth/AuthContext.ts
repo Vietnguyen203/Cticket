@@ -17,7 +17,7 @@ export interface AuthValue {
    */
   login: (email: string, password: string, remember?: boolean) => Promise<MfaChallenge | null>
   /** Start using a session from the two-factor step. */
-  completeLogin: (result: LoginResult, remember: boolean) => Promise<void>
+  completeLogin: (result: LoginResult) => Promise<void>
   /** `notice`: a message the layout shows once afterwards (e.g. the account was deleted). */
   logout: (notice?: string) => Promise<void>
   setUser: (user: User) => void

@@ -68,6 +68,7 @@ async function changeStatus(context, adminId, userId, { status, reason }) {
         if (admins.filter((id) => id !== userId).length === 0) throw new AppError('LAST_ADMIN');
       }
       await endSessionsAfterCommit(client, userId);
+      await auth.forgetTrustedDevices(client, userId);
     } else if (user.status === USER_STATUS.SUSPENDED) {
       next = user.email_verified_at ? USER_STATUS.ACTIVE : USER_STATUS.PENDING_VERIFICATION;
     } else {

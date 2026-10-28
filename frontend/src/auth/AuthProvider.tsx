@@ -4,7 +4,6 @@ import { getMe } from '../api/users'
 import type { LoginResult, MfaChallenge, Role, User } from '../api/types'
 import { AuthContext, type AuthStatus, type AuthValue } from './AuthContext'
 import { decodeJwt } from './jwt'
-import { isRemembered, setRemembered } from './remember'
 import { getAccessToken, onAccessTokenChange, refreshAccessToken, setAccessToken, takeSessionEndReason } from './session'
 import { isFreshOpen, type PresenceMessage } from './tabPresence'
 
@@ -17,13 +16,14 @@ const channel = typeof BroadcastChannel === 'undefined' ? null : new BroadcastCh
 
 /**
  * The session at page load, decided ONCE (React may run start-up effects
- * twice): without "remember me", coming back after closing every tab of the
- * site ends the session (logout revokes it on the server too).
+ * twice): coming back after closing every tab of the site ends the session,
+ * always (logout revokes it on the server too). "Ghi nhớ đăng nhập" only
+ * spares the two-factor code on this browser for 30 days (API device cookie).
  */
 let startup: Promise<string | null> | null = null
 function startupToken(): Promise<string | null> {
   startup ??= (async () => {
-    if (!isRemembered() && (await isFreshOpen(channel))) {
+    if (await isFreshOpen(channel)) {
       await authApi.logout().catch(() => undefined)
       return null
     }
@@ -97,8 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [restore])
 
   /** A session obtained (password alone, or after the two-factor step): start using it. */
-  const completeLogin = useCallback(async (result: LoginResult, remember: boolean) => {
-    setRemembered(remember)
+  const completeLogin = useCallback(async (result: LoginResult) => {
     setAccessToken(result.accessToken)
     // The profile carries the permissions (what menus to show); fall back to the login answer.
     setUser(await getMe().catch(() => result.user))
@@ -112,7 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (email: string, password: string, remember = false): Promise<MfaChallenge | null> => {
       const result = await authApi.login(email, password, remember)
       if (authApi.isMfaChallenge(result)) return result
-      await completeLogin(result, remember)
+      await completeLogin(result)
       return null
     },
     [completeLogin],
@@ -126,7 +125,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Offline or already logged out: forget the session here anyway.
     } finally {
       setAccessToken(null)
-      setRemembered(false)
       setUser(null)
       setStatus('anonymous')
       if (afterwards) setNotice(afterwards)

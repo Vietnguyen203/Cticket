@@ -156,6 +156,7 @@ async function deletePersonalRows(db, userId) {
     `DELETE FROM user_tokens WHERE user_id = $1`,
     `DELETE FROM user_recovery_codes WHERE user_id = $1`,
     `DELETE FROM user_totp WHERE user_id = $1`,
+    `DELETE FROM trusted_devices WHERE user_id = $1`,
     `DELETE FROM user_roles WHERE user_id = $1`,
     `DELETE FROM event_staff WHERE user_id = $1`,
     `DELETE FROM notifications WHERE user_id = $1`,

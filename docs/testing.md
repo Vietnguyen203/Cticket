@@ -9,7 +9,7 @@ Dự án có 4 tầng kiểm thử, từ nhanh / hẹp tới chậm / rộng:
 | End-to-end (trình duyệt) | Playwright (Chromium, desktop + điện thoại) | **29 kịch bản** | máy dev, CI | ≈ 1 phút |
 | Tải (load) | k6 | **5 kịch bản**, số người dùng chọn khi chạy | chạy tay | 1–5 phút / kịch bản |
 
-Danh sách kịch bản test theo chức năng (120 test case, gồm cả những case kiểm tra tay) và test tự động tương ứng: [`docs/test-scenarios.md`](test-scenarios.md). Test tay bằng thao tác trên web, từng bước theo thứ tự (120 bước, 16 phiên): [`docs/ui-test-guide.md`](ui-test-guide.md).
+Danh sách kịch bản test theo chức năng (121 test case, gồm cả những case kiểm tra tay) và test tự động tương ứng: [`docs/test-scenarios.md`](test-scenarios.md). Test tay bằng thao tác trên web, từng bước theo thứ tự (121 bước, 16 phiên): [`docs/ui-test-guide.md`](ui-test-guide.md).
 
 Mỗi lần push hoặc mở pull request, **GitHub Actions** chạy 3 tầng đầu (`.github/workflows/ci.yml`). Load test chạy tay vì lâu và số đo phụ thuộc máy.
 
@@ -28,7 +28,7 @@ Test chạy trên **PostgreSQL và Redis thật** (không giả lập database),
 |---|---|---|
 | Đăng ký, đăng nhập, OTP, refresh token xoay vòng, cookie | `auth`, `redis-auth` | 37 |
 | **Khóa đăng nhập** (Phase 18.1): 5 lần sai → khóa, gấp đôi, email không tồn tại khóa y hệt, sai mã 2FA cũng tính, đặt lại mật khẩu / admin mở khóa | `login-lockout` | 7 |
-| Xác thực hai lớp: TOTP (test vector RFC 6238), mã hóa secret, đăng nhập 2 bước, mã khôi phục, refresh chặn phiên thiếu 2FA, admin đặt lại | `two-factor`, `totp` | 32 |
+| Xác thực hai lớp: TOTP (test vector RFC 6238), mã hóa secret, đăng nhập 2 bước, mã khôi phục, refresh chặn phiên thiếu 2FA, admin đặt lại; "Ghi nhớ đăng nhập" (cookie thiết bị 30 ngày bỏ qua mã, không cho admin, quên khi tắt 2FA / xin quên; phiên luôn là cookie phiên) | `two-factor`, `totp` | 33 |
 | Schema, ràng buộc DB, transaction | `schema`, `transaction`, `databaseErrors` | 31 |
 | Sự kiện, suất, hạng vé, duyệt, danh mục, nhà tổ chức, địa điểm đề xuất | `events`, `catalog`, `organizers`, `venue-proposals` | 34 |
 | Sơ đồ ghế, tồn kho, khóa / mở ghế | `inventory` | 16 |
@@ -138,7 +138,7 @@ Admin bắt buộc xác thực hai lớp (Phase 15): admin của môi trường 
 | **Ban tổ chức tạo sự kiện hoàn toàn bằng giao diện** → admin duyệt → khách thấy và chọn ghế | các form quản trị |
 | Soát vé trên **điện thoại** | vào 1 lần, quét lại bị từ chối, lịch sử |
 | Admin hoàn tiền | vé hết hiệu lực, báo cáo doanh thu của ban tổ chức đổi đúng |
-| **Xác thực hai lớp** (2 test) | admin mới bị buộc thiết lập (đọc khóa trên trang, tính mã như điện thoại), lưu mã khôi phục, đăng nhập lại bằng mã khôi phục; khách tự bật ở trang tài khoản rồi đăng nhập bằng mã |
+| **Xác thực hai lớp** (2 test) | admin mới bị buộc thiết lập (đọc khóa trên trang, tính mã như điện thoại), lưu mã khôi phục, đăng nhập lại bằng mã khôi phục; khách tự bật ở trang tài khoản rồi đăng nhập bằng mã, có "Ghi nhớ đăng nhập"; đóng trình duyệt mở lại → phải đăng nhập lại nhưng không bị hỏi mã; "Quên các thiết bị" → hỏi mã lại |
 | Phân quyền (3 test) | khách không vào được trang admin; ban tổ chức không mở được sự kiện của người khác; chưa đăng nhập → trang đăng nhập rồi quay lại |
 
 E2E đã tìm ra 2 lỗi giao diện (trang chỉnh sửa mở được sự kiện của nhà tổ chức khác; một ô nhập không gắn nhãn) và 1 điểm yếu khi máy quá tải (mã OTP chỉ nằm trong Redis) — xem `docs/phase-13-testing-design.md`, mục 8.

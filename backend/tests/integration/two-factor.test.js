@@ -165,18 +165,67 @@ describe('logging in', () => {
     await post('/auth/login/2fa', { mfaToken, code: code(ADMIN_TOTP_SECRET) }).expect(200); // nothing was used up
   });
 
-  test('web app (cookie mode): "remember me" chosen at step 1 decides the cookie of step 2', async () => {
+});
+
+// "Ghi nhớ đăng nhập": the session ends with the browser; a browser that passed
+// the code step with the box ticked skips the code for 30 days.
+describe('remembered browsers (trusted devices)', () => {
+  const web = (req) => req.set('X-Auth-Transport', 'cookie');
+  const cookieOf = (res, name) => (res.headers['set-cookie'] ?? []).find((c) => c.startsWith(`${name}=`));
+  const valueOf = (setCookie) => setCookie.split(';')[0].split('=')[1];
+  const step1 = ({ email, password }, { remember = false, device } = {}) => {
+    const req = web(request(app).post('/api/v1/auth/login'));
+    if (device) req.set('Cookie', `etp_device=${device}`);
+    return req.send({ email, password, remember }).expect(200);
+  };
+  const step2 = (mfaToken, answer) =>
+    web(request(app).post('/api/v1/auth/login/2fa')).set('User-Agent', 'Mozilla/5.0 (test) Chrome/150').send({ mfaToken, ...answer }).expect(200);
+  const devicesOf = async (email) => (await query(`SELECT count(*)::int AS n FROM trusted_devices WHERE user_id = $1`, [await userIdOf(email)])).rows[0].n;
+
+  test('ticked: the code once, then this browser signs in with the password alone; the session cookie never outlives the browser', async () => {
+    const user = await customerWithTwoFactor();
+    const second = await step2((await step1(user, { remember: true })).body.data.mfaToken, { code: code(user.secret, 1) });
+    expect(cookieOf(second, 'etp_refresh')).not.toMatch(/Max-Age|Expires/);
+    const deviceCookie = cookieOf(second, 'etp_device');
+    expect(deviceCookie).toMatch(/Max-Age=2592000/); // 30 days
+    expect(deviceCookie).toMatch(/HttpOnly/);
+    expect(deviceCookie).toMatch(/SameSite=Strict/);
+    expect(deviceCookie).toMatch(/Path=\/api\/v1\/auth/);
+    const device = valueOf(deviceCookie);
+
+    // The same browser after it was closed: password only, a full session (and still a session cookie).
+    const again = await step1(user, { device });
+    expect(again.body.data).not.toHaveProperty('mfaRequired');
+    expect(again.body.data.accessToken).toEqual(expect.any(String));
+    expect(cookieOf(again, 'etp_refresh')).not.toMatch(/Max-Age|Expires/);
+    // Another browser, or a made-up cookie: the code is asked.
+    expect((await step1(user)).body.data.mfaRequired).toBe(true);
+    expect((await step1(user, { device: 'A'.repeat(43) })).body.data.mfaRequired).toBe(true);
+    // Not ticked: no device cookie.
+    const plain = await step2((await step1(user)).body.data.mfaToken, { recoveryCode: user.recoveryCodes[0] });
+    expect(cookieOf(plain, 'etp_device')).toBeUndefined();
+
+    // Listed on the account page, then "Quên các thiết bị": the code is asked again.
+    const token = again.body.data.accessToken;
+    const list = await request(app).get('/api/v1/users/me/2fa/trusted-devices').set(bearer(token)).expect(200);
+    expect(list.body.data.devices).toEqual([expect.objectContaining({ userAgent: 'Mozilla/5.0 (test) Chrome/150', expiresAt: expect.any(String) })]);
+    const forget = await web(request(app).delete('/api/v1/users/me/2fa/trusted-devices')).set(bearer(token)).expect(200);
+    expect(cookieOf(forget, 'etp_device')).toMatch(/Expires=Thu, 01 Jan 1970/);
+    expect((await step1(user, { device })).body.data.mfaRequired).toBe(true);
+  });
+
+  test('admins always type the code; turning two-factor off forgets the browsers', async () => {
     const email = await newAdmin({ totpSecret: ADMIN_TOTP_SECRET });
-    const cookieMode = (req) => req.set('X-Auth-Transport', 'cookie');
-    const step = async (remember, steps) => {
-      const { mfaToken } = (await cookieMode(request(app).post('/api/v1/auth/login')).send({ email, password: PASSWORD, remember })).body.data;
-      return cookieMode(request(app).post('/api/v1/auth/login/2fa')).send({ mfaToken, code: code(ADMIN_TOTP_SECRET, steps) }).expect(200);
-    };
-    const remembered = await step(true, 0);
-    expect(remembered.body.data.refreshToken).toBeUndefined();
-    expect(remembered.headers['set-cookie'][0]).toMatch(/^etp_refresh=.*Max-Age=604800/);
-    const forgotten = await step(false, 1);
-    expect(forgotten.headers['set-cookie'][0]).not.toMatch(/Max-Age|Expires/);
+    const adminLogin = await step2((await step1({ email, password: PASSWORD }, { remember: true })).body.data.mfaToken, { code: code(ADMIN_TOTP_SECRET) });
+    expect(cookieOf(adminLogin, 'etp_device')).toBeUndefined();
+    expect(await devicesOf(email)).toBe(0);
+
+    const user = await customerWithTwoFactor();
+    const trusted = await step2((await step1(user, { remember: true })).body.data.mfaToken, { recoveryCode: user.recoveryCodes[0] });
+    expect(cookieOf(trusted, 'etp_device')).toBeDefined();
+    expect(await devicesOf(user.email)).toBe(1);
+    await post('/users/me/2fa/disable', { password: user.password, code: code(user.secret, 1) }, trusted.body.data.accessToken).expect(200);
+    expect(await devicesOf(user.email)).toBe(0);
   });
 });
 

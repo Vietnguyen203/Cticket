@@ -18,6 +18,7 @@ const repository = require('./two-factor.repository');
 const authRepository = require('./auth.repository');
 const tokens = require('./auth.tokens');
 const sessions = require('./sessions');
+const trustedDevices = require('./trusted-devices');
 const denylist = require('./denylist');
 const loginGuard = require('./login-guard');
 
@@ -194,7 +195,10 @@ async function verifyLogin({ mfaToken, code, recoveryCode }, meta) {
   if (!code) {
     await queueAlert(user, ALERT.RECOVERY_CODE_USED, { codesLeft: await repository.countRecoveryCodesLeft(pool, user.id) });
   }
-  return { session, remember: claims.remember };
+  // "Ghi nhớ đăng nhập" ticked at step 1: this browser skips the code from now on (not for admins).
+  const deviceToken =
+    claims.remember && !isRequiredFor(roles) ? await trustedDevices.trustDevice(pool, { userId: user.id, userAgent: meta?.userAgent }) : null;
+  return { session, deviceToken };
 }
 
 /** POST /auth/login/2fa/setup: an admin without two-factor gets a secret to scan. */
@@ -222,7 +226,7 @@ async function confirmLoginSetup({ mfaToken, code }, meta) {
   if (!result) await failWrongCode(claims, user);
   await loginGuard.clear(pool, user.email);
   await queueAlert(user, ALERT.ENABLED);
-  return { ...result, remember: claims.remember };
+  return result;
 }
 
 // ---------------------------------------------------------------------------

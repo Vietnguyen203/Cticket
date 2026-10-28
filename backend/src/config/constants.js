@@ -43,6 +43,9 @@ const TWO_FACTOR = Object.freeze({
   MFA_TOKEN_TTL_SECONDS: 300,
   MAX_ATTEMPTS: 5,
   RECOVERY_CODES: 10,
+  // "Ghi nhớ đăng nhập": a browser that passed the code step skips it this long (trusted-devices.js).
+  TRUSTED_DEVICE_DAYS: 30,
+  TRUSTED_DEVICES_PER_USER: 10, // the oldest is forgotten beyond this
 });
 
 // Phase 18.1: wrong passwords (and two-factor codes) per email before a pause.
