@@ -1,8 +1,8 @@
 # Hướng dẫn test chức năng trên giao diện
 
-> Bản 22/10/2026 (đã có danh sách suất diễn, nghệ sĩ khách mời, ô giờ gõ theo 24 giờ).
+> Bản 28/10/2026 (vé không hủy, không hoàn theo yêu cầu: chỉ hoàn khi sự kiện bị hủy, phiên 9 và 16; ô số tiền có dấu chấm hàng nghìn).
 > Dùng để **test tay toàn bộ chức năng bằng cách thao tác trên web**, theo thứ tự, từ một hệ thống trống tới khi đã có đơn, vé, soát vé, đánh giá, hoàn tiền.
-> Mỗi bước ghi mã test case tương ứng trong [`test-scenarios.md`](test-scenarios.md) (danh sách đầy đủ 111 case và test tự động bảo vệ từng case).
+> Mỗi bước ghi mã test case tương ứng trong [`test-scenarios.md`](test-scenarios.md) (danh sách đầy đủ 113 case và test tự động bảo vệ từng case).
 
 ## 1. Cách dùng
 
@@ -68,7 +68,7 @@ Mật khẩu của các tài khoản test do người test tự đặt và tự 
 | Danh mục | `Hòa nhạc test` | 2.1 |
 | Địa điểm | `Nhà hát Test`, TP. Hồ Chí Minh, **sức chứa 150**: **Khu A** ghế ngồi, hàng A–E, ghế 1–10 (50 ghế); **Khu đứng** 100 chỗ | 2.2–2.4 |
 | Mã giảm giá | `TEST10`: giảm 10% | 2.5 |
-| Sự kiện 1 | `Đêm nhạc Test <ngày>`: 1 suất **30 ngày sau**, hạng `VIP` 1.500.000 (ghế) và `Vé đứng` 300.000; chính sách hủy **Tiêu chuẩn** | 3.4–3.12 |
+| Sự kiện 1 | `Đêm nhạc Test <ngày>`: 1 suất **30 ngày sau**, hạng `VIP` 1.500.000 (ghế) và `Vé đứng` 300.000 | 3.4–3.12 |
 | Sự kiện 2 | `Đêm soát vé <ngày>`: 1 suất bắt đầu **2 giờ sau lúc tạo**, chỉ `Vé đứng` **2 vé** | 3.13–3.15 |
 
 Thêm ngày test vào tên (ví dụ `Đêm nhạc Test 22-10`) để phân biệt với dữ liệu khác và để dọn sau (mục 5).
@@ -115,13 +115,13 @@ Hồ sơ trình duyệt "Admin": đăng nhập `admin@etp.local`. Menu "Quản t
 | 3.1 · ORG-01 ★ | Hồ sơ trình duyệt "Ban tổ chức": đăng ký `ten+btc@…` (như 1.1–1.2) → chân trang hoặc trang tài khoản: "Trở thành ban tổ chức" → "Tên tổ chức / công ty" → "Gửi đăng ký" | "Đơn đã gửi, đang chờ quản trị viên duyệt." | |
 | 3.2 · ORG-01 ★ | Admin: "Nhà tổ chức" → lọc "Chờ duyệt" → dòng của tổ chức vừa gửi → "Duyệt" | Trạng thái "Hoạt động" | |
 | 3.3 · ORG-01 ★ | Ban tổ chức: tải lại trang đăng ký → "Cập nhật quyền ngay" | "Đã được duyệt: bạn có thể tạo sự kiện."; đầu trang có menu "Ban tổ chức" | |
-| 3.4 · ORG-02 ★ | "Ban tổ chức" → "Tạo sự kiện": "Tên sự kiện" `Đêm nhạc Test <ngày>`, "Mô tả", chọn danh mục `Hòa nhạc test`, "Chính sách hủy đơn của khách": **Tiêu chuẩn** → "Tạo và tiếp tục" | Sang thẻ "Buổi diễn & vé"; sự kiện ở trạng thái nháp | |
+| 3.4 · ORG-02 ★ | "Ban tổ chức" → "Tạo sự kiện": "Tên sự kiện" `Đêm nhạc Test <ngày>`, "Mô tả", chọn danh mục `Hòa nhạc test` → "Tạo và tiếp tục" | Sang thẻ "Buổi diễn & vé"; sự kiện ở trạng thái nháp; form không có ô chính sách hủy | |
 | 3.5 · ORG-03 | Thẻ "Thông tin" → "Ảnh bìa": tải một ảnh **dọc** từ máy | Hộp thoại căn ảnh mở: kéo để dịch, thu phóng; "Hiện trọn ảnh" thì thấy cả ảnh trong khung 16:9 | |
 | 3.6 · ORG-03 | "Dùng ảnh này" → "Lưu thông tin" | Ảnh mới hiện ở ô xem trước; "Đã lưu." | |
 | 3.7 · ORG-04 | Đổi tên một file `.txt` thành `.png` rồi tải làm ảnh | Bị từ chối, báo file không phải ảnh | |
 | 3.8 · ORG-05 ★ | Thẻ "Buổi diễn & vé" → "Buổi diễn": chọn địa điểm `Nhà hát Test — TP. Hồ Chí Minh`; "Ngày diễn" **30 ngày sau**, "Giờ bắt đầu" gõ `19:00` (24 giờ; gõ `1900` cũng được), "Giờ kết thúc" `21:00` (để trống = 3 tiếng sau) → "Lưu buổi diễn" | Dòng buổi diễn đã lưu; không có nút thêm buổi thứ hai (mỗi sự kiện một buổi diễn); phần "Nghệ sĩ khách mời" và thẻ hạng vé hiện bên dưới | |
 | 3.9 · ORG-05 ★ | "Tổng số người tham dự": ô đã điền sẵn sức chứa của địa điểm; nhập `100` → "Lưu tổng" | Dòng "Sức chứa địa điểm: … · các khu: … chỗ"; "Đã xếp 0 / 100 người · … · còn lại 100"; bảng "Hạng vé theo khu của địa điểm" liệt kê các khu có sẵn | |
-| 3.10 · ORG-05 ★ | Dòng "Khu A" (khu ngồi, 50 ghế): "Tên hạng" `VIP`, "Giá (VND)" `1500000` → "Gán 50 ghế" | Dòng Khu A hiện "VIP · 1.500.000 ₫ · 50 ghế" và nút "Bỏ gán"; bảng hạng vé: VIP "Ghế ngồi · Khu A: hàng A–E"; "Đã xếp 50 / 100" | |
+| 3.10 · ORG-05 ★ | Dòng "Khu A" (khu ngồi, 50 ghế): "Tên hạng" `VIP`, "Giá (VND)" gõ `1500000` (ô tự hiện `1.500.000`) → "Gán 50 ghế" | Dòng Khu A hiện "VIP · 1.500.000 ₫ · 50 ghế" và nút "Bỏ gán"; bảng hạng vé: VIP "Ghế ngồi · Khu A: hàng A–E"; "Đã xếp 50 / 100" | |
 | 3.11 · ORG-05 ★ | Dòng "Khu đứng" (100 chỗ): "Tên hạng" `Vé đứng`, "Giá (VND)" `300000`, "Số vé" đã điền sẵn `50` (phần còn lại của tổng; khu chứa 100), thử sửa thành `100` rồi trả về `50` → "Gán" | Với 100: báo "Chỉ còn 50 người chưa xếp"; với 50: "Đã xếp 100 / 100 · còn lại 0"; danh sách "sẵn sàng gửi duyệt" ở đầu trang không còn mục đỏ | |
 | 3.12 · ORG-06 ★ | "Gửi duyệt" → xác nhận "Gửi duyệt". Admin: "Sự kiện" → mở sự kiện → "Duyệt và mở bán" → xác nhận | Ban tổ chức thấy "Đã gửi duyệt." rồi "Chờ duyệt"; sau khi admin duyệt: "Đang bán" | |
 | 3.13 · ORG-02 ★ | Ban tổ chức tạo **sự kiện 2**: `Đêm soát vé <ngày>`, danh mục `Hòa nhạc test`, chính sách mặc định → "Tạo và tiếp tục" | Sự kiện nháp | |
@@ -139,7 +139,7 @@ Hồ sơ "Khách A".
 | 4.2 · CAT-02 ★ | Ô tìm kiếm: gõ `Đêm nhạc Test` → tìm | Chỉ hiện sự kiện khớp; dòng "N sự kiện cho …" đúng | |
 | 4.3 · CAT-03 | Lọc thành phố `TP. Hồ Chí Minh`, bấm danh mục `Hòa nhạc test`; chép URL sang tab khác; rồi "Xóa bộ lọc" | Kết quả lọc đúng; tab kia (cùng URL) cho cùng kết quả; "Xóa bộ lọc" về lại tất cả | |
 | 4.4 · CAT-04 | Tìm `khongcosukiennay` | "Không có sự kiện nào phù hợp" và nút "Xem tất cả sự kiện" | |
-| 4.5 · CAT-05 ★ | Mở `Đêm nhạc Test` | Ảnh bìa, tên, thời gian, địa điểm, ban tổ chức, "Giá vé từ 300.000", lịch diễn có giá từng hạng, "Chính sách hủy: Tiêu chuẩn" | |
+| 4.5 · CAT-05 ★ | Mở `Đêm nhạc Test` | Ảnh bìa, tên, thời gian, địa điểm, ban tổ chức, "Giá vé từ 300.000", lịch diễn có giá từng hạng, khung "Vé không hủy, không hoàn" (hủy sự kiện thì hoàn 100% tự động) | |
 | 4.6 · CAT-07 | Mở `http://localhost:8080/events/khong-ton-tai` | "Không tìm thấy sự kiện" | |
 
 ### Phiên 5. Mua vé: giữ chỗ, mã giảm giá, thanh toán, vé
@@ -204,15 +204,17 @@ Sự kiện 2 chỉ có 2 vé đứng.
 | 8.6 · WTL-03 | A mở lại trang chọn chỗ của `Đêm soát vé`, thử giữ vé | Không giữ được: vé đang được dành cho người trong danh sách chờ | |
 | 8.7 · WTL-02 ★ | B → "Đặt ngay" → thêm 2 vé đứng → "Giữ chỗ (10 phút)" → "Tiếp tục thanh toán" → "Giả lập thanh toán thành công" | B có 2 vé `Đêm soát vé`; "Danh sách chờ" ghi "Đã đặt" | |
 
-### Phiên 9. Hủy đơn, hoàn tiền
+### Phiên 9. Không hủy vé, không hoàn tiền theo yêu cầu
+
+Vé đã trả không hủy, không hoàn theo yêu cầu của khách hay admin; tiền chỉ được hoàn khi sự kiện hoặc suất diễn bị hủy (phiên 16).
 
 | Bước | Thao tác | Kết quả mong đợi | KQ |
 |---|---|---|---|
-| 9.1 · REF-01 ★ | A mở đơn đã trả ở bước 7.6 (1 ghế VIP C01, 1.500.000) | Có dòng: hủy bây giờ được hoàn **1.200.000 (80%)**, phí hủy **300.000** | |
-| 9.2 · REF-01 ★ | "Hủy đơn và hoàn tiền" → hộp thoại "Hủy đơn" | Đơn "Đã hoàn tiền"; mục "Hoàn tiền" ghi 1.200.000 "Đã hoàn"; vé hết hiệu lực; A nhận email; ghế C01 trống lại trên sơ đồ | |
-| 9.3 · REF-04 | B mở đơn `Đêm soát vé` | Không có nút hủy (chính sách sự kiện 2 và giờ diễn không cho phép), có ghi lý do | |
-| 9.4 · REF-05 ★ | Admin: "Đơn hàng" → mở đơn 3 vé của A (bước 5.9) → "Hoàn tiền" → "Lý do" → "Hoàn tiền" | "Đã hoàn tiền"; 3 vé của A hết hiệu lực ("Vé của tôi": không còn QR) | |
-| 9.5 · ORG-08 ★ | Ban tổ chức: `Đêm nhạc Test` → thẻ "Doanh thu" | "Doanh thu", "Vé đã bán", "Hoàn tiền", phí hủy khớp các bước 9.2 và 9.4 (300.000 phí hủy được giữ lại) | |
+| 9.1 · REF-01 ★ | A mở đơn đã trả ở bước 7.6 (1 ghế VIP C01) | Đơn "Đã thanh toán"; **không** có nút hủy đơn hay hoàn tiền | |
+| 9.2 · REF-09 | Trang `Đêm nhạc Test` → khung "Vé không hủy, không hoàn" → "Điều kiện hoàn tiền" | Mở /dieu-khoan đúng "Điều 5. Không hủy vé, hoàn tiền khi sự kiện bị hủy" | |
+| 9.3 · REF-01 | B mở đơn `Đêm soát vé` | Không có nút hủy đơn | |
+| 9.4 · REF-02 ★ | Admin: "Đơn hàng" → mở đơn 3 vé của A (bước 5.9) | Mục "Thanh toán" **không** có nút "Hoàn tiền"; đơn vẫn "Đã thanh toán", 3 vé còn QR | |
+| 9.5 · ORG-08 ★ | Ban tổ chức: `Đêm nhạc Test` → thẻ "Doanh thu" | "Doanh thu" và "Vé đã bán" gồm các đơn đã trả của A (bước 5.9 và 7.6); "Hoàn tiền" chưa có đơn nào | |
 
 ### Phiên 10. Soát vé ở cổng (điện thoại)
 
@@ -226,7 +228,7 @@ Cổng mở từ **3 giờ trước giờ diễn**: sự kiện 2 (bắt đầu 
 | 10.4 · CHK-02 ★ | "Tên cổng của máy này" `Cổng 1` → "Quét vé" ở `Đêm soát vé` → cho phép dùng camera | Trang quét: "Cổng: Cổng 1", camera bật | |
 | 10.5 · CHK-02 ★ | Máy tính, hồ sơ B: "Vé của tôi" → mở vé thứ nhất của `Đêm soát vé` (mã QR lên màn hình). Đưa điện thoại quét | Màn hình **xanh** "Mời vào", mã vé, "Đã vào 1 / 2" | |
 | 10.6 · CHK-03 ★ | Chạm để quét tiếp, quét lại **đúng vé đó** (sau 3 giây) | Màn hình **đỏ** "Vé đã được sử dụng", lúc nào, "Tại: Cổng 1" | |
-| 10.7 · CHK-05 | Mở file PDF đã tải ở bước 5.12 (vé sự kiện 1 của A, đã hoàn ở 9.4) và quét mã QR trong đó | Màn hình đỏ kèm lý do (vé không thuộc suất này / đã hoàn) | |
+| 10.7 · CHK-05 | Mở file PDF đã tải ở bước 5.12 (vé sự kiện 1 của A) và quét mã QR trong đó | Màn hình đỏ kèm lý do (vé không thuộc suất này) | |
 | 10.8 · CHK-06 | Mở lịch sử soát vé | "Đã vào 1 / 2 vé"; dòng của vé, đúng cổng và giờ | |
 | 10.9 · CHK-04 | (Nếu có 2 điện thoại) Hai máy cùng quét vé thứ hai của B cùng lúc | Đúng 1 máy "Mời vào", máy kia "đã sử dụng"; số "Đã vào" giống nhau trên cả hai | |
 
@@ -248,7 +250,7 @@ Không có điện thoại: mở https://localhost:8443 trên máy tính có web
 | 12.1 · ORG-07 ★ | `Đêm nhạc Test` → "Thông tin": sửa mô tả, **chưa lưu** | "Có thay đổi chưa lưu." | |
 | 12.2 · ORG-07 ★ | "Lưu thông tin" | "Đã lưu."; trang sự kiện công khai hiện mô tả mới | |
 | 12.3 · ORG-07 | Xem các ô tên, danh mục, giờ suất diễn | Bị khóa khi sự kiện đang bán | |
-| 12.4 · ORG-07 | Đổi "Chính sách hủy đơn của khách" sang Linh hoạt → lưu | Trang sự kiện ghi "Chính sách hủy: Linh hoạt" | |
+| 12.4 · ORG-07 | Thẻ "Thông tin": tìm chính sách hủy | Không có ô chọn chính sách hủy; chỉ có link "Xem Điều kiện giao dịch chung (Điều 5, Điều 6)" (mở tab mới) | |
 | 12.5 · BKG-08 | Thẻ "Buổi diễn & vé" → "Đóng bán" suất của sự kiện 1; khách mở trang sự kiện; rồi "Mở bán" lại | Khách thấy "Đã đóng bán", không có nút chọn chỗ; mở bán lại thì có | |
 | 12.6 · ORG-11 ★ | Thẻ "Thông tin" → "Nghệ sĩ khách mời": ô 1 `Hà Anh Tuấn`; "+ Thêm nghệ sĩ": `Phương Linh`; "Lưu danh sách nghệ sĩ". Mở trang sự kiện công khai | "Đã lưu danh sách nghệ sĩ."; trang sự kiện có mục "Nghệ sĩ khách mời" với 2 tên | |
 | 12.7 · SEC-02 ★ | Chép URL trang sửa sự kiện (`/organizer/events/…`), mở bằng hồ sơ **Khách A** | Không mở được (không có quyền / không tìm thấy) | |
@@ -262,7 +264,7 @@ Không có điện thoại: mở https://localhost:8443 trên máy tính có web
 | 13.3 · ADM-01 ★ | Admin "Mở khóa" Khách B (nếu B bị khóa đăng nhập ở 1.12: "Mở khóa đăng nhập") | B đăng nhập lại được | |
 | 13.4 · ADM-02 | "Phân quyền" Khách A → đánh dấu "Soát vé" → "Lưu"; A bấm sang trang khác | Có hiệu lực ngay: phiên cũ của A bị thu hồi, A phải đăng nhập lại và thấy menu "Soát vé". Gỡ lại vai trò sau khi xem | |
 | 13.5 · ADM-03 | (Nếu đã làm 1.8) "Đặt lại 2FA" Khách A | A đăng nhập lại chỉ cần mật khẩu; có email báo | |
-| 13.6 · ADM-06 | "Audit log" | Có các hành động: duyệt nhà tổ chức, duyệt sự kiện, hoàn tiền, đổi cấu hình hàng chờ, khóa / mở khóa, đổi vai trò | |
+| 13.6 · ADM-06 | "Audit log" | Có các hành động: duyệt nhà tổ chức, duyệt sự kiện, đổi cấu hình hàng chờ, khóa / mở khóa, đổi vai trò | |
 
 ### Phiên 14. Phân quyền
 
@@ -282,6 +284,16 @@ Không có điện thoại: mở https://localhost:8443 trên máy tính có web
 | 15.4 · UI-02 | Máy tính, chỉ dùng phím Tab / Enter / Space: trang chủ, đăng nhập, chọn một ghế | Thấy rõ khung focus; đầu trang có "Bỏ qua menu"; chọn ghế được bằng phím | |
 | 15.5 · UI-04 | F12 → Network → "Offline", bấm một nút cần API | "Không kết nối được máy chủ…", nút không quay mãi. Bật lại "No throttling" | |
 | 15.6 · UI-03 | (Tùy chọn) Windows: Settings → Accessibility → Visual effects → tắt "Animation effects"; mở trang chủ | Không còn hiệu ứng chuyển động, nội dung hiện ngay | |
+
+### Phiên 16. Hủy sự kiện, hoàn tiền (làm cuối cùng)
+
+Hủy sự kiện 1 thì mọi đơn đã trả của nó được hoàn, nên làm sau tất cả các phiên khác. Mỗi khách có đơn nhận email báo hoàn tiền (email thật).
+
+| Bước | Thao tác | Kết quả mong đợi | KQ |
+|---|---|---|---|
+| 16.1 · REF-06 | Ban tổ chức: `Đêm nhạc Test` → "Hủy sự kiện" → "Lý do" `Thử hủy sự kiện` → "Hủy sự kiện" | Sự kiện "Đã hủy"; trang sự kiện công khai không còn nút chọn chỗ | |
+| 16.2 · REF-06 | A: "Đơn hàng" → đơn 3 vé (bước 5.9) và đơn C01 (bước 7.6) | Cả hai "Đã hoàn tiền", mục "Hoàn tiền" ghi đủ 100% số đã trả; "Vé của tôi": các vé không còn QR; A nhận email "Đã hoàn tiền đơn …" | |
+| 16.3 · ORG-08 | Ban tổ chức: thẻ "Doanh thu"; admin: "Audit log" | "Hoàn tiền" bằng tổng các đơn đã trả, "Vé đã bán" về 0; audit có hủy sự kiện và hoàn tiền từng đơn | |
 
 ### Phần không làm được trên stack này
 
@@ -325,13 +337,14 @@ Mức độ: Cao (sai tiền, bán trùng, lộ dữ liệu) / Trung bình (sai 
 | 6. Đổi ghế, hết giờ | 6 | | | |
 | 7. Hàng chờ | 9 | | | |
 | 8. Danh sách chờ | 7 | | | |
-| 9. Hủy, hoàn tiền | 5 | | | |
+| 9. Không hủy, không hoàn | 5 | | | |
 | 10. Soát vé | 9 | | | |
 | 11. Đánh giá | 4 | | | |
 | 12. Sửa sự kiện đang bán | 7 | | | |
 | 13. Quản trị | 6 | | | |
 | 14. Phân quyền | 3 | | | |
 | 15. Giao diện | 6 | | | |
-| **Tổng** | **115** | | | |
+| 16. Hủy sự kiện, hoàn tiền | 3 | | | |
+| **Tổng** | **118** | | | |
 
 Người test: ………… Ngày: ………… Phiên bản (`git log -1 --format=%h`): …………

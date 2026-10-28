@@ -475,7 +475,7 @@ test('the ★ steps of the UI test guide', async ({ browser, api }) => {
     })
 
     // --- Phiên 9: không hủy, không hoàn theo yêu cầu (chỉ hoàn khi sự kiện bị hủy)
-    await step('9.1-9.2', 'Đơn C01 đã thanh toán của A: không có nút hủy đơn', () => pageA, async () => {
+    await step('9.1', 'Đơn C01 đã thanh toán của A: không có nút hủy đơn', () => pageA, async () => {
       await pageA.goto(`/orders/${order2}`)
       await expect(pageA.getByText('Đã thanh toán').first()).toBeVisible()
       await expect(pageA.getByRole('button', { name: /Hủy đơn/ })).toHaveCount(0)
