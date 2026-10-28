@@ -31,7 +31,7 @@ export function EventsReviewPage() {
 
   return (
     <>
-      <PageHeader title="Sự kiện" subtitle="Mọi sự kiện trên nền tảng. Tab Chờ duyệt: sự kiện ban tổ chức gửi lên; duyệt thì vé được mở bán theo lịch của từng suất." />
+      <PageHeader title="Sự kiện" subtitle="" />
       <Tabs
         value={status}
         onChange={(value) => {
