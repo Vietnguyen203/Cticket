@@ -3,7 +3,7 @@ import { createPromotion, listPromotions, updatePromotion, type Promotion, type 
 import { ApiError, toApiError } from '../../api/errors'
 import { EmptyRow, PageHeader, Pagination, StatusBadge, TableCard, Tabs } from '../../admin/components'
 import { DateTimeField } from '../../components/DateTimeField'
-import { Alert, Button, Card, TextField } from '../../components/ui'
+import { Alert, Button, Card, NumberField, TextField } from '../../components/ui'
 import { formatDateTime, formatVnd } from '../../utils/format'
 import { useAsync } from '../../utils/useAsync'
 import { fromVnInput, toVnInput } from '../../utils/vnTime'
@@ -180,28 +180,24 @@ function PromotionForm({ promotion, onClose, onSaved }: { promotion: Promotion |
             <option value="FIXED_AMOUNT">Số tiền (VND)</option>
           </select>
         </label>
-        <TextField
+        <NumberField
           label={form.discountType === 'PERCENTAGE' ? 'Giảm (%)' : 'Giảm (VND)'}
           name="discountValue"
-          type="number"
-          min={1}
           value={form.discountValue}
           onChange={set('discountValue')}
           error={fieldErrors.discountValue}
         />
-        <TextField
+        <NumberField
           label="Giảm tối đa (VND, không bắt buộc)"
           name="maxDiscount"
-          type="number"
-          min={1}
           disabled={form.discountType !== 'PERCENTAGE'}
           value={form.maxDiscount}
           onChange={set('maxDiscount')}
           error={fieldErrors.maxDiscount}
         />
-        <TextField label="Đơn tối thiểu (VND)" name="minOrderAmount" type="number" min={0} value={form.minOrderAmount} onChange={set('minOrderAmount')} error={fieldErrors.minOrderAmount} />
-        <TextField label="Tổng số lượt (trống: không giới hạn)" name="usageLimit" type="number" min={1} value={form.usageLimit} onChange={set('usageLimit')} error={fieldErrors.usageLimit} />
-        <TextField label="Lượt / người (trống: không giới hạn)" name="perUserLimit" type="number" min={1} value={form.perUserLimit} onChange={set('perUserLimit')} error={fieldErrors.perUserLimit} />
+        <NumberField label="Đơn tối thiểu (VND)" name="minOrderAmount" value={form.minOrderAmount} onChange={set('minOrderAmount')} error={fieldErrors.minOrderAmount} />
+        <NumberField label="Tổng số lượt (trống: không giới hạn)" name="usageLimit" value={form.usageLimit} onChange={set('usageLimit')} error={fieldErrors.usageLimit} />
+        <NumberField label="Lượt / người (trống: không giới hạn)" name="perUserLimit" value={form.perUserLimit} onChange={set('perUserLimit')} error={fieldErrors.perUserLimit} />
         <DateTimeField label="Bắt đầu (giờ VN)" name="startsAt" value={form.startsAt} onChange={(startsAt) => setForm((f) => ({ ...f, startsAt }))} error={fieldErrors.startsAt} />
         <DateTimeField label="Hết hạn (giờ VN)" name="expiresAt" value={form.expiresAt} onChange={(expiresAt) => setForm((f) => ({ ...f, expiresAt }))} error={fieldErrors.expiresAt} />
         <label className="text-sm">

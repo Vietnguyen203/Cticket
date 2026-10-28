@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { ApiError, toApiError } from '../api/errors'
 import { createTicketType, deleteTicketType, saveSeatPlan, updateSchedule } from '../api/organizer'
-import { Alert, Button, TextField } from '../components/ui'
+import { Alert, Button, NumberField, TextField } from '../components/ui'
 import { venueCapacityMessage, zonePlaces } from '../admin/venueCapacity'
 import { formatVnd } from '../utils/format'
 import { allocation, freeSeatsOfZones, planWith, planWithout, tierCode, zoneLines, type ZoneLine } from './allocation'
@@ -76,12 +76,9 @@ function CapacityForm({ setup, allocated, onChanged }: { setup: LoadedSchedule; 
       noValidate
     >
       <div className="flex flex-wrap items-end gap-3">
-        <TextField
+        <NumberField
           label="Tổng số người tham dự"
           name={`capacity-${schedule.id}`}
-          type="number"
-          min={1}
-          max={venueCapacity ?? undefined}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           error={tooSmall ? `Các hạng đã xếp ${n(allocated)} người.` : tooBig ? `Địa điểm chỉ chứa ${n(venueCapacity!)} người.` : undefined}
@@ -253,13 +250,10 @@ function ZoneTierLine({ line, setup, remaining, onChanged }: { line: ZoneLine; s
       {line.free > 0 && (
         <form onSubmit={assign} className="flex flex-wrap items-end gap-2" noValidate aria-label={`Gán hạng cho ${zone.name}`}>
           <TextField label="Tên hạng" name={`tier-name-${zone.id}`} value={name} onChange={(e) => setName(e.target.value)} />
-          <TextField label="Giá (VND)" name={`tier-price-${zone.id}`} type="number" min={0} step={1000} value={price} onChange={(e) => setPrice(e.target.value)} />
-          <TextField
+          <NumberField label="Giá (VND)" name={`tier-price-${zone.id}`} value={price} onChange={(e) => setPrice(e.target.value)} />
+          <NumberField
             label={seated ? 'Số ghế' : 'Số vé'}
             name={`tier-count-${zone.id}`}
-            type="number"
-            min={1}
-            max={line.free}
             value={count}
             onChange={(e) => setTyped(e.target.value)}
           />

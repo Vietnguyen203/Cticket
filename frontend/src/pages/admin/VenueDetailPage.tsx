@@ -5,7 +5,7 @@ import { ApiError, toApiError } from '../../api/errors'
 import { PageHeader, StatusBadge } from '../../admin/components'
 import { venueCapacityMessage } from '../../admin/venueCapacity'
 import { VenueZonesEditor } from '../../admin/VenueZonesEditor'
-import { Alert, Button, Card, FullPageSpinner, TextField } from '../../components/ui'
+import { Alert, Button, Card, FullPageSpinner, NumberField, TextField } from '../../components/ui'
 import { useAsync } from '../../utils/useAsync'
 
 export function VenueDetailPage() {
@@ -109,7 +109,7 @@ function VenueInfo({ venue, onSaved }: { venue: VenueRecord; onSaved: () => void
           onChange={(e) => setForm({ ...form, addressLine: e.target.value })}
           className="sm:col-span-2"
         />
-        <TextField label="Sức chứa" name="capacity" type="number" min={1} value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} />
+        <NumberField label="Sức chứa" name="capacity" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} />
         <div className="flex flex-wrap items-end justify-end gap-2">
           {venue.status === 'PENDING' ? (
             <>

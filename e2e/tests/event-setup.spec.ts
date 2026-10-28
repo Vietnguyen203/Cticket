@@ -63,6 +63,7 @@ test('the editor says what is missing, and a new venue is used only once it has 
   const zoneA = page.getByRole('form', { name: 'Gán hạng cho Khu A' })
   await zoneA.getByLabel('Tên hạng').fill('Hạng VIP')
   await zoneA.getByLabel('Giá (VND)').fill('800000')
+  await expect(zoneA.getByLabel('Giá (VND)')).toHaveValue('800.000') // "." between thousands as it is typed
   await zoneA.getByRole('button', { name: 'Gán 10 ghế' }).click()
   await expect(page.getByRole('cell', { name: /Ghế ngồi · Khu A: hàng A–B/ })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Gửi duyệt' })).toBeEnabled()

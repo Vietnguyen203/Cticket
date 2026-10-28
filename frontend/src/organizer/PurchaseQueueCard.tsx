@@ -3,7 +3,7 @@ import { ApiError, toApiError } from '../api/errors'
 import type { EventInput } from '../api/organizer'
 import { getQueueStats, type QueueStats } from '../api/queue'
 import type { EventDetail } from '../api/types'
-import { Alert, Button, Card, TextField } from '../components/ui'
+import { Alert, Button, Card, NumberField, TextField } from '../components/ui'
 
 /** Backend limits (PURCHASE_QUEUE in backend/src/config/constants.js). */
 const MAX_CAPACITY = 10_000
@@ -65,12 +65,9 @@ export function PurchaseQueueCard({ event, onSave }: { event: EventDetail; onSav
           Bật hàng chờ
         </label>
         <div className="grid gap-4 sm:grid-cols-2">
-          <TextField
+          <NumberField
             label="Số người được mua cùng lúc"
             name="queueCapacity"
-            type="number"
-            min={1}
-            max={MAX_CAPACITY}
             value={form.capacity}
             disabled={!editable}
             onChange={(e) => setForm({ ...form, capacity: e.target.value })}

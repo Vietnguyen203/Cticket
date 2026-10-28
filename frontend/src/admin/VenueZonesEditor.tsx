@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { createSeats, createZone, getVenueLayout, type LayoutZone, type ZoneKind } from '../api/admin'
 import { ApiError, toApiError } from '../api/errors'
-import { Alert, Button, Card, TextField } from '../components/ui'
+import { Alert, Button, Card, NumberField, TextField } from '../components/ui'
 import { useAsync } from '../utils/useAsync'
 import { parseRowLabels } from './rowLabels'
 import { venueCapacityMessage, zonePlaces } from './venueCapacity'
@@ -174,11 +174,9 @@ function NewZone({ venueId, onCreated }: { venueId: string; onCreated: () => voi
             <option value="STANDING">Khu đứng</option>
           </select>
         </label>
-        <TextField
+        <NumberField
           label="Sức chứa"
           name="zoneCapacity"
-          type="number"
-          min={1}
           disabled={form.kind === 'SEATED'}
           value={form.capacity}
           onChange={(e) => setForm({ ...form, capacity: e.target.value })}
