@@ -12,6 +12,7 @@ const otpService = require('./otp.service');
 const denylist = require('./denylist');
 const sessions = require('./sessions');
 const twoFactor = require('./two-factor.service');
+const trustedDevices = require('./trusted-devices');
 const loginGuard = require('./login-guard');
 
 /** Account status a user must have to receive / use a code for each purpose. */
@@ -109,6 +110,8 @@ async function verifyOtp({ email, purpose, otp, newPassword }) {
     } else {
       await users.updatePasswordHash(client, user.id, newPasswordHash);
       await authRepository.revokeAllRefreshTokensOfUser(client, user.id);
+      // A new password: no browser skips the code any more.
+      await trustedDevices.forgetDevices(client, user.id);
     }
   });
   if (purpose === OTP_PURPOSE.PASSWORD_RESET) {
@@ -128,7 +131,7 @@ async function verifyOtp({ email, purpose, otp, newPassword }) {
  * yet but an mfaToken for step 2: { mfaRequired } (enter a code) or
  * { mfaSetupRequired } (a role that requires two-factor, not set up yet).
  */
-async function login({ email, password, remember }, meta) {
+async function login({ email, password, remember }, meta, { deviceToken } = {}) {
   // Phase 18.1: a locked email is refused before its password is even checked.
   await loginGuard.assertNotLocked(pool, email);
   const user = await users.findByEmail(pool, email);
@@ -150,6 +153,11 @@ async function login({ email, password, remember }, meta) {
 
   const roles = await users.findRoleCodes(pool, user.id);
   const challenge = await twoFactor.loginChallenge(pool, user, roles);
+  // "Ghi nhớ đăng nhập": this browser passed the code step lately (never for admins).
+  if (challenge === 'verify' && !twoFactor.isRequiredFor(roles) && (await trustedDevices.isTrusted(pool, user.id, deviceToken))) {
+    await loginGuard.clear(pool, email);
+    return sessions.openSession(pool, { user, roles, meta, mfa: true });
+  }
   if (challenge) {
     return {
       [challenge === 'verify' ? 'mfaRequired' : 'mfaSetupRequired']: true,

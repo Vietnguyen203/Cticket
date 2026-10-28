@@ -54,7 +54,7 @@ test('a new admin must set up two-factor at the first login, then gets in with a
   await page.waitForURL(/\/admin$/)
 })
 
-test('a customer turns two-factor on from the account page; the next login asks for a code', async ({ page, api }) => {
+test('a customer turns two-factor on; the next login asks for a code; "Ghi nhớ đăng nhập" spares it on this browser, never the login', async ({ page, api, browser }) => {
   const customer = await createCustomer(api, 'Lan')
   await signIn(page, customer.email, undefined, '/account')
 
@@ -72,8 +72,33 @@ test('a customer turns two-factor on from the account page; the next login asks 
   await page.goto('/login?next=%2Faccount')
   await page.getByLabel('Email').fill(customer.email)
   await page.getByLabel('Mật khẩu', { exact: true }).fill(customer.password)
+  await page.getByLabel('Ghi nhớ đăng nhập').check()
   await page.getByRole('button', { name: 'Đăng nhập' }).click()
   await page.getByLabel('Mã xác thực').fill(totpCode(secret, 1))
   await page.waitForURL(/\/account$/)
   await expect(page.getByRole('heading', { name: 'Xác thực hai lớp' })).toBeVisible()
+
+  // The browser is closed and opened again: its session cookies are gone, the 30-day device cookie stays.
+  const state = await page.context().storageState()
+  const reopened = await browser.newContext({ storageState: { ...state, cookies: state.cookies.filter((c) => c.expires !== -1) } })
+  const again = await reopened.newPage()
+  await again.goto('/account')
+  await expect(again).toHaveURL(/\/login/) // signed out: the session never outlives the browser
+  await again.getByLabel('Email').fill(customer.email)
+  await again.getByLabel('Mật khẩu', { exact: true }).fill(customer.password)
+  await again.getByRole('button', { name: 'Đăng nhập' }).click()
+  await again.waitForURL(/\/account$/) // no code asked on this browser
+  await expect(again.getByRole('heading', { name: 'Thiết bị được ghi nhớ' })).toBeVisible()
+  await expect(again.getByRole('listitem').filter({ hasText: /trên/ })).toHaveCount(1)
+
+  // "Quên các thiết bị": the code is asked again.
+  await again.getByRole('button', { name: 'Quên các thiết bị' }).click()
+  await expect(again.getByText('Đã quên mọi thiết bị')).toBeVisible()
+  await logOut(again)
+  await again.goto('/login')
+  await again.getByLabel('Email').fill(customer.email)
+  await again.getByLabel('Mật khẩu', { exact: true }).fill(customer.password)
+  await again.getByRole('button', { name: 'Đăng nhập' }).click()
+  await expect(again.getByLabel('Mã xác thực')).toBeVisible()
+  await reopened.close()
 })

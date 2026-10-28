@@ -17,9 +17,11 @@ const env = require('../../config/env');
 const COOKIE_NAME = 'etp_refresh';
 const COOKIE_PATH = '/api/v1/auth';
 const TRANSPORT_HEADER = 'x-auth-transport';
-// "Remember me": the web asks for a 7-day cookie. Without it the cookie has no
-// expiry (a session cookie): the browser forgets it when it is closed.
-const REMEMBER_HEADER = 'x-auth-remember';
+// The refresh cookie has no expiry (a session cookie): closing the browser
+// ends the session, always. "Ghi nhớ đăng nhập" is the device cookie below.
+// The device cookie: this browser passed the two-factor step with
+// "Ghi nhớ đăng nhập" ticked (trusted-devices.js). Same path, same flags.
+const DEVICE_COOKIE_NAME = 'etp_device';
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // Browsers accept Secure cookies on http://localhost, so production can always require HTTPS.
@@ -31,37 +33,48 @@ function usesCookie(req) {
   return req.get(TRANSPORT_HEADER) === 'cookie';
 }
 
-/** The refresh cookie's value, or undefined. Read only for requests that opted in (CSRF). */
-function readRefreshCookie(req) {
+/** A cookie's value, or undefined. Read only for requests that opted in (CSRF). */
+function readCookie(req, name) {
   if (!usesCookie(req)) return undefined;
   for (const pair of (req.get('cookie') ?? '').split(';')) {
     const separator = pair.indexOf('=');
-    if (separator > 0 && pair.slice(0, separator).trim() === COOKIE_NAME) {
+    if (separator > 0 && pair.slice(0, separator).trim() === name) {
       return pair.slice(separator + 1).trim() || undefined;
     }
   }
   return undefined;
 }
 
-/** Persistent only for "remember me" (login body `remember`, or the header on later refreshes). */
-function wantsPersistentCookie(req) {
-  return req.valid?.body?.remember === true || req.get(REMEMBER_HEADER) === '1';
-}
+const readRefreshCookie = (req) => readCookie(req, COOKIE_NAME);
+const readDeviceCookie = (req) => readCookie(req, DEVICE_COOKIE_NAME);
 
-function setRefreshCookie(res, token, { persistent }) {
-  res.cookie(COOKIE_NAME, token, persistent ? { ...cookieOptions(), maxAge: env.REFRESH_TOKEN_TTL_DAYS * DAY_MS } : cookieOptions());
+/** Always a session cookie: no Max-Age, the browser drops it when it closes. */
+function setRefreshCookie(res, token) {
+  res.cookie(COOKIE_NAME, token, cookieOptions());
 }
 
 function clearRefreshCookie(res) {
   res.clearCookie(COOKIE_NAME, cookieOptions());
 }
 
+/** Kept TRUSTED_DEVICE_DAYS: survives closing the browser (the session does not). */
+function setDeviceCookie(res, token, days) {
+  res.cookie(DEVICE_COOKIE_NAME, token, { ...cookieOptions(), maxAge: days * DAY_MS });
+}
+
+function clearDeviceCookie(res) {
+  res.clearCookie(DEVICE_COOKIE_NAME, cookieOptions());
+}
+
 module.exports = {
   COOKIE_NAME,
   COOKIE_PATH,
   usesCookie,
+  DEVICE_COOKIE_NAME,
   readRefreshCookie,
-  wantsPersistentCookie,
+  readDeviceCookie,
   setRefreshCookie,
   clearRefreshCookie,
+  setDeviceCookie,
+  clearDeviceCookie,
 };

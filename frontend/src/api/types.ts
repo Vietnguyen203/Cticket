@@ -43,6 +43,14 @@ export interface TwoFactorSetup {
   qrDataUrl: string
 }
 
+/** A browser that skips the two-factor code ("Ghi nhớ đăng nhập", 30 days). */
+export interface TrustedDevice {
+  userAgent: string | null
+  createdAt: string
+  lastUsedAt: string
+  expiresAt: string
+}
+
 export interface TwoFactorStatus {
   enabled: boolean
   enabledAt: string | null

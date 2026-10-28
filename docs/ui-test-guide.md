@@ -91,7 +91,8 @@ Trình duyệt hồ sơ "Khách A".
 | 1.6 · UI-06 | Ở ô "Mật khẩu", bấm biểu tượng con mắt | Mật khẩu hiện / ẩn; form không bị gửi | |
 | 1.7 · AUTH-05 | "Quên mật khẩu?" → email Khách A → nhập mã trong email + mật khẩu mới | Đăng nhập được bằng mật khẩu mới; mật khẩu cũ không còn dùng được | |
 | 1.8 · AUTH-07 | (Nếu có ứng dụng xác thực) Trang tài khoản → "Bật xác thực hai lớp" → "Mật khẩu hiện tại" → "Tiếp tục" → quét mã QR bằng ứng dụng → nhập "Mã xác thực" → đánh dấu "Tôi đã lưu các mã này ở nơi an toàn" → "Xong" | Trang tài khoản ghi "Đang bật từ … Còn 10 mã khôi phục."; có email báo vừa bật 2FA. **Chép 10 mã khôi phục ra giấy** | |
-| 1.9 · AUTH-07 | Đăng xuất, đăng nhập lại | Sau mật khẩu, trang hỏi mã 6 số; nhập mã trong ứng dụng thì vào được | |
+| 1.9 · AUTH-07 | Đăng xuất, đăng nhập lại (để trống "Ghi nhớ đăng nhập") | Sau mật khẩu, trang hỏi mã 6 số; nhập mã trong ứng dụng thì vào được | |
+| 1.9b · AUTH-14 | Đăng xuất, đăng nhập lại, **đánh dấu "Ghi nhớ đăng nhập"**, nhập mã. Đóng hẳn trình duyệt, mở lại trang | Mở lại thì phải đăng nhập lại, nhưng lần này **chỉ cần mật khẩu**, không hỏi mã; trang tài khoản có mục "Thiết bị được ghi nhớ". Bấm "Quên các thiết bị" → lần đăng nhập sau lại hỏi mã | |
 | 1.10 · AUTH-08 | Đăng xuất, đăng nhập lại; ở bước hỏi mã bấm "Không có điện thoại? Dùng mã khôi phục" → nhập một mã đã chép → "Xác nhận" | Vào được; trang tài khoản còn 9 mã; dùng lại đúng mã đó thì bị từ chối | |
 | 1.11 · AUTH-01 ★ | Hồ sơ trình duyệt "Khách B": đăng ký `ten+khachb@…` như 1.1–1.2 | Khách B đăng nhập được | |
 | 1.12 · AUTH-04 | (Tùy chọn, mất 15 phút khóa) Hồ sơ Khách B, đăng xuất: nhập sai mật khẩu **5 lần** liên tiếp, rồi nhập đúng | Lần thứ 5 báo bị khóa tạm; mật khẩu đúng cũng bị từ chối; có email báo bị khóa. Gỡ khóa: bước 13.3 (admin) hoặc "Quên mật khẩu?" | |
@@ -121,8 +122,8 @@ Hồ sơ trình duyệt "Admin": đăng nhập `admin@etp.local`. Menu "Quản t
 | 3.7 · ORG-04 | Đổi tên một file `.txt` thành `.png` rồi tải làm ảnh | Bị từ chối, báo file không phải ảnh | |
 | 3.8 · ORG-05 ★ | Thẻ "Buổi diễn & vé" → "Buổi diễn": chọn địa điểm `Nhà hát Test — TP. Hồ Chí Minh`; "Ngày diễn" **30 ngày sau**, "Giờ bắt đầu" gõ `19:00` (24 giờ; gõ `1900` cũng được), "Giờ kết thúc" `21:00` (để trống = 3 tiếng sau) → "Lưu buổi diễn" | Dòng buổi diễn đã lưu; không có nút thêm buổi thứ hai (mỗi sự kiện một buổi diễn); phần "Nghệ sĩ khách mời" và thẻ hạng vé hiện bên dưới | |
 | 3.9 · ORG-05 ★ | "Tổng số người tham dự": ô đã điền sẵn sức chứa của địa điểm; nhập `100` → "Lưu tổng" | Dòng "Sức chứa địa điểm: … · các khu: … chỗ"; "Đã xếp 0 / 100 người · … · còn lại 100"; bảng "Hạng vé theo khu của địa điểm" liệt kê các khu có sẵn | |
-| 3.10 · ORG-05 ★ | Dòng "Khu A" (khu ngồi, 50 ghế): "Tên hạng" `VIP`, "Giá (VND)" gõ `1500000` (ô tự hiện `1.500.000`) → "Gán 50 ghế" | Dòng Khu A hiện "VIP · 1.500.000 ₫ · 50 ghế" và nút "Bỏ gán"; bảng hạng vé: VIP "Ghế ngồi · Khu A: hàng A–E"; "Đã xếp 50 / 100" | |
-| 3.11 · ORG-05 ★ | Dòng "Khu đứng" (100 chỗ): "Tên hạng" `Vé đứng`, "Giá (VND)" `300000`, "Số vé" đã điền sẵn `50` (phần còn lại của tổng; khu chứa 100), thử sửa thành `100` rồi trả về `50` → "Gán" | Với 100: báo "Chỉ còn 50 người chưa xếp"; với 50: "Đã xếp 100 / 100 · còn lại 0"; danh sách "sẵn sàng gửi duyệt" ở đầu trang không còn mục đỏ | |
+| 3.10 · ORG-05 ★ | Dòng "Khu A" (khu ngồi, 50 ghế): "Tên hạng" `VIP`, "Giá (VND)" gõ `1500000` (ô tự hiện `1.500.000`) → "Xác nhận (1 khu)" | Dòng Khu A hiện "VIP · 1.500.000 ₫ · 50 ghế" và nút "Bỏ gán"; bảng hạng vé: VIP "Ghế ngồi · Khu A: hàng A–E"; "Đã xếp 50 / 100" | |
+| 3.11 · ORG-05 ★ | Dòng "Khu đứng" (100 chỗ): "Tên hạng" `Vé đứng`, "Giá (VND)" `300000`, "Số vé" đã điền sẵn `50` (phần còn lại của tổng; khu chứa 100), thử sửa thành `100` rồi trả về `50` → "Xác nhận (1 khu)". (Có thể điền giá cho nhiều khu rồi bấm "Xác nhận" một lần) | Với 100: báo "Chỉ còn 50 người chưa xếp"; với 50: "Đã xếp 100 / 100 · còn lại 0"; danh sách "sẵn sàng gửi duyệt" ở đầu trang không còn mục đỏ | |
 | 3.12 · ORG-06 ★ | "Gửi duyệt" → xác nhận "Gửi duyệt". Admin: "Sự kiện" → mở sự kiện → "Duyệt và mở bán" → xác nhận | Ban tổ chức thấy "Đã gửi duyệt." rồi "Chờ duyệt"; sau khi admin duyệt: "Đang bán" | |
 | 3.13 · ORG-02 ★ | Ban tổ chức tạo **sự kiện 2**: `Đêm soát vé <ngày>`, danh mục `Hòa nhạc test`, chính sách mặc định → "Tạo và tiếp tục" | Sự kiện nháp | |
 | 3.14 · ORG-05 ★ | "Buổi diễn": địa điểm `Nhà hát Test`; "Ngày diễn" hôm nay, "Giờ bắt đầu" = **2 giờ sau giờ hiện tại**, "Giờ kết thúc" để trống (3 tiếng sau) → "Lưu buổi diễn". "Tổng số người tham dự" `2` → "Lưu tổng"; dòng "Khu đứng": "Tên hạng" `Vé đứng`, "Giá (VND)" `200000`, "Số vé" **`2`** → "Gán" | Buổi diễn có 1 hạng vé, 2 vé; "Đã xếp 2 / 2" | |
@@ -331,7 +332,7 @@ Mức độ: Cao (sai tiền, bán trùng, lộ dữ liệu) / Trung bình (sai 
 
 | Phiên | Số bước | Đạt | Lỗi | Ghi chú |
 |---|---|---|---|---|
-| 1. Tài khoản | 12 | | | |
+| 1. Tài khoản | 13 | | | |
 | 2. Quản trị chuẩn bị | 5 | | | |
 | 3. Ban tổ chức tạo sự kiện | 16 | | | |
 | 4. Tìm và xem | 6 | | | |
@@ -347,6 +348,6 @@ Mức độ: Cao (sai tiền, bán trùng, lộ dữ liệu) / Trung bình (sai 
 | 14. Phân quyền | 3 | | | |
 | 15. Giao diện | 6 | | | |
 | 16. Hủy sự kiện, hoàn tiền | 3 | | | |
-| **Tổng** | **120** | | | |
+| **Tổng** | **121** | | | |
 
 Người test: ………… Ngày: ………… Phiên bản (`git log -1 --format=%h`): …………

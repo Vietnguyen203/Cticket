@@ -1,10 +1,19 @@
 import { useState, type FormEvent } from 'react'
 import { ApiError, toApiError } from '../../api/errors'
 import type { TwoFactorSetup } from '../../api/types'
-import { confirmTwoFactorSetup, disableTwoFactor, getTwoFactorStatus, regenerateRecoveryCodes, startTwoFactorSetup } from '../../api/twoFactor'
+import {
+  confirmTwoFactorSetup,
+  disableTwoFactor,
+  forgetTrustedDevices,
+  getTwoFactorStatus,
+  listTrustedDevices,
+  regenerateRecoveryCodes,
+  startTwoFactorSetup,
+} from '../../api/twoFactor'
 import { setAccessToken } from '../../auth/session'
 import { CodeField, RecoveryCodesPanel, SetupInstructions } from '../../auth/TwoFactorParts'
 import { Alert, Button, Card, PasswordField } from '../../components/ui'
+import { browserName } from '../../utils/browserName'
 import { formatDateTime } from '../../utils/format'
 import { useAsync } from '../../utils/useAsync'
 
@@ -16,7 +25,7 @@ type Mode =
   | { kind: 'disable' }
   | { kind: 'regenerate' }
 
-/** Phase 15, account page: turn two-factor on / off, new recovery codes. */
+/** Phase 15, account page: turn two-factor on / off, new recovery codes, the remembered browsers. */
 export function TwoFactorSection({ email }: { email: string }) {
   const status = useAsync(getTwoFactorStatus, 'two-factor-status')
   const [mode, setMode] = useState<Mode>({ kind: 'idle' })
@@ -101,6 +110,8 @@ export function TwoFactorSection({ email }: { email: string }) {
         </div>
       )}
 
+      {mode.kind === 'idle' && s?.enabled && !s.required && <TrustedDevices onForgotten={() => setDone('Đã quên mọi thiết bị: lần đăng nhập tới sẽ hỏi mã ở mọi nơi.')} />}
+
       {mode.kind === 'password' && (
         <form onSubmit={submit(async () => open({ kind: 'scan', setup: await startTwoFactorSetup(password) }))} className="space-y-3">
           <PasswordField label="Mật khẩu hiện tại" autoComplete="current-password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} />
@@ -184,3 +195,55 @@ export function TwoFactorSection({ email }: { email: string }) {
     </Card>
   )
 }
+
+/**
+ * "Ghi nhớ đăng nhập": the browsers where the code is not asked (30 days after
+ * the login that ticked the box). One button forgets them all.
+ */
+function TrustedDevices({ onForgotten }: { onForgotten: () => void }) {
+  const devices = useAsync(listTrustedDevices, 'trusted-devices')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const list = devices.data ?? []
+
+  async function forget() {
+    setBusy(true)
+    setError(null)
+    try {
+      await forgetTrustedDevices()
+      devices.reload()
+      onForgotten()
+    } catch (err) {
+      setError(toApiError(err).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="space-y-2 border-t border-line pt-4">
+      <h3 className="font-semibold">Thiết bị được ghi nhớ</h3>
+      <p className="text-sm text-slate-600">Trên các trình duyệt này, đăng nhập không hỏi mã xác thực (30 ngày kể từ lần đăng nhập có đánh dấu "Ghi nhớ đăng nhập").</p>
+      {(error || devices.error) && <Alert>{error ?? devices.error?.message}</Alert>}
+      {devices.data && list.length === 0 && <p className="text-sm text-slate-500">Chưa có thiết bị nào.</p>}
+      {list.length > 0 && (
+        <>
+          <ul className="divide-y divide-line rounded-control border border-line text-sm">
+            {list.map((device) => (
+              <li key={device.createdAt} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 px-3 py-2">
+                <span className="font-medium text-ink">{browserName(device.userAgent)}</span>
+                <span className="text-xs text-slate-500">
+                  Dùng lần cuối {formatDateTime(device.lastUsedAt)} · hết hạn {formatDateTime(device.expiresAt)}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <Button variant="secondary" loading={busy} onClick={() => void forget()}>
+            Quên các thiết bị
+          </Button>
+        </>
+      )}
+    </div>
+  )
+}
+

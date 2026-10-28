@@ -4,8 +4,8 @@
  * - A reload keeps sessionStorage (per tab): the mark is there → not fresh.
  * - A new tab while another tab of the site is open: that tab answers the
  *   ping on the BroadcastChannel → not fresh.
- * - Otherwise the user closed the site and came back → fresh: without
- *   "remember me", they must log in again.
+ * - Otherwise the user closed the site and came back → fresh: they must
+ *   log in again ("Ghi nhớ đăng nhập" only spares the two-factor code).
  */
 const MARK = 'etp-tab-open'
 const ANSWER_WAIT_MS = 300

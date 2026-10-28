@@ -48,7 +48,8 @@ Ký hiệu file test tự động:
 | TC-AUTH-03 | Đăng nhập sai mật khẩu | Có tài khoản | Nhập sai mật khẩu | Báo "sai email hoặc mật khẩu" (giống hệt khi email không tồn tại); không có phiên | P1 | E2E:auth, BE:auth |
 | TC-AUTH-04 | Khóa đăng nhập sau 5 lần sai | Có tài khoản | Sai mật khẩu 5 lần liên tiếp → thử lại đúng mật khẩu | Bị khóa 15 phút (lần khóa sau gấp đôi, tối đa 24 giờ); email báo bị khóa; đúng mật khẩu cũng bị từ chối trong lúc khóa | P1 | BE:login-lockout |
 | TC-AUTH-05 | Quên mật khẩu | Có tài khoản | "Quên mật khẩu?" → mã email → mật khẩu mới | Đăng nhập được bằng mật khẩu mới; mọi thiết bị khác bị đăng xuất; khóa đăng nhập (nếu có) được gỡ | P1 | BE:auth, BE:login-lockout |
-| TC-AUTH-06 | Ghi nhớ đăng nhập / đăng xuất | Đã đăng nhập | Đóng trình duyệt, mở lại; rồi bấm "Đăng xuất" | Có "Ghi nhớ" thì vẫn đăng nhập (7 ngày); đăng xuất thì token cũ không dùng được nữa | P2 | E2E:auth, BE:auth |
+| TC-AUTH-06 | Phiên đăng nhập kết thúc khi đóng trình duyệt; đăng xuất | Đã đăng nhập | Đóng mọi tab / trình duyệt, mở lại; rồi bấm "Đăng xuất" | Mở lại thì phải đăng nhập lại (có hay không "Ghi nhớ đăng nhập"); tải lại trang (F5) vẫn còn đăng nhập; đăng xuất thì token cũ không dùng được nữa | P2 | E2E:auth, E2E:two-factor, BE:auth |
+| TC-AUTH-14 | "Ghi nhớ đăng nhập" bỏ qua mã 2FA 30 ngày | 2FA đang bật (không phải admin) | Đăng nhập, đánh dấu "Ghi nhớ đăng nhập", nhập mã; đóng trình duyệt, mở lại, đăng nhập | Lần sau chỉ cần mật khẩu trên trình duyệt đó (30 ngày); trình duyệt khác vẫn hỏi mã; admin luôn hỏi mã; tắt 2FA, đặt lại mật khẩu, bị admin xóa / đặt lại 2FA, hoặc "Quên các thiết bị" ở trang tài khoản → hỏi mã lại | P1 | E2E:two-factor, BE:two-factor |
 | TC-AUTH-07 | Khách tự bật 2FA | Đã đăng nhập | Tài khoản → Xác thực hai lớp → quét QR bằng Google Authenticator → nhập mã → lưu 10 mã khôi phục → đăng xuất, đăng nhập lại | Lần sau hỏi mã 6 số sau mật khẩu; mã sai 5 lần thì phải đăng nhập lại | P1 | E2E:two-factor, BE:two-factor |
 | TC-AUTH-08 | Đăng nhập bằng mã khôi phục | 2FA đang bật | Ở bước nhập mã, dùng một mã khôi phục | Vào được; mã đó không dùng lại được; số mã còn lại giảm 1 | P2 | E2E:two-factor, BE:two-factor |
 | TC-AUTH-09 | Admin bắt buộc 2FA (production) | Server production, admin mới | Đăng nhập lần đầu | Bị buộc thiết lập 2FA trước khi vào trang quản trị | P1 | E2E:two-factor, BE:two-factor, BE-unit:env |
@@ -270,7 +271,7 @@ cd e2e && npm test
 
 | Nhóm | Số test case | Có test tự động | Chỉ test tay |
 |---|---|---|---|
-| AUTH | 13 | 12 | 1 |
+| AUTH | 14 | 13 | 1 |
 | CAT | 7 | 5 | 2 |
 | BKG | 9 | 8 | 1 |
 | QUE | 10 | 10 | 0 |
@@ -286,6 +287,6 @@ cd e2e && npm test
 | UI | 6 | 2 | 4 |
 | LOAD | 3 | 3 | 0 |
 | MON | 6 | 6 | 0 |
-| **Tổng** | **120** | **112** | **8** |
+| **Tổng** | **121** | **113** | **8** |
 
-Test tự động hiện có: backend 444 test, web 147 test, E2E 30 kịch bản, k6 5 kịch bản (chi tiết `docs/testing.md`). Những ca "chỉ test tay" cần thiết bị hoặc dịch vụ thật (điện thoại, đồng hồ máy, cài đặt hệ điều hành) hoặc là cảm nhận giao diện.
+Test tự động hiện có: backend 445 test, web 148 test, E2E 30 kịch bản, k6 5 kịch bản (chi tiết `docs/testing.md`). Những ca "chỉ test tay" cần thiết bị hoặc dịch vụ thật (điện thoại, đồng hồ máy, cài đặt hệ điều hành) hoặc là cảm nhận giao diện.

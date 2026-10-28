@@ -69,7 +69,7 @@ export function LoginPage() {
   }
 
   async function signIn(result: LoginResult) {
-    await completeLogin(result, remember)
+    await completeLogin(result)
     navigate(next, { replace: true })
   }
 
@@ -274,7 +274,7 @@ export function LoginPage() {
         <div className="flex items-center justify-between gap-2">
           <label className="flex items-center gap-2 text-sm text-slate-700">
             <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-            Ghi nhớ đăng nhập (7 ngày)
+            Ghi nhớ đăng nhập
           </label>
           <Link to="/forgot-password" state={{ email } satisfies AuthPageState} className="text-sm text-brand-700 hover:underline">
             Quên mật khẩu?

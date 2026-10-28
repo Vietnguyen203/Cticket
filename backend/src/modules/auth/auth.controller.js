@@ -7,6 +7,7 @@ const twoFactor = require('./two-factor.service');
 const { verifyAccessToken } = require('./auth.tokens');
 const schemas = require('./auth.schemas');
 const cookie = require('./refresh-cookie');
+const { TWO_FACTOR } = require('../../config/constants');
 
 const HTTP_CREATED = 201;
 const HTTP_ACCEPTED = 202;
@@ -43,19 +44,20 @@ function refreshTokenOf(req) {
 
 /**
  * Cookie mode: the refresh token goes into the cookie and is left out of the body (a script could read the body).
- * `persistent`: "remember me"; after a two-factor step it comes from the mfaToken, not this request.
+ * `deviceToken`: "Ghi nhớ đăng nhập" after a two-factor step, the device cookie (30 days).
  */
-function sendTokens(req, res, tokens, { persistent = cookie.wantsPersistentCookie(req) } = {}) {
+function sendTokens(req, res, tokens, { deviceToken = null } = {}) {
   if (!cookie.usesCookie(req)) return sendSuccess(res, tokens);
   const { refreshToken, ...rest } = tokens;
-  cookie.setRefreshCookie(res, refreshToken, { persistent });
+  cookie.setRefreshCookie(res, refreshToken);
+  if (deviceToken) cookie.setDeviceCookie(res, deviceToken, TWO_FACTOR.TRUSTED_DEVICE_DAYS);
   return sendSuccess(res, rest);
 }
 
 // The request context (IP, user agent) is stored with each refresh token so
 // users can later see their active sessions.
 async function login(req, res) {
-  const result = await authService.login(req.valid.body, requestContext(req));
+  const result = await authService.login(req.valid.body, requestContext(req), { deviceToken: cookie.readDeviceCookie(req) });
   // Two-factor (Phase 15): no session yet, only the mfaToken for step 2.
   if (result.mfaToken) return sendSuccess(res, result);
   return sendTokens(req, res, result);
@@ -63,8 +65,8 @@ async function login(req, res) {
 
 /** Login step 2: a code (or recovery code) → the session. */
 async function verifyLoginTwoFactor(req, res) {
-  const { session, remember } = await twoFactor.verifyLogin(req.valid.body, requestContext(req));
-  return sendTokens(req, res, session, { persistent: remember });
+  const { session, deviceToken } = await twoFactor.verifyLogin(req.valid.body, requestContext(req));
+  return sendTokens(req, res, session, { deviceToken });
 }
 
 /** An admin without two-factor: the secret to scan. */
@@ -74,8 +76,8 @@ async function startLoginTwoFactorSetup(req, res) {
 
 /** The first code: two-factor on, the recovery codes (shown once) and the session. */
 async function confirmLoginTwoFactorSetup(req, res) {
-  const { session, recoveryCodes, remember } = await twoFactor.confirmLoginSetup(req.valid.body, requestContext(req));
-  return sendTokens(req, res, { ...session, recoveryCodes }, { persistent: remember });
+  const { session, recoveryCodes } = await twoFactor.confirmLoginSetup(req.valid.body, requestContext(req));
+  return sendTokens(req, res, { ...session, recoveryCodes });
 }
 
 async function refresh(req, res) {
