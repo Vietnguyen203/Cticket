@@ -16,14 +16,20 @@ export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   workers: process.env.CI ? 2 : 4,
-  reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : [['list'], ['html', { open: 'never' }]],
+  reporter: [
+    ['list'],
+    ['html', { open: 'never' }],
+    // E2E_VIDEO=1: the videos are also copied to e2e/videos/, under readable names.
+    ...(process.env.E2E_VIDEO ? [['./support/video-reporter.ts'] as const] : []),
+  ],
   use: {
     baseURL: WEB_URL,
     locale: 'vi-VN',
     timezoneId: 'Asia/Ho_Chi_Minh',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    // E2E_VIDEO=1 keeps a video of every test, passed or not (to watch a run in the report).
+    video: process.env.E2E_VIDEO ? 'on' : 'retain-on-failure',
   },
   projects: [
     // Opens the app once so the dev server has compiled it before the first spec (tests/warmup.setup.ts).
