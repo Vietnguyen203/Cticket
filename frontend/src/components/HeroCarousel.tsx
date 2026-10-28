@@ -4,36 +4,43 @@ import type { EventSummary } from '../api/types'
 import { dateParts, formatVnd } from '../utils/format'
 import { STOCK_LABEL, stockOf } from '../utils/stock'
 import { EventImage } from './EventImage'
-import { ArrowRightIcon, CalendarIcon, ChevronLeftIcon, ChevronRightIcon, MapPinIcon } from './icons'
+import { ArrowRightIcon, CalendarIcon, MapPinIcon } from './icons'
 
-const AUTO_MS = 6000
+const AUTO_MS = 3000
 
 /**
  * The home page's featured events, one at a time, full width: the picture,
  * darkened toward the text, the essentials and "Mua vé". Slides cross-fade
  * (a transition, so a quick second click retargets smoothly).
  *
- * It moves on by itself every 6 s, but never while the pointer or the
- * keyboard is in it, while the tab is hidden, after the pause button, or
- * with reduced motion (WCAG 2.2.2: moving content can be paused).
+ * It moves on by itself every 3 s; no pause or arrow buttons, only the dots
+ * (and the arrow keys). It holds still while the pointer or the keyboard is
+ * in it (to read or click a slide), while the tab is hidden, and with
+ * reduced motion. `onActiveChange`: the slide shown (the home page tints the
+ * area below with its picture).
  */
-export function HeroCarousel({ events }: { events: EventSummary[] }) {
+export function HeroCarousel({ events, onActiveChange }: { events: EventSummary[]; onActiveChange?: (event: EventSummary) => void }) {
   const [index, setIndex] = useState(0)
   const [held, setHeld] = useState(false) // pointer / focus inside
-  const [paused, setPaused] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+  const [still] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   const count = events.length
   const go = (to: number) => setIndex(((to % count) + count) % count)
+  const current = Math.min(index, Math.max(0, count - 1))
 
   useEffect(() => {
-    if (count < 2 || held || paused) return undefined
+    if (count < 2 || held || still) return undefined
     const timer = window.setInterval(() => {
-      if (!document.hidden) setIndex((current) => (current + 1) % count)
+      if (!document.hidden) setIndex((i) => (i + 1) % count)
     }, AUTO_MS)
     return () => window.clearInterval(timer)
-  }, [count, held, paused])
+  }, [count, held, still])
+
+  const active = events[current]
+  useEffect(() => {
+    if (active) onActiveChange?.(active)
+  }, [active, onActiveChange])
 
   if (count === 0) return null
-  const current = Math.min(index, count - 1)
 
   return (
     <section
@@ -60,7 +67,7 @@ export function HeroCarousel({ events }: { events: EventSummary[] }) {
 
       {count > 1 && (
         <div className="absolute inset-x-0 bottom-0 z-10">
-          <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 pb-16 sm:px-6">
+          <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 pb-16 sm:px-6">
             <div className="flex items-center gap-1.5">
               {events.map((event, i) => (
                 <button
@@ -77,29 +84,12 @@ export function HeroCarousel({ events }: { events: EventSummary[] }) {
                 </button>
               ))}
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setPaused((p) => !p)}
-                className="whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold text-white/80 ring-1 ring-white/25 transition hover:bg-white/10 hover:text-white"
-              >
-                {paused ? 'Tự chuyển' : 'Tạm dừng'}
-              </button>
-              <button type="button" onClick={() => go(current - 1)} aria-label="Sự kiện trước" className={NAV}>
-                <ChevronLeftIcon size={20} />
-              </button>
-              <button type="button" onClick={() => go(current + 1)} aria-label="Sự kiện tiếp theo" className={NAV}>
-                <ChevronRightIcon size={20} />
-              </button>
-            </div>
           </div>
         </div>
       )}
     </section>
   )
 }
-
-const NAV = 'flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/20 backdrop-blur transition hover:bg-white/20 active:scale-[0.97]'
 
 function Slide({ event, active, position }: { event: EventSummary; active: boolean; position: string }) {
   const when = event.nextStartAt ? dateParts(event.nextStartAt) : null

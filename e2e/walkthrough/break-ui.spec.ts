@@ -150,7 +150,6 @@ test('break-ui: demo vs worst case', async ({ browser, api, admin }) => {
     await shoot(page, `poster-demo-${tag}`)
     await page.goto('/')
     // The carousel: bring the worst event's slide forward.
-    await page.getByRole('button', { name: 'Tạm dừng' }).click()
     await page.getByRole('button', { name: /^Sự kiện \d+: Đêm nhạc Trịnh Công Sơn/ }).click()
     await page.waitForTimeout(700)
     await page.screenshot({ path: path.join(OUT, `carousel-worst-${tag}.png`) })

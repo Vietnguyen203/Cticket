@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
 import { getAvailability, getEvent } from '../../api/events'
 import type { EventDetail, Schedule, TicketTypeAvailability } from '../../api/types'
@@ -19,6 +18,22 @@ function saleState(schedule: Schedule, now = new Date()): SaleState {
   if (now < new Date(schedule.salesStartAt)) return 'not-yet'
   if (now >= new Date(schedule.salesEndAt)) return 'closed'
   return 'on-sale'
+}
+
+/** "19:00 - 22:00": the show's start and end times (Vietnam time). */
+function timeRange(schedule: Schedule): string {
+  const end = dateParts(schedule.endAt)
+  return `${dateParts(schedule.startAt).time} - ${end.time}`
+}
+
+/** The greyed button of the buying card when nothing is on sale. */
+function headerState(schedules: Schedule[]): string {
+  const states = schedules.map((s) => saleState(s))
+  if (states.length > 0 && states.every((s) => s === 'over' || s === 'cancelled')) {
+    return states.every((s) => s === 'cancelled') ? 'Sự kiện đã hủy' : 'Sự kiện đã kết thúc'
+  }
+  if (states.some((s) => s === 'not-yet' || s === 'not-ready')) return 'Chưa mở bán'
+  return 'Đã đóng bán'
 }
 
 const SALE_LABEL: Record<SaleState, string> = {
@@ -96,65 +111,104 @@ export function EventDetailPage() {
             </span>
           </nav>
 
-          <div className="grid items-center gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-            <div className="order-2 flex animate-fade-up flex-col lg:order-1">
-              <div className="flex flex-wrap gap-2">
-                {e.categories.map((c) => (
-                  <Link key={c.id} to={`/events?categoryId=${c.id}`} className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/15 hover:bg-white/20">
-                    {c.name}
-                  </Link>
-                ))}
-                {e.ageRestriction ? <span className="rounded-full bg-accent-500 px-3 py-1 text-xs font-bold text-white">{e.ageRestriction}+</span> : null}
-              </div>
-              <h1 className="mt-4 text-balance text-3xl font-bold leading-tight sm:text-4xl lg:text-5xl">{e.title}</h1>
+          {/*
+            The buying card, shaped like a ticket: the essentials and "Mua vé" on the
+            left, the event's picture on the right, a perforated line between them.
+          */}
+          <div className="relative grid animate-fade-up overflow-hidden rounded-panel bg-night-soft/90 shadow-raised ring-1 ring-white/10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.6fr)]">
+            <div className="flex flex-col p-5 sm:p-7 lg:order-1">
+              {(e.categories.length > 0 || e.ageRestriction) && (
+                <div className="mb-3 flex flex-wrap gap-2">
+                  {e.categories.map((c) => (
+                    <Link key={c.id} to={`/events?categoryId=${c.id}`} className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white ring-1 ring-white/15 hover:bg-white/20">
+                      {c.name}
+                    </Link>
+                  ))}
+                  {e.ageRestriction ? <span className="rounded-full bg-accent-500 px-3 py-1 text-xs font-bold text-white">{e.ageRestriction}+</span> : null}
+                </div>
+              )}
+              <h1 className="text-balance text-2xl font-bold leading-snug sm:text-3xl">{e.title}</h1>
               {e.rating?.average != null && (
-                <a href="#danh-gia" className="mt-3 inline-flex w-fit items-center gap-1 rounded-control text-sm text-slate-200 hover:text-white">
+                <a href="#danh-gia" className="mt-2 inline-flex w-fit items-center gap-1 rounded-control text-sm text-slate-200 hover:text-white">
                   <StarIcon size={16} className="text-amber-400" />
                   <span className="font-semibold text-white">{e.rating.average.toLocaleString('vi-VN')}</span>
                   <span>· {e.rating.count} đánh giá</span>
                 </a>
               )}
 
-              <dl className="mt-6 space-y-3 text-sm">
+              <dl className="mt-5 space-y-3 text-sm">
                 {next && nextWhen && (
-                  <Fact icon={<CalendarIcon size={20} />} label={schedules.length > 1 ? `Suất gần nhất (${schedules.length} suất)` : 'Thời gian'}>
-                    {nextWhen.weekday}, {nextWhen.day}/{nextWhen.month.slice(2)}/{nextWhen.year} · {nextWhen.time}
-                  </Fact>
+                  <div className="flex gap-2.5">
+                    <dt className="mt-0.5 shrink-0 text-brand-300">
+                      <CalendarIcon size={18} />
+                      <span className="sr-only">{schedules.length > 1 ? `Suất gần nhất (${schedules.length} suất)` : 'Thời gian'}</span>
+                    </dt>
+                    <dd className="font-semibold text-brand-300">
+                      {timeRange(next)}, {nextWhen.day.padStart(2, '0')} Tháng {nextWhen.month.slice(2).padStart(2, '0')}, {nextWhen.year}
+                      {schedules.length > 1 && <span className="block text-xs font-normal text-slate-300">Suất gần nhất · {schedules.length} suất diễn</span>}
+                    </dd>
+                  </div>
                 )}
                 {next && (
-                  <Fact icon={<MapPinIcon size={20} />} label="Địa điểm">
-                    {next.venue.name}
-                    <span className="block font-normal text-slate-300">
-                      {next.venue.addressLine}, {next.venue.city}
-                    </span>
-                  </Fact>
+                  <div className="flex gap-2.5">
+                    <dt className="mt-0.5 shrink-0 text-brand-300">
+                      <MapPinIcon size={18} />
+                      <span className="sr-only">Địa điểm</span>
+                    </dt>
+                    <dd>
+                      <span className="block font-semibold text-brand-300">{next.venue.name}</span>
+                      <span className="block text-slate-300">
+                        {next.venue.addressLine}, {next.venue.city}
+                      </span>
+                    </dd>
+                  </div>
                 )}
-                <Fact icon={<UserIcon size={20} />} label="Ban tổ chức">
-                  {e.organizer.name}
-                </Fact>
+                <div className="flex gap-2.5">
+                  <dt className="mt-0.5 shrink-0 text-slate-400">
+                    <UserIcon size={18} />
+                    <span className="sr-only">Ban tổ chức</span>
+                  </dt>
+                  <dd className="text-slate-300">{e.organizer.name}</dd>
+                </div>
               </dl>
 
-              <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-4">
-                <a
-                  href="#lich-dien"
-                  className="pressable inline-flex h-12 items-center gap-2 rounded-control bg-brand-700 px-6 font-semibold text-white shadow-raised transition hover:bg-brand-800"
-                >
-                  <TicketIcon size={20} />
-                  {onSale.length > 0 ? 'Mua vé' : 'Xem lịch diễn'}
-                </a>
+              {/* Price and button at the bottom of the card, whatever the length of the text above. */}
+              <div className="mt-6 border-t border-white/15 pt-4 lg:mt-auto">
                 {onSale.length > 0 ? (
-                  <p>
-                    <span className="block text-sm text-slate-300">Giá vé từ</span>
-                    <span className="block text-2xl font-bold text-white">{fromPrice !== null ? formatVnd(fromPrice) : availability.data ? 'Đã hết vé' : '…'}</span>
-                  </p>
+                  <a href="#lich-dien" className="group flex items-baseline gap-2 rounded-control">
+                    <span className="font-semibold text-white">Giá vé từ</span>
+                    <span className="text-2xl font-bold text-brand-300">{fromPrice !== null ? formatVnd(fromPrice) : availability.data ? 'Đã hết vé' : '…'}</span>
+                    <ChevronRightIcon size={20} className="self-center text-white transition-transform group-hover:translate-x-0.5" />
+                  </a>
                 ) : (
                   <p className="text-sm font-medium text-slate-300">Hiện không có suất nào đang mở bán.</p>
+                )}
+                {onSale.length > 0 ? (
+                  <a
+                    href="#lich-dien"
+                    className="pressable mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-control bg-brand-700 px-6 font-semibold text-white shadow-raised transition hover:bg-brand-800"
+                  >
+                    <TicketIcon size={20} />
+                    Mua vé ngay
+                  </a>
+                ) : (
+                  <span aria-disabled="true" className="mt-3 flex h-12 w-full items-center justify-center rounded-control bg-white/10 px-6 font-semibold text-slate-400">
+                    {headerState(schedules)}
+                  </span>
                 )}
               </div>
             </div>
 
-            <div className="order-1 aspect-video animate-scale-in overflow-hidden rounded-panel shadow-raised ring-1 ring-white/10 lg:order-2">
-              <EventImage src={e.bannerUrl ?? e.thumbnailUrl} />
+            {/* The picture, behind the perforation (wide screens: on the right). */}
+            <div className="relative order-first aspect-video lg:order-2 lg:aspect-auto lg:min-h-[22rem]">
+              <div className="absolute inset-0 animate-scale-in">
+                <EventImage src={e.bannerUrl ?? e.thumbnailUrl} />
+              </div>
+            </div>
+            {/* The perforated line and its two notches (wide screens only, where the card is a ticket on its side). */}
+            <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-[36%] hidden w-0 border-l-2 border-dashed border-white/40 lg:block">
+              <span className="absolute -left-[1.3rem] -top-5 h-10 w-10 rounded-full bg-night" />
+              <span className="absolute -bottom-5 -left-[1.3rem] h-10 w-10 rounded-full bg-night" />
             </div>
           </div>
         </div>
@@ -240,18 +294,6 @@ export function EventDetailPage() {
 }
 
 /** One line of the poster's essentials (light text on the dark poster). */
-function Fact({ icon, label, children }: { icon: ReactNode; label: string; children: ReactNode }) {
-  return (
-    <div className="flex gap-3">
-      <span className="mt-0.5 shrink-0 text-brand-300">{icon}</span>
-      <div className="min-w-0">
-        <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</dt>
-        <dd className="mt-0.5 font-semibold text-white">{children}</dd>
-      </div>
-    </div>
-  )
-}
-
 const AVATAR_COLORS = ['bg-brand-700', 'bg-accent-500', 'bg-brand-900', 'bg-accent-700', 'bg-brand-500']
 
 function ScheduleBox({ schedule, slug, ticketTypes }: { schedule: Schedule; slug: string; ticketTypes: TicketTypeAvailability[] | undefined }) {
