@@ -96,6 +96,9 @@ services:
       SMTP_PASS: ${SMTP_PASS:-}
       MAIL_FROM: ${MAIL_FROM:-Event Tickets <no-reply@etp.local>}
       ALERT_EMAILS: ${ALERT_EMAILS:-}
+      # Phase 23: no alert emails from this local stack by default (it mails through a real
+      # account, and a laptop's full disk or a stopped worker is no emergency). The page still works.
+      MONITORING_ALERTS: ${MONITORING_ALERTS:-false}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       # Browser origins of the web app (WebSocket Origin check, Phase 11).
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:8080,https://localhost:8443}
@@ -159,6 +162,9 @@ services:
       SMTP_PASS: ${SMTP_PASS:-}
       MAIL_FROM: ${MAIL_FROM:-Event Tickets <no-reply@etp.local>}
       ALERT_EMAILS: ${ALERT_EMAILS:-}
+      # Phase 23: no alert emails from this local stack by default (it mails through a real
+      # account, and a laptop's full disk or a stopped worker is no emergency). The page still works.
+      MONITORING_ALERTS: ${MONITORING_ALERTS:-false}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
     depends_on:
       postgres:
