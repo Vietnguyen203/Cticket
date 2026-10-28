@@ -91,7 +91,7 @@ const ERROR_CODES = Object.freeze({
   TWO_FACTOR_SETUP_NOT_STARTED: { status: 409, message: 'Start the two-factor setup first.' },
   LAST_ADMIN: { status: 409, message: 'The platform must keep at least one active administrator.' },
   ACCOUNT_DELETION_BLOCKED: { status: 409, message: 'This account cannot be deleted yet; see details.reasons.' },
-  ACCOUNT_DELETED: { status: 409, message: 'This account was deleted by its owner.' },
+  ACCOUNT_DELETED: { status: 409, message: 'This account has been deleted for good.' },
   TICKET_NOT_REISSUABLE: { status: 409, message: 'Only a valid (not used, not refunded) ticket can get a new QR code.' },
   STAFF_USER_NOT_FOUND: { status: 422, message: 'No active account uses this email.' },
   WAITLIST_NOT_NEEDED: { status: 409, message: 'There are tickets left: book them now instead of waiting.' },

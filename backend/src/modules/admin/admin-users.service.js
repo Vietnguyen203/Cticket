@@ -6,6 +6,7 @@ const { toLimitOffset, toPageMeta } = require('../../utils/pagination');
 const { recordAudit } = require('../audit');
 const auth = require('../auth');
 const organizers = require('../organizers');
+const account = require('../account/account.service');
 const adminUsersRepository = require('./admin-users.repository');
 
 function toAdminUser(row) {
@@ -87,6 +88,32 @@ async function changeStatus(context, adminId, userId, { status, reason }) {
 }
 
 /**
+ * "Xóa vĩnh viễn": the admin deletes an account for good, as its owner can
+ * (DELETE /users/me): personal data removed, the person logged out
+ * everywhere, the email freed. Orders, payments, refunds and tickets stay,
+ * anonymised, for the accounts. The same blockers apply (open order, show
+ * still to come, refund in progress, organizer with events, admin role).
+ * Never one's own account. Not undoable; the reason goes to the audit log.
+ */
+async function deletePermanently(context, adminId, userId, { reason }) {
+  if (userId === adminId) throw new AppError('CANNOT_CHANGE_SELF');
+  const unusable = await account.unusablePasswordHash();
+  await withTransaction(async (client) => {
+    const user = await adminUsersRepository.findForUpdate(client, userId);
+    if (!user) throw userNotFound();
+    if (user.status === USER_STATUS.DELETED) throw new AppError('ACCOUNT_DELETED');
+    await account.closeAccount(client, {
+      userId,
+      email: user.email,
+      unusable,
+      context,
+      audit: { action: 'ACCOUNT_DELETED_BY_ADMIN', oldValue: { status: user.status }, newValue: { status: USER_STATUS.DELETED, reason } },
+    });
+  });
+  return { deleted: true };
+}
+
+/**
  * USR-05: set the user's roles (CUSTOMER is always kept). The system always
  * keeps at least one active admin, and an admin cannot drop their own ADMIN
  * role. A removed role is gone at once (sessions ended); an added one shows
@@ -160,4 +187,4 @@ async function unlockLogin(context, userId) {
   });
 }
 
-module.exports = { listUsers, changeStatus, setRoles, resetTwoFactor, unlockLogin };
+module.exports = { listUsers, changeStatus, deletePermanently, setRoles, resetTwoFactor, unlockLogin };

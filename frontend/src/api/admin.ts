@@ -220,9 +220,21 @@ export async function unlockUserLogin(id: string): Promise<AdminUser> {
   return (await api.post(`/admin/users/${id}/login-unlock`)).data.data.user
 }
 
-/** Suspending logs the user out everywhere at once (reason required). */
+/**
+ * "Xóa tài khoản" (SUSPENDED, reason required): logged out everywhere at once,
+ * cannot sign in; data and transactions untouched, restored with ACTIVE.
+ */
 export async function setUserStatus(id: string, status: 'ACTIVE' | 'SUSPENDED', reason?: string): Promise<AdminUser> {
   return (await api.patch(`/admin/users/${id}/status`, { status, ...(reason ? { reason } : {}) })).data.data.user
+}
+
+/**
+ * "Xóa vĩnh viễn": personal data removed for good; orders, payments, refunds
+ * and tickets stay, anonymised. Refused (ACCOUNT_DELETION_BLOCKED, details.reasons)
+ * while something still needs the account.
+ */
+export async function deleteUserPermanently(id: string, reason: string): Promise<void> {
+  await api.delete(`/admin/users/${id}`, { data: { reason } })
 }
 
 export async function setUserRoles(id: string, roles: Role[]): Promise<AdminUser> {
