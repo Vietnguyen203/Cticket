@@ -36,23 +36,21 @@ test('organizer builds an event in the pages, submits it; the admin approves; it
   await page.getByRole('button', { name: 'Lưu tổng' }).click()
   await expect(page.getByTestId('allocation')).toContainText('Đã xếp 0 / 70 người')
 
-  // The venue's zones are there already: a tier is given to each. Khu A sells its 20 seats.
-  const zoneA = page.getByRole('form', { name: 'Gán hạng cho Khu A' })
+  // The venue's zones are there already: a tier for each, both confirmed with ONE button.
+  // Khu A sells its 20 seats; the standing zone holds 100, but only 50 of the 70 are left after Khu A.
+  const zoneA = page.getByRole('group', { name: 'Gán hạng cho Khu A' })
   await zoneA.getByLabel('Tên hạng').fill('Hạng VIP')
   await zoneA.getByLabel('Giá (VND)').fill('1500000')
-  await zoneA.getByRole('button', { name: 'Gán 20 ghế' }).click()
-  await expect(page.getByRole('cell', { name: /Ghế ngồi · Khu A: hàng A–B/ })).toBeVisible()
-
-  // The standing zone holds 100, but only 50 of the 70 are left.
-  const pit = page.getByRole('form', { name: 'Gán hạng cho Khu đứng' })
+  const pit = page.getByRole('group', { name: 'Gán hạng cho Khu đứng' })
   await pit.getByLabel('Tên hạng').fill('Vé đứng')
   await pit.getByLabel('Giá (VND)').fill('300000')
-  // The zone holds 100 but only 50 of the 70 are left: that is the default; more is refused at once.
-  await expect(pit.getByLabel('Số vé')).toHaveValue('50')
+  await expect(pit.getByLabel('Số vé')).toHaveValue('50') // what is left after Khu A's 20
   await pit.getByLabel('Số vé').fill('51')
-  await expect(pit.getByText('Chỉ còn 50 người chưa xếp (tổng số người tham dự).')).toBeVisible()
+  await expect(page.getByText('Các khu đã nhập giá cộng lại 71 người, chỉ còn 70 người chưa xếp (tổng số người tham dự).')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Xác nhận (2 khu)' })).toBeDisabled()
   await pit.getByLabel('Số vé').fill('50')
-  await pit.getByRole('button', { name: 'Gán', exact: true }).click()
+  await page.getByRole('button', { name: 'Xác nhận (2 khu)' }).click()
+  await expect(page.getByRole('cell', { name: /Ghế ngồi · Khu A: hàng A–B/ })).toBeVisible()
   await expect(page.getByTestId('allocation')).toContainText('Đã xếp 70 / 70 người')
   await expect(page.getByText(/^Vé đứng · 300\.000.* · 50 vé$/)).toBeVisible()
 

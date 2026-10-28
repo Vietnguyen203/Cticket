@@ -60,11 +60,11 @@ test('the editor says what is missing, and a new venue is used only once it has 
   await page.getByRole('button', { name: 'Lưu tổng' }).click()
   await expect(page.getByText(/chưa có khu đứng: suất này chỉ bán được vé ghế ngồi/)).toBeVisible()
   // Its one zone gets a tier: all its 10 seats.
-  const zoneA = page.getByRole('form', { name: 'Gán hạng cho Khu A' })
+  const zoneA = page.getByRole('group', { name: 'Gán hạng cho Khu A' })
   await zoneA.getByLabel('Tên hạng').fill('Hạng VIP')
   await zoneA.getByLabel('Giá (VND)').fill('800000')
   await expect(zoneA.getByLabel('Giá (VND)')).toHaveValue('800.000') // "." between thousands as it is typed
-  await zoneA.getByRole('button', { name: 'Gán 10 ghế' }).click()
+  await page.getByRole('button', { name: /^Xác nhận/ }).click()
   await expect(page.getByRole('cell', { name: /Ghế ngồi · Khu A: hàng A–B/ })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Gửi duyệt' })).toBeEnabled()
 })
@@ -124,8 +124,8 @@ test('an approved venue without seats: the organizer is told who can fix it', as
   await expect(page.getByRole('button', { name: 'Thêm khu / ghế cho địa điểm này' })).toHaveCount(0)
   // Standing tiers are what this venue can sell, in its standing zone (a zone is required).
   // Only the standing zone has places (the seated one has no seats): it gets the tier, within the total of 200.
-  await expect(page.getByRole('form', { name: 'Gán hạng cho Vip' })).toHaveCount(0)
-  const pitForm = page.getByRole('form', { name: 'Gán hạng cho Khu đứng sân' })
+  await expect(page.getByRole('group', { name: 'Gán hạng cho Vip' })).toHaveCount(0)
+  const pitForm = page.getByRole('group', { name: 'Gán hạng cho Khu đứng sân' })
   // The default stays within the total (200 of the zone's 300); more is refused at once.
   await expect(pitForm.getByLabel('Số vé')).toHaveValue('200')
   await pitForm.getByLabel('Số vé').fill('300')
@@ -133,7 +133,7 @@ test('an approved venue without seats: the organizer is told who can fix it', as
   await pitForm.getByLabel('Tên hạng').fill('Vé đứng')
   await pitForm.getByLabel('Giá (VND)').fill('300000')
   await pitForm.getByLabel('Số vé').fill('200')
-  await pitForm.getByRole('button', { name: 'Gán', exact: true }).click()
+  await page.getByRole('button', { name: /^Xác nhận/ }).click()
   await expect(page.getByRole('cell', { name: 'Vé đứng · Khu đứng sân' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Gửi duyệt' })).toBeEnabled()
 })
@@ -183,11 +183,11 @@ test('a seated zone larger than the total is assigned in part; "Bỏ gán" frees
 
   await signIn(page, organizer.email, undefined, `/organizer/events/${event.id}?tab=schedules`)
   // 20 seats, 15 people in total: the zone line proposes 15 of its seats (front rows first).
-  const zoneA = page.getByRole('form', { name: 'Gán hạng cho Khu A' })
+  const zoneA = page.getByRole('group', { name: 'Gán hạng cho Khu A' })
   await expect(zoneA.getByLabel('Số ghế')).toHaveValue('15')
   await zoneA.getByLabel('Tên hạng').fill('Hạng VIP')
   await zoneA.getByLabel('Giá (VND)').fill('1000000')
-  await zoneA.getByRole('button', { name: 'Gán 15 ghế' }).click()
+  await page.getByRole('button', { name: /^Xác nhận/ }).click()
   await expect(page.getByRole('cell', { name: /Ghế ngồi · Khu A: hàng A–B/ })).toBeVisible()
   await expect(page.getByTestId('allocation')).toContainText('Đã xếp 15 / 15 người')
 

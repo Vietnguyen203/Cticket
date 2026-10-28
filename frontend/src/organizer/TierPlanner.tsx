@@ -4,7 +4,7 @@ import { createTicketType, deleteTicketType, saveSeatPlan, updateSchedule } from
 import { Alert, Button, NumberField, TextField } from '../components/ui'
 import { venueCapacityMessage, zonePlaces } from '../admin/venueCapacity'
 import { formatVnd } from '../utils/format'
-import { allocation, freeSeatsOfZones, planWith, planWithout, tierCode, zoneLines, type ZoneLine } from './allocation'
+import { allocation, freeSeatsOfZones, planWithAll, planWithout, tierCode, tierRows, zoneLines, type TierDraft, type TierRow, type ZoneLine } from './allocation'
 import type { LoadedSchedule } from './setup'
 
 /**
@@ -116,94 +116,132 @@ function CapacityForm({ setup, allocated, onChanged }: { setup: LoadedSchedule; 
   )
 }
 
+const n = (x: number) => x.toLocaleString('vi-VN')
+
 /**
  * "Hạng vé theo khu": the venue already has its zones, so a tier is given to
- * a zone, not created out of nothing. A seated zone sells all its free seats
+ * a zone, not created out of nothing. A seated zone sells its free seats
  * (buyers pick them on the map); a standing zone sells a number of tickets, at
  * most its capacity. Each line: tier name (the zone's name by default), price,
- * max per order, "Gán"; a zone with a tier shows it, with "Bỏ gán".
+ * count, max per order. Every zone with a price is assigned by ONE button,
+ * "Xác nhận" (the seats of all seated zones in one save); a zone with a tier
+ * shows it, with "Bỏ gán".
  */
 function ZoneTierTable({ setup, remaining, onChanged }: { setup: LoadedSchedule; remaining: number; onChanged: () => void }) {
-  const { zones, plan, ticketTypes } = setup
+  const { schedule, zones, plan, ticketTypes } = setup
+  const [drafts, setDrafts] = useState<Record<string, TierDraft>>({})
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
   if (!zones) return <p className="text-sm text-amber-700">Chưa tải được khu và ghế của địa điểm.</p>
   const lines = zoneLines(zones, plan, ticketTypes)
   if (lines.length === 0) return <p className="text-sm text-amber-700">Địa điểm chưa có khu nào có chỗ (khu ngồi chưa có ghế, chưa có khu đứng).</p>
-  return (
-    <div>
-      <h4 className="mb-1 text-sm font-semibold">Hạng vé theo khu của địa điểm</h4>
-      <p className="mb-2 text-xs text-slate-500">
-        Gán hạng và giá cho từng khu có sẵn. Khu ngồi bán toàn bộ ghế trống của khu (khách chọn ghế trên sơ đồ); khu đứng bán theo số lượng, tối đa
-        bằng sức chứa của khu.
-      </p>
-      <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
-        {lines.map((line) => (
-          <ZoneTierLine key={line.zone.id} line={line} setup={setup} remaining={remaining} onChanged={onChanged} />
-        ))}
-      </ul>
-    </div>
-  )
-}
 
-function ZoneTierLine({ line, setup, remaining, onChanged }: { line: ZoneLine; setup: LoadedSchedule; remaining: number; onChanged: () => void }) {
-  const { schedule, zones, plan, ticketTypes } = setup
-  const { zone, seated } = line
-  const [name, setName] = useState(zone.name)
-  const [price, setPrice] = useState('')
-  // The number typed; until then, what the zone has left within the total (follows every change).
-  const [typed, setTyped] = useState<string | null>(null)
-  const count = typed ?? String(Math.max(0, Math.min(line.free, remaining)))
-  const [maxPerOrder, setMaxPerOrder] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  const n = (x: number) => x.toLocaleString('vi-VN')
+  const change = (line: ZoneLine, patch: Partial<TierDraft>) =>
+    setDrafts((all) => ({ ...all, [line.zone.id]: { ...(all[line.zone.id] ?? { name: line.zone.name, price: '', typed: null, maxPerOrder: '' }), ...patch } }))
+  const { rows, chosen, overTotal } = tierRows(lines, drafts, remaining)
+  const canConfirm = chosen.length > 0 && chosen.every((row) => !row.problem) && !overTotal
 
-  // Seated: that many of the zone's free seats, front rows first. Standing: that many tickets.
-  const places = Number(count)
-  const problem =
-    line.free === 0
-      ? null
-      : !Number.isInteger(places) || places < 1
-        ? seated
-          ? 'Nhập số ghế (số nguyên dương).'
-          : 'Nhập số vé (số nguyên dương).'
-        : places > line.free
-          ? `Khu còn ${n(line.free)} ${seated ? 'ghế trống' : 'chỗ'}.`
-          : places > remaining
-            ? `Chỉ còn ${n(Math.max(0, remaining))} người chưa xếp (tổng số người tham dự).`
-            : null
-
-  async function assign(e: FormEvent) {
-    e.preventDefault()
+  /** Every zone with a price: its tier, then the seats of all seated zones in one seat-plan save. */
+  async function confirm(event: FormEvent) {
+    event.preventDefault()
     setBusy(true)
     setError(null)
+    const created: Array<{ id: string; row: TierRow }> = []
     try {
-      const code = tierCode(zone.code, ticketTypes.map((tt) => tt.code))
-      const created = await createTicketType(schedule.id, {
-        code,
-        name: name.trim(),
-        price: Number(price),
-        inventoryMode: seated ? 'RESERVED' : 'GENERAL_ADMISSION',
-        ...(seated ? {} : { capacity: places, venueZoneId: zone.id }),
-        ...(maxPerOrder ? { maxPerOrder: Number(maxPerOrder) } : {}),
-      })
-      if (seated && zones) {
-        try {
-          await saveSeatPlan(schedule.id, planWith(plan, created.id, freeSeatsOfZones(zones, plan, [zone.id]).slice(0, places)))
-        } catch (err) {
-          // A seated tier without its seats would be a dead end: take it back.
-          await deleteTicketType(created.id).catch(() => undefined)
-          throw err
-        }
+      const codes = ticketTypes.map((tt) => tt.code)
+      for (const row of chosen) {
+        const { line, draft, places } = row
+        const code = tierCode(line.zone.code, codes)
+        codes.push(code)
+        const tier = await createTicketType(schedule.id, {
+          code,
+          name: draft.name.trim(),
+          price: Number(draft.price),
+          inventoryMode: line.seated ? 'RESERVED' : 'GENERAL_ADMISSION',
+          ...(line.seated ? {} : { capacity: places, venueZoneId: line.zone.id }),
+          ...(draft.maxPerOrder ? { maxPerOrder: Number(draft.maxPerOrder) } : {}),
+        })
+        created.push({ id: tier.id, row })
       }
-      setPrice('')
-      setTyped(null)
+      const seated = created.filter(({ row }) => row.line.seated)
+      if (seated.length > 0) {
+        await saveSeatPlan(
+          schedule.id,
+          planWithAll(
+            plan,
+            seated.map(({ id, row }) => ({ ticketTypeId: id, seatIds: freeSeatsOfZones(zones!, plan, [row.line.zone.id]).slice(0, row.places) })),
+          ),
+        )
+      }
+      setDrafts({})
       onChanged()
     } catch (err) {
+      // All or nothing: a seated tier without its seats would be a dead end.
+      await Promise.all(created.map(({ id }) => deleteTicketType(id).catch(() => undefined)))
       setError(toApiError(err).message)
     } finally {
       setBusy(false)
     }
   }
+
+  return (
+    <div>
+      <h4 className="mb-1 text-sm font-semibold">Hạng vé theo khu của địa điểm</h4>
+      <p className="mb-2 text-xs text-slate-500">
+        Nhập tên hạng và giá cho các khu muốn bán rồi bấm "Xác nhận" một lần. Khu để trống giá thì chưa gán. Khu ngồi bán ghế trống của khu (khách chọn
+        ghế trên sơ đồ); khu đứng bán theo số lượng, tối đa bằng sức chứa của khu.
+      </p>
+      <form onSubmit={confirm} noValidate aria-label="Gán hạng vé cho các khu">
+        <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+          {lines.map((line) => (
+            <ZoneTierLine
+              key={line.zone.id}
+              line={line}
+              row={rows.find((row) => row.line === line)}
+              setup={setup}
+              disabled={busy}
+              onChange={(patch) => change(line, patch)}
+              onChanged={onChanged}
+            />
+          ))}
+        </ul>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <Button type="submit" loading={busy} disabled={!canConfirm}>
+            {chosen.length > 0 ? `Xác nhận (${chosen.length} khu)` : 'Xác nhận'}
+          </Button>
+          {chosen.length === 0 && rows.length > 0 && <span className="text-sm text-slate-500">Nhập giá cho ít nhất một khu.</span>}
+          {overTotal && <span className="text-sm text-red-600">{overTotal}</span>}
+        </div>
+        {error && (
+          <div className="mt-2">
+            <Alert>{error}</Alert>
+          </div>
+        )}
+      </form>
+    </div>
+  )
+}
+
+function ZoneTierLine({
+  line,
+  row,
+  setup,
+  disabled,
+  onChange,
+  onChanged,
+}: {
+  line: ZoneLine
+  /** absent: no free place left in the zone (nothing to type) */
+  row: TierRow | undefined
+  setup: LoadedSchedule
+  disabled: boolean
+  onChange: (patch: Partial<TierDraft>) => void
+  onChanged: () => void
+}) {
+  const { schedule, plan } = setup
+  const { zone, seated } = line
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
 
   /**
    * Takes the tier off THIS zone. A seated tier that also has seats in other
@@ -218,7 +256,7 @@ function ZoneTierLine({ line, setup, remaining, onChanged }: { line: ZoneLine; s
       const elsewhere = seated && plan.assignments.some((a) => a.ticketTypeId === id && !zoneSeats.has(a.seatId))
       if (elsewhere) await saveSeatPlan(schedule.id, planWithout(plan, id, [...zoneSeats]))
       else await deleteTicketType(id)
-      setTyped(null)
+      onChange({ typed: null })
       onChanged()
     } catch (err) {
       setError(toApiError(err).message)
@@ -241,22 +279,17 @@ function ZoneTierLine({ line, setup, remaining, onChanged }: { line: ZoneLine; s
           <span>
             <strong>{tier.name}</strong> · {formatVnd(tier.price)} · {n(tier.places)} {seated ? 'ghế' : 'vé'}
           </span>
-          <Button type="button" variant="ghost" className="ml-auto text-red-600 hover:bg-red-50" disabled={busy} onClick={() => void unassign(tier.id)}>
+          <Button type="button" variant="ghost" className="ml-auto text-red-600 hover:bg-red-50" disabled={busy || disabled} onClick={() => void unassign(tier.id)}>
             Bỏ gán
           </Button>
         </div>
       ))}
       {error && <Alert>{error}</Alert>}
-      {line.free > 0 && (
-        <form onSubmit={assign} className="flex flex-wrap items-end gap-2" noValidate aria-label={`Gán hạng cho ${zone.name}`}>
-          <TextField label="Tên hạng" name={`tier-name-${zone.id}`} value={name} onChange={(e) => setName(e.target.value)} />
-          <NumberField label="Giá (VND)" name={`tier-price-${zone.id}`} value={price} onChange={(e) => setPrice(e.target.value)} />
-          <NumberField
-            label={seated ? 'Số ghế' : 'Số vé'}
-            name={`tier-count-${zone.id}`}
-            value={count}
-            onChange={(e) => setTyped(e.target.value)}
-          />
+      {row && (
+        <fieldset className="flex flex-wrap items-end gap-2" disabled={disabled} aria-label={`Gán hạng cho ${zone.name}`}>
+          <TextField label="Tên hạng" name={`tier-name-${zone.id}`} value={row.draft.name} onChange={(e) => onChange({ name: e.target.value })} />
+          <NumberField label="Giá (VND)" name={`tier-price-${zone.id}`} value={row.draft.price} onChange={(e) => onChange({ price: e.target.value })} />
+          <NumberField label={seated ? 'Số ghế' : 'Số vé'} name={`tier-count-${zone.id}`} value={row.count} onChange={(e) => onChange({ typed: e.target.value })} />
           <TextField
             label="Tối đa / đơn"
             name={`tier-max-${zone.id}`}
@@ -264,14 +297,11 @@ function ZoneTierLine({ line, setup, remaining, onChanged }: { line: ZoneLine; s
             min={1}
             max={50}
             placeholder="10"
-            value={maxPerOrder}
-            onChange={(e) => setMaxPerOrder(e.target.value)}
+            value={row.draft.maxPerOrder}
+            onChange={(e) => onChange({ maxPerOrder: e.target.value })}
           />
-          <Button type="submit" loading={busy} disabled={!name.trim() || price === '' || Boolean(problem)}>
-            {seated ? `Gán ${n(places > 0 ? places : line.free)} ghế` : 'Gán'}
-          </Button>
-          {problem && <p className="w-full text-sm text-red-600">{problem}</p>}
-        </form>
+          {row.problem && <p className="w-full text-sm text-red-600">{row.problem}</p>}
+        </fieldset>
       )}
     </li>
   )
