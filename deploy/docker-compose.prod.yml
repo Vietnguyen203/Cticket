@@ -40,6 +40,8 @@ x-app-env: &app-env
   SMTP_USER: ${SMTP_USER:-}
   SMTP_PASS: ${SMTP_PASS:-}
   MAIL_FROM: ${MAIL_FROM:?Set MAIL_FROM in deploy/.env}
+  # Phase 23: monitoring alerts also go to these addresses (besides every admin).
+  ALERT_EMAILS: ${ALERT_EMAILS:-}
   # Phase 17: VNPay (docs/deployment.md, section 13). Empty TMN code = VNPay off.
   VNPAY_TMN_CODE: ${VNPAY_TMN_CODE:-}
   VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET:-}

@@ -119,6 +119,13 @@ const envSchema = z.object({
   VNPAY_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60_000).default(10_000),
   PAYMENT_SIMULATOR: booleanString.optional(),
 
+  // Phase 23: monitoring alerts also go to these addresses (comma-separated),
+  // besides every active account with the system:monitor permission.
+  ALERT_EMAILS: z.string().default('').transform(csv).pipe(z.array(z.email())),
+  // The alert check (every minute). Off on test stacks: their machine's disk or
+  // load would email every test admin.
+  MONITORING_ALERTS: booleanString.default(true),
+
   // Used only by `npm run seed:admin`.
   ADMIN_EMAIL: z.string().optional(),
   ADMIN_PASSWORD: z.string().optional(),

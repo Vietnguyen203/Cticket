@@ -3,6 +3,7 @@ const helmet = require('helmet');
 const cors = require('cors');
 const env = require('./config/env');
 const requestLogger = require('./middleware/requestLogger');
+const { metricsMiddleware } = require('./modules/monitoring');
 const notFound = require('./middleware/notFound');
 const errorHandler = require('./middleware/errorHandler');
 const { rateLimit, LIMITS } = require('./middleware/rateLimit');
@@ -22,6 +23,7 @@ function createApp() {
   if (env.TRUST_PROXY > 0) app.set('trust proxy', env.TRUST_PROXY);
 
   app.use(requestLogger);
+  app.use(metricsMiddleware); // Phase 23: request counts and latency
   app.use(helmet());
   // The web app is served from the same origin as the API (Vite / nginx proxy),
   // so CORS is only for other listed origins; clients that are not browsers

@@ -86,6 +86,8 @@ Object.assign(process.env, {
   QUEUE_MODE: 'inline',
   // Every request comes from 127.0.0.1; the limits have their own Jest tests.
   RATE_LIMIT_ENABLED: 'false',
+  // Phase 23: no alert emails from this stack (this machine's disk would email every test admin).
+  MONITORING_ALERTS: 'false',
   // A laptop running several browsers + Vite + Docker sometimes answers Redis
   // in more than the 200 ms default: cache and locks then degrade as designed,
   // but sign-up codes (Redis only) fail with 503. Seen while writing these

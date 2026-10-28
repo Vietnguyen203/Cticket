@@ -11,7 +11,7 @@ export interface MenuEntry {
 }
 
 export const ADMIN_MENU: MenuEntry[] = [
-  { to: '/admin', label: 'Tổng quan', anyOf: ['report:read:any', 'event:approve', 'organizer:manage', 'venue:manage', 'category:manage', 'user:manage', 'order:manage', 'audit:read'] },
+  { to: '/admin', label: 'Tổng quan', anyOf: ['report:read:any', 'event:approve', 'organizer:manage', 'venue:manage', 'category:manage', 'user:manage', 'order:manage', 'audit:read', 'system:monitor'] },
   { to: '/admin/reports', label: 'Doanh thu', anyOf: ['report:read:any'] },
   { to: '/admin/events', label: 'Sự kiện', anyOf: ['event:approve', 'event:manage:any'] },
   { to: '/admin/organizers', label: 'Nhà tổ chức', anyOf: ['organizer:manage'] },
@@ -22,6 +22,7 @@ export const ADMIN_MENU: MenuEntry[] = [
   { to: '/admin/promotions', label: 'Mã giảm giá', anyOf: ['promotion:manage'] },
   { to: '/admin/reviews', label: 'Đánh giá', anyOf: ['review:manage'] }, // Phase 19
   { to: '/admin/audit', label: 'Audit log', anyOf: ['audit:read'] },
+  { to: '/admin/system', label: 'Tình trạng hệ thống', anyOf: ['system:monitor'] }, // Phase 23
 ]
 
 /** Organizer area (Phase 12.2): the organizer's own events. */

@@ -234,6 +234,37 @@ const EVENT_LIMITS = Object.freeze({
   MAX_CATEGORIES: 5,
 });
 
+// Phase 23: system monitoring (docs/phase-23-monitoring-design.md).
+const MONITORING = Object.freeze({
+  FLUSH_INTERVAL_MS: 10_000, // each API process pushes its counts to Redis
+  KEEP_MINUTES: 25 * 60, // per-minute figures (24 hours shown)
+  // Latency histogram, upper bounds in ms; anything slower falls in the last bucket.
+  LATENCY_BUCKETS_MS: [25, 50, 100, 250, 500, 1000, 2500, 5000],
+  CHECK_INTERVAL_MS: 60_000, // alert rules
+  HEARTBEAT_INTERVAL_MS: 30_000, // the worker says it is alive
+  WS_REPORT_MAX_AGE_MS: 30_000, // a process silent longer is gone
+  HISTORY_DAYS: 7, // alert history and web errors
+  HISTORY_MAX: 200,
+  REMIND_AFTER_MS: 30 * 60_000, // a firing alert is emailed again after this
+  CLIENT_ERRORS_PER_PAGE: 5, // the web sends at most this many per page load
+  // Alert thresholds (section 5 of the design).
+  THRESHOLDS: Object.freeze({
+    errorRatePercent: 5,
+    errorRateMinRequests: 20,
+    windowMinutes: 5,
+    p95Ms: 2000,
+    dependencyFailures: 2, // consecutive checks
+    heartbeatMaxAgeMs: 2 * 60_000,
+    queueWaiting: 500,
+    queueOldestWaitMs: 5 * 60_000,
+    failedJobsPerHour: 10,
+    refundPendingMs: 60 * 60_000,
+    diskFreePercent: 10,
+    clientErrors: 50,
+    clientErrorsWindowMinutes: 10,
+  }),
+});
+
 // The terms of sale in force (frontend/src/legal/terms.ts TERMS_VERSION, the
 // /dieu-khoan page). A buyer accepts them at checkout; a new text gets a new
 // version here and there, so a page left open on the old text is refused.
@@ -251,6 +282,7 @@ module.exports = {
   REVIEW_STATUS,
   REVIEW,
   PURCHASE_QUEUE,
+  MONITORING,
   PASSWORD,
   ORGANIZER_STATUS,
   EVENT_STATUS,
