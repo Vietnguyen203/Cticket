@@ -4,11 +4,8 @@ import type { EventInput } from '../api/organizer'
 import { getQueueStats, type QueueStats } from '../api/queue'
 import type { EventDetail } from '../api/types'
 import { Alert, Button, Card, NumberField, TextField } from '../components/ui'
+import { QUEUE_LIMITS, queueProblems, type QueueForm } from './purchaseQueueForm'
 
-/** Backend limits (PURCHASE_QUEUE in backend/src/config/constants.js). */
-const MAX_CAPACITY = 10_000
-const MIN_MINUTES = 5
-const MAX_MINUTES = 30
 const STATS_EVERY_MS = 10_000
 
 /**
@@ -18,7 +15,7 @@ const STATS_EVERY_MS = 10_000
  */
 export function PurchaseQueueCard({ event, onSave }: { event: EventDetail; onSave: (input: Partial<EventInput>) => Promise<void> }) {
   const saved = event.queue ?? { enabled: false, capacity: 100, sessionMinutes: 10 }
-  const [form, setForm] = useState({ enabled: saved.enabled, capacity: String(saved.capacity), minutes: String(saved.sessionMinutes) })
+  const [form, setForm] = useState<QueueForm>({ enabled: saved.enabled, capacity: String(saved.capacity), minutes: String(saved.sessionMinutes) })
   const [error, setError] = useState<ApiError | null>(null)
   const [busy, setBusy] = useState(false)
   const editable = event.status === 'DRAFT' || event.status === 'PUBLISHED'
@@ -27,8 +24,7 @@ export function PurchaseQueueCard({ event, onSave }: { event: EventDetail; onSav
   if (form.enabled !== saved.enabled) changes.queueEnabled = form.enabled
   if (Number(form.capacity) !== saved.capacity) changes.queueCapacity = Number(form.capacity)
   if (Number(form.minutes) !== saved.sessionMinutes) changes.queueSessionMinutes = Number(form.minutes)
-  const capacityOk = Number.isInteger(Number(form.capacity)) && Number(form.capacity) >= 1 && Number(form.capacity) <= MAX_CAPACITY
-  const minutesOk = Number.isInteger(Number(form.minutes)) && Number(form.minutes) >= MIN_MINUTES && Number(form.minutes) <= MAX_MINUTES
+  const problems = queueProblems(form)
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -54,47 +50,51 @@ export function PurchaseQueueCard({ event, onSave }: { event: EventDetail; onSav
           </p>
         </div>
         {error && <Alert>{error.message}</Alert>}
-        <label className="flex items-center gap-2 text-sm font-medium">
-          <input
-            type="checkbox"
-            checked={form.enabled}
-            disabled={!editable}
-            onChange={(e) => setForm({ ...form, enabled: e.target.checked })}
-            className="h-4 w-4"
-          />
-          Bật hàng chờ
-        </label>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <NumberField
-            label="Số người được mua cùng lúc"
-            name="queueCapacity"
-            value={form.capacity}
-            disabled={!editable}
-            onChange={(e) => setForm({ ...form, capacity: e.target.value })}
-            error={capacityOk ? undefined : `Từ 1 đến ${MAX_CAPACITY.toLocaleString('vi-VN')}.`}
-          />
-          <TextField
-            label="Thời gian mỗi lượt (phút)"
-            name="queueSessionMinutes"
-            type="number"
-            min={MIN_MINUTES}
-            max={MAX_MINUTES}
-            value={form.minutes}
-            disabled={!editable}
-            onChange={(e) => setForm({ ...form, minutes: e.target.value })}
-            error={minutesOk ? undefined : `Từ ${MIN_MINUTES} đến ${MAX_MINUTES} phút.`}
-          />
-        </div>
+        <QueueFields form={form} onChange={setForm} disabled={!editable} />
         <p className="text-xs text-slate-500">
           Lượt của khách kết thúc khi họ thanh toán, hủy đơn, hoặc hết thời gian mà chưa giữ chỗ. Khách đã giữ chỗ được thanh toán nốt, không phải xếp
           hàng lại. Giảm số người không đuổi ai đang mua ra.
         </p>
         {saved.enabled && event.status === 'PUBLISHED' && <QueueStatsLine eventId={event.id} />}
-        <Button type="submit" loading={busy} disabled={!editable || Object.keys(changes).length === 0 || !capacityOk || !minutesOk}>
+        <Button type="submit" loading={busy} disabled={!editable || Object.keys(changes).length === 0 || Boolean(problems.capacity || problems.minutes)}>
           Lưu hàng chờ
         </Button>
       </form>
     </Card>
+  )
+}
+
+/** The three fields (on / off, how many buy at once, minutes per turn): the editor's card and the new-event form. */
+export function QueueFields({ form, onChange, disabled = false }: { form: QueueForm; onChange: (form: QueueForm) => void; disabled?: boolean }) {
+  const problems = queueProblems(form)
+  return (
+    <>
+      <label className="flex items-center gap-2 text-sm font-medium">
+        <input type="checkbox" checked={form.enabled} disabled={disabled} onChange={(e) => onChange({ ...form, enabled: e.target.checked })} className="h-4 w-4" />
+        Bật hàng chờ
+      </label>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <NumberField
+          label="Số người được mua cùng lúc"
+          name="queueCapacity"
+          value={form.capacity}
+          disabled={disabled}
+          onChange={(e) => onChange({ ...form, capacity: e.target.value })}
+          error={problems.capacity ?? undefined}
+        />
+        <TextField
+          label="Thời gian mỗi lượt (phút)"
+          name="queueSessionMinutes"
+          type="number"
+          min={QUEUE_LIMITS.minMinutes}
+          max={QUEUE_LIMITS.maxMinutes}
+          value={form.minutes}
+          disabled={disabled}
+          onChange={(e) => onChange({ ...form, minutes: e.target.value })}
+          error={problems.minutes ?? undefined}
+        />
+      </div>
+    </>
   )
 }
 

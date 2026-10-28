@@ -24,7 +24,7 @@ const fields = {
   bannerUrl: imageUrl.nullable(),
   thumbnailUrl: imageUrl.nullable(),
   ageRestriction: z.number().int().min(0).max(99).nullable(),
-  // Phase 21: purchase queue (changed with PATCH only; a new event starts without it)
+  // Phase 21: purchase queue (set when the event is created, or later with PATCH)
   queueEnabled: z.boolean(),
   queueCapacity: z.number().int().min(1).max(PURCHASE_QUEUE.MAX_CAPACITY),
   queueSessionMinutes: z.number().int().min(PURCHASE_QUEUE.MIN_SESSION_MINUTES).max(PURCHASE_QUEUE.MAX_SESSION_MINUTES),
@@ -46,6 +46,9 @@ const createEvent = z.object({
   bannerUrl: fields.bannerUrl.optional(),
   thumbnailUrl: fields.thumbnailUrl.optional(),
   ageRestriction: fields.ageRestriction.optional(),
+  queueEnabled: fields.queueEnabled.optional(),
+  queueCapacity: fields.queueCapacity.optional(),
+  queueSessionMinutes: fields.queueSessionMinutes.optional(),
   categoryIds: fields.categoryIds,
 });
 

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { ApiError, toApiError } from '../api/errors'
 import { listCategories } from '../api/events'
@@ -26,7 +26,18 @@ function initialForm(event?: EventDetail) {
 }
 
 /** Title, description, images (links), age, categories. New event, or the info tab of the editor. */
-export function EventInfoForm({ event, onSubmit, submitLabel }: { event?: EventDetail; onSubmit: (input: Partial<EventInput>) => Promise<void>; submitLabel: string }) {
+export function EventInfoForm({
+  event,
+  onSubmit,
+  submitLabel,
+  children,
+}: {
+  event?: EventDetail
+  onSubmit: (input: Partial<EventInput>) => Promise<void>
+  submitLabel: string
+  /** More fields, shown above the button (the new-event page: the purchase queue). */
+  children?: ReactNode
+}) {
   const [categoryRound, setCategoryRound] = useState(0)
   const categories = useAsync(listCategories, `categories:${categoryRound}`)
   // Admins fix category names from here (in a new tab), then reload the list.
@@ -177,6 +188,7 @@ export function EventInfoForm({ event, onSubmit, submitLabel }: { event?: EventD
         </div>
         {fieldErrors.categoryIds && <p className="mt-1 text-sm text-red-600">Chọn ít nhất một danh mục.</p>}
       </fieldset>
+      {children}
       {/* Required only where it can still change: a published event keeps its title and categories (some older ones have none). */}
       <div className="flex flex-wrap items-center gap-3">
         <Button

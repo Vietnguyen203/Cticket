@@ -37,7 +37,7 @@ export interface EventInput {
   ageRestriction?: number | null
   /** Phase 18.3 */
   categoryIds: string[]
-  /** Phase 21: purchase queue (PATCH only) */
+  /** Phase 21: purchase queue (at creation, or later with PATCH) */
   queueEnabled?: boolean
   queueCapacity?: number
   queueSessionMinutes?: number

@@ -1,4 +1,5 @@
 const { buildSetClause } = require('../../utils/sql');
+const { PURCHASE_QUEUE } = require('../../config/constants');
 const { escapeLike } = require('../../utils/pagination');
 
 const EVENT_COLUMNS = `e.id, e.organizer_id, e.title, e.slug, e.description, e.banner_url, e.thumbnail_url,
@@ -38,8 +39,9 @@ const SORT_ORDERS = Object.freeze({
 
 async function insertEvent(db, event) {
   const { rows } = await db.query(
-    `INSERT INTO events (organizer_id, title, slug, description, banner_url, thumbnail_url, age_restriction)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `INSERT INTO events (organizer_id, title, slug, description, banner_url, thumbnail_url, age_restriction,
+                         queue_enabled, queue_capacity, queue_session_minutes)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      RETURNING id`,
     [
       event.organizerId,
@@ -49,6 +51,10 @@ async function insertEvent(db, event) {
       event.bannerUrl ?? null,
       event.thumbnailUrl ?? null,
       event.ageRestriction ?? null,
+      // Phase 21: the purchase queue may be set up with the event (off unless asked).
+      event.queueEnabled ?? false,
+      event.queueCapacity ?? PURCHASE_QUEUE.DEFAULT_CAPACITY,
+      event.queueSessionMinutes ?? PURCHASE_QUEUE.DEFAULT_SESSION_MINUTES,
     ],
   );
   return rows[0].id;
