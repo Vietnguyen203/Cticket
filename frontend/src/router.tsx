@@ -7,6 +7,7 @@ import { RequireAuth } from './auth/RequireAuth'
 import { Layout } from './components/Layout'
 import { HomePage } from './pages/HomePage'
 import { NotFoundPage } from './pages/NotFoundPage'
+import { RouteErrorPage } from './pages/RouteErrorPage'
 import { TermsPage } from './pages/TermsPage'
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage'
 import { LoginPage } from './pages/auth/LoginPage'
@@ -37,6 +38,7 @@ import { PromotionsPage } from './pages/admin/PromotionsPage'
 import { EventReportPage } from './pages/admin/EventReportPage'
 import { ReportsPage } from './pages/admin/ReportsPage'
 import { UsersPage } from './pages/admin/UsersPage'
+import { SystemPage } from './pages/admin/SystemPage'
 import { ApplyOrganizerPage } from './pages/organizer/ApplyOrganizerPage'
 import { EventEditorPage } from './pages/organizer/EventEditorPage'
 import { MyEventsPage } from './pages/organizer/MyEventsPage'
@@ -53,6 +55,8 @@ const signedIn = (element: ReactNode) => <RequireAuth>{element}</RequireAuth>
 export const router = createBrowserRouter([
   {
     element: <Layout />,
+    // Phase 23: a page that fails while drawing shows an error page (and reports it), not a blank screen.
+    errorElement: <RouteErrorPage />,
     children: [
       { index: true, element: <HomePage /> },
       { path: 'events', element: <EventsPage /> },
@@ -101,6 +105,7 @@ export const router = createBrowserRouter([
           { path: 'reviews', element: guarded(['review:manage'], <ReviewsPage />) }, // Phase 19
           { path: 'reports', element: guarded(['report:read:any'], <ReportsPage />) },
           { path: 'reports/events/:id', element: guarded(['report:read:any'], <EventReportPage />) },
+          { path: 'system', element: guarded(['system:monitor'], <SystemPage />) }, // Phase 23
         ],
       },
       {

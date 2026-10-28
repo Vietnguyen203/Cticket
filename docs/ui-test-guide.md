@@ -260,11 +260,13 @@ Không có điện thoại: mở https://localhost:8443 trên máy tính có web
 | Bước | Thao tác | Kết quả mong đợi | KQ |
 |---|---|---|---|
 | 13.1 · ADM-06 | "Tổng quan", "Doanh thu" | Số liệu có các đơn vừa tạo | |
-| 13.2 · ADM-01 ★ | "Người dùng" → tìm Khách B → "Khóa" → "Khóa tài khoản". Nhìn trình duyệt của B, bấm một trang bất kỳ | B bị đăng xuất ngay; đăng nhập lại bị từ chối | |
-| 13.3 · ADM-01 ★ | Admin "Mở khóa" Khách B (nếu B bị khóa đăng nhập ở 1.12: "Mở khóa đăng nhập") | B đăng nhập lại được | |
+| 13.2 · ADM-01 ★ | "Người dùng" → tìm Khách B → "Xóa tài khoản" → "Lý do" → "Xóa tài khoản". Nhìn trình duyệt của B, bấm một trang bất kỳ | B bị đăng xuất ngay; đăng nhập lại bị từ chối ("đã bị quản trị viên xóa"); dòng của B: "Đã xóa · khôi phục được" | |
+| 13.3 · ADM-01 ★ | Admin "Khôi phục" Khách B (nếu B bị khóa đăng nhập ở 1.12: "Mở khóa đăng nhập") | B đăng nhập lại được, đơn và vé vẫn còn | |
 | 13.4 · ADM-02 | "Phân quyền" Khách A → đánh dấu "Soát vé" → "Lưu"; A bấm sang trang khác | Có hiệu lực ngay: phiên cũ của A bị thu hồi, A phải đăng nhập lại và thấy menu "Soát vé". Gỡ lại vai trò sau khi xem | |
 | 13.5 · ADM-03 | (Nếu đã làm 1.8) "Đặt lại 2FA" Khách A | A đăng nhập lại chỉ cần mật khẩu; có email báo | |
-| 13.6 · ADM-06 | "Audit log" | Có các hành động: duyệt nhà tổ chức, duyệt sự kiện, đổi cấu hình hàng chờ, khóa / mở khóa, đổi vai trò | |
+| 13.6 · ADM-06 | "Audit log" | Có các hành động: duyệt nhà tổ chức, duyệt sự kiện, đổi cấu hình hàng chờ, xóa / khôi phục tài khoản, đổi vai trò | |
+| 13.7 · ADM-08 | Tạo thêm một tài khoản khách C (chưa mua gì) → admin "Xóa vĩnh viễn" C → "Lý do" → xác nhận | Dòng của C: "Đã xóa vĩnh viễn", tên "Người dùng đã xóa"; C không đăng nhập được; email của C đăng ký lại được. Thử "Xóa vĩnh viễn" Khách A (còn vé chưa diễn): bị từ chối kèm lý do | |
+| 13.8 · MON-01 | "Tình trạng hệ thống" | Dòng trạng thái chung; số request, lỗi, p95; thành phần, job nền; tự cập nhật | |
 
 ### Phiên 14. Phân quyền
 
@@ -341,10 +343,10 @@ Mức độ: Cao (sai tiền, bán trùng, lộ dữ liệu) / Trung bình (sai 
 | 10. Soát vé | 9 | | | |
 | 11. Đánh giá | 4 | | | |
 | 12. Sửa sự kiện đang bán | 7 | | | |
-| 13. Quản trị | 6 | | | |
+| 13. Quản trị | 8 | | | |
 | 14. Phân quyền | 3 | | | |
 | 15. Giao diện | 6 | | | |
 | 16. Hủy sự kiện, hoàn tiền | 3 | | | |
-| **Tổng** | **118** | | | |
+| **Tổng** | **120** | | | |
 
 Người test: ………… Ngày: ………… Phiên bản (`git log -1 --format=%h`): …………

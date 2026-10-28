@@ -257,7 +257,29 @@ ${html}
 </body></html>`;
 }
 
+/**
+ * Phase 23: a monitoring alert (src/modules/monitoring/alerts.js) starts, is
+ * still on after a while, or is over. Sent straight over SMTP.
+ * @param {{ kind: 'FIRING'|'REMINDER'|'RESOLVED', title: string, detail: string|null, since: Date, at: Date }} alert
+ */
+function systemAlertEmail({ kind, title, detail, since, at }) {
+  const vn = (date) => date.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+  const heading = { FIRING: 'Cảnh báo', REMINDER: 'Vẫn còn', RESOLVED: 'Đã hết' }[kind];
+  const lines = [
+    `${heading}: ${title}.`,
+    ...(detail ? [`Chi tiết: ${detail}.`] : []),
+    kind === 'RESOLVED' ? `Bắt đầu lúc ${vn(since)}, hết lúc ${vn(at)}.` : `Bắt đầu lúc ${vn(since)}.`,
+    'Xem trang Quản trị → Tình trạng hệ thống.',
+  ];
+  return {
+    subject: `[ETP] ${heading}: ${title}`,
+    text: lines.join('\n'),
+    html: lines.map((line) => `<p>${escapeHtml(line)}</p>`).join('\n'),
+  };
+}
+
 module.exports = {
+  systemAlertEmail,
   brandedLayout,
   ticketQrReissuedEmail,
   reviewInviteEmail,

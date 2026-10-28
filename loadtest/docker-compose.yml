@@ -41,6 +41,8 @@ x-load-env: &load-env
   SMTP_PASS: ""
   MAIL_FROM: Event Tickets Load <no-reply@load.test>
   RATE_LIMIT_ENABLED: "false"
+  # Phase 23: no alert emails from a load test (errors and slowness are the point).
+  MONITORING_ALERTS: "false"
   # Phase 17: the buyers pay with the simulator (off by default with NODE_ENV=production).
   PAYMENT_SIMULATOR: "true"
 

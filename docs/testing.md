@@ -9,7 +9,7 @@ Dự án có 4 tầng kiểm thử, từ nhanh / hẹp tới chậm / rộng:
 | End-to-end (trình duyệt) | Playwright (Chromium, desktop + điện thoại) | **29 kịch bản** | máy dev, CI | ≈ 1 phút |
 | Tải (load) | k6 | **5 kịch bản**, số người dùng chọn khi chạy | chạy tay | 1–5 phút / kịch bản |
 
-Danh sách kịch bản test theo chức năng (113 test case, gồm cả những case kiểm tra tay) và test tự động tương ứng: [`docs/test-scenarios.md`](test-scenarios.md). Test tay bằng thao tác trên web, từng bước theo thứ tự (118 bước, 16 phiên): [`docs/ui-test-guide.md`](ui-test-guide.md).
+Danh sách kịch bản test theo chức năng (120 test case, gồm cả những case kiểm tra tay) và test tự động tương ứng: [`docs/test-scenarios.md`](test-scenarios.md). Test tay bằng thao tác trên web, từng bước theo thứ tự (120 bước, 16 phiên): [`docs/ui-test-guide.md`](ui-test-guide.md).
 
 Mỗi lần push hoặc mở pull request, **GitHub Actions** chạy 3 tầng đầu (`.github/workflows/ci.yml`). Load test chạy tay vì lâu và số đo phụ thuộc máy.
 
@@ -44,6 +44,7 @@ Test chạy trên **PostgreSQL và Redis thật** (không giả lập database),
 | **Hàng chờ mua vé** (Phase 21): tắt thì như cũ; N = 1 → người thứ hai chờ, giữ chỗ bị từ chối; thanh toán / hủy / hết hạn / hết lượt → người sau vào và được báo qua WebSocket; người mới không chen trước; vào lại không mất chỗ; lời mời danh sách chờ không cần lượt; tắt / tăng N; số liệu chỉ cho ban tổ chức; Redis lỗi → cho qua | `purchase-queue` (unit + tích hợp) | 17 |
 | **Vé PDF** (Phase 20): nội dung trang, mã QR trong PDF đúng phiên bản, font có dấu; email xác nhận đính kèm, lỗi tạo PDF vẫn gửi email; tải PDF chỉ chủ đơn, đơn đã hoàn → 409; cấp lại QR → email kèm PDF mới | `ticket-pdf` (unit + tích hợp) | 6 |
 | WebSocket real-time | `websocket` | 12 |
+| **Theo dõi hệ thống** (Phase 23): histogram p50 / p95, đếm request theo trạng thái và mẫu đường dẫn (không có id), `/health` không đếm, hai tiến trình cộng đúng, 429; trang chỉ cho `system:monitor`; Redis lỗi vẫn trả lời; mọi quy tắc cảnh báo đúng ngưỡng; một email khi bắt đầu, nhắc sau 30 phút, báo khi hết; cơ sở dữ liệu phải lỗi 2 lần liên tiếp; worker không nhịp tim; lỗi JavaScript: bỏ query string, gộp, từ chối dữ liệu sai, giới hạn 30 / phút | `monitoring` (unit + tích hợp) | 21 |
 | Hàng đợi BullMQ, email, hết hạn giữ chỗ | `queue` | 11 |
 | Cache Redis | `cache` | 7 |
 | Admin (người dùng, audit, cấp lại QR), phân quyền, báo cáo | `admin`, `rbac`, `reports` | 20 |
@@ -102,7 +103,7 @@ Cần Docker đang chạy `postgres` và `redis`; `TEST_DATABASE_URL`, `TEST_RED
 
 ## 2. Web: Vitest
 
-Phần logic không cần trình duyệt: lý do VNPay từ chối (theo mã), gộp cập nhật sơ đồ ghế real-time (phiên bản, ghế bị người khác lấy, chế độ sửa đơn đang giữ), client WebSocket (kết nối lại, đăng nhập lại khi token hết hạn), refresh token chỉ chạy một lần cho nhiều request và nhiều tab, giờ server, giờ Việt Nam, kết quả quét vé, kiểm tra trước khi gửi duyệt, quyền menu, CSV (BOM, chống CSV injection), số trên biểu đồ.
+Phần logic không cần trình duyệt: lý do VNPay từ chối (theo mã), gộp cập nhật sơ đồ ghế real-time (phiên bản, ghế bị người khác lấy, chế độ sửa đơn đang giữ), client WebSocket (kết nối lại, đăng nhập lại khi token hết hạn), refresh token chỉ chạy một lần cho nhiều request và nhiều tab, giờ server, giờ Việt Nam, kết quả quét vé, kiểm tra trước khi gửi duyệt, quyền menu, CSV (BOM, chống CSV injection), số trên biểu đồ, màu và chữ của trang Tình trạng hệ thống, bộ gửi lỗi JavaScript (tối đa 5 mỗi trang, bỏ trùng, bỏ query string).
 
 ```
 cd frontend
@@ -125,10 +126,11 @@ Admin bắt buộc xác thực hai lớp (Phase 15): admin của môi trường 
 | Sai mật khẩu | báo lỗi, không có phiên |
 | Mua 2 ghế + 1 vé đứng | mã giảm giá sai rồi đúng, thẻ bị từ chối rồi trả lại, 3 vé có QR |
 | **Trả qua VNPay** (Phase 17) | trình duyệt sang trang của một VNPay giả (`e2e/support/fake-vnpay.mjs`, kiểm chữ ký của URL), hủy → về trang kết quả với lý do; trả lại → IPN tới API, về thẳng trang đơn, có vé |
-| **Hủy đơn theo chính sách** (Phase 18.3) | trang sự kiện ghi chính sách; trang đơn hiện số được hoàn và phí; hủy → đơn hoàn tiền, mục Hoàn tiền "Đã hoàn" |
+| **Không hủy, không hoàn theo yêu cầu** | trang sự kiện ghi "Vé không hủy, không hoàn"; đơn đã trả không có nút hủy; ban tổ chức hủy sự kiện → mọi đơn hoàn 100%, vé hết hiệu lực, báo cáo chuyển sang Hoàn tiền; admin không có nút hoàn tiền |
 | **Danh sách chờ** (Phase 18.4) | hết vé → "Báo tôi khi có vé"; người khác trả vé → lời mời (job chạy trong API của E2E mỗi 2 giây); vé đang dành không ai khác giữ được; đặt từ trang Danh sách chờ |
 | **Đánh giá** (Phase 19) | người đã vào cổng đi từ "Vé của tôi" tới trang sự kiện, chấm sao và viết; ban tổ chức trả lời ngay trên trang; admin ẩn → điểm trung bình đổi, người viết thấy lý do |
 | **Hàng chờ mua vé** (Phase 21) | ban tổ chức bật hàng chờ N = 1 trên trang sự kiện; A có lượt, B thấy "vị trí 1"; A thanh toán → trang của B (không tải lại) tự hiện sơ đồ ghế, B giữ chỗ được; số người đang mua / đang chờ trên trang ban tổ chức |
+| **Tình trạng hệ thống** (Phase 23) | một trang của khách gặp lỗi JavaScript → admin mở "Tình trạng hệ thống", thấy số request, các thành phần, hàng đợi và lỗi đó (không có query string của trang) |
 | **Tải vé PDF** (Phase 20) | nút "Tải vé PDF" ở trang đơn và trang vé tải về đúng tên file, nội dung là PDF |
 | **2 trình duyệt cùng xem sơ đồ** | A giữ ghế → B thấy đổi màu ngay, ghế B đang chọn bị bỏ kèm thông báo |
 | Giữ chỗ hết hạn | đơn báo hết hạn, ghế trở lại trống |

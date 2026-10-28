@@ -19,6 +19,7 @@ const { checkInsRouter, scheduleCheckInsRouter } = require('./modules/checkins/c
 const { waitlistRouter, scheduleWaitlistRouter } = require('./modules/waitlist/waitlist.routes');
 const { eventReviewsRouter, reviewsRouter, adminReviewsRouter } = require('./modules/reviews/reviews.routes');
 const { purchaseQueueRouter } = require('./modules/purchase-queue/purchase-queue.routes');
+const { systemRouter, clientErrorsRouter } = require('./modules/monitoring/monitoring.routes');
 
 /** Everything under /api/v1. Each module mounts its own router here. */
 const apiRouter = Router();
@@ -51,8 +52,10 @@ apiRouter.use('/waitlist', waitlistRouter); // Phase 18.4
 apiRouter.use('/schedules', scheduleWaitlistRouter); // POST /schedules/:id/waitlist
 apiRouter.use('/uploads', uploadsRoutes);
 apiRouter.use('/admin/reviews', adminReviewsRouter); // Phase 19
+apiRouter.use('/admin/system', systemRouter); // Phase 23
 apiRouter.use('/admin', adminRoutes);
 apiRouter.use('/reviews', reviewsRouter); // Phase 19: the organizer's reply
 apiRouter.use('/reports', reportsRoutes);
+apiRouter.use('/client-errors', clientErrorsRouter); // Phase 23: JavaScript errors of the web
 
 module.exports = apiRouter;

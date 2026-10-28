@@ -10,6 +10,7 @@ const { closePool } = require('./database/pool');
 const { redis, closeRedis } = require('./redis/client');
 const { closeQueues } = require('./queue/queues');
 const { RealtimeHub } = require('./realtime/hub');
+const monitoring = require('./modules/monitoring');
 
 const server = http.createServer(createApp());
 // Behind a proxy that keeps connections open (nginx upstream keepalive, cloud
@@ -23,6 +24,11 @@ server.headersTimeout = KEEP_ALIVE_TIMEOUT_MS + 1_000; // must be larger than ke
 // WebSocket endpoint /ws on the same port as the REST API.
 const realtimeHub = new RealtimeHub();
 realtimeHub.attach(server).catch((err) => logger.error({ err }, 'Failed to start the WebSocket endpoint'));
+
+// Phase 23: push request figures to Redis, report the open WebSockets, check the alert rules.
+monitoring.reportConnections(() => realtimeHub.connections.size);
+const stopMetricsFlush = monitoring.startMetricsFlush();
+const stopAlertLoop = env.MONITORING_ALERTS ? monitoring.startAlertLoop() : () => {};
 
 server.listen(env.PORT, () => {
   logger.info({ port: env.PORT, env: env.NODE_ENV, pid: process.pid, pgPoolMax: env.PG_POOL_MAX }, 'API server listening');
@@ -56,6 +62,8 @@ async function shutdown(signal, exitCode = 0) {
   forceExitTimer.unref();
 
   try {
+    stopAlertLoop();
+    stopMetricsFlush();
     // Open WebSockets would keep server.close() waiting forever: close them first.
     await realtimeHub.close();
     await new Promise((resolve, reject) => server.close((err) => (err ? reject(err) : resolve())));

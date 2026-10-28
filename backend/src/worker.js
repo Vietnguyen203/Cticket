@@ -7,6 +7,9 @@ const { closePool } = require('./database/pool');
 const { closeRedis } = require('./redis/client');
 const { QUEUE, PREFIX, getQueue, closeQueues } = require('./queue/queues');
 const processors = require('./queue/processors');
+const { MONITORING } = require('./config/constants');
+const { beat } = require('./modules/monitoring/system-status');
+const { recordJobFailure } = require('./modules/monitoring/metrics');
 
 const MINUTE_MS = 60_000;
 
@@ -46,9 +49,11 @@ async function startWorkers({ concurrency = env.WORKER_CONCURRENCY, schedule = t
       concurrency: name === QUEUE.MAINTENANCE ? 1 : concurrency,
     });
     // Job data is never logged: an OTP job carries the code.
-    worker.on('failed', (job, err) =>
-      logger.warn({ err, queue: name, job: job?.name, jobId: job?.id, attempt: job?.attemptsMade }, 'Job failed'),
-    );
+    worker.on('failed', (job, err) => {
+      logger.warn({ err, queue: name, job: job?.name, jobId: job?.id, attempt: job?.attemptsMade }, 'Job failed');
+      // Phase 23: a job that will not be tried again counts for the "failed jobs" alert.
+      if (!job || job.attemptsMade >= (job.opts.attempts ?? 1)) recordJobFailure();
+    });
     worker.on('error', (err) => logger.error({ err, queue: name }, 'Worker error'));
     return worker;
   });
@@ -60,9 +65,16 @@ async function startWorkers({ concurrency = env.WORKER_CONCURRENCY, schedule = t
     }
   }
 
+  // Phase 23: "the worker is alive", read by the system page and its alerts.
+  const sendBeat = () => beat().catch((err) => logger.warn({ err }, 'Worker heartbeat not written'));
+  sendBeat();
+  const heartbeat = setInterval(sendBeat, MONITORING.HEARTBEAT_INTERVAL_MS);
+  heartbeat.unref();
+
   return {
     workers,
     async stop() {
+      clearInterval(heartbeat);
       // close() lets the jobs in progress finish (INF-07), then stops fetching new ones.
       await Promise.all(workers.map((worker) => worker.close()));
       connection.disconnect();

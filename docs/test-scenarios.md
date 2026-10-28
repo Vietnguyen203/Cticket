@@ -191,12 +191,13 @@ Vé đã thanh toán không hủy, không hoàn theo yêu cầu của khách hay
 
 | Mã | Kịch bản | Tiền điều kiện | Các bước | Kết quả mong đợi | Ưu tiên | Tự động |
 |---|---|---|---|---|---|---|
-| TC-ADM-01 | Khóa tài khoản | Admin | Người dùng → khóa một khách | Khách bị đăng xuất ngay mọi nơi, không đăng nhập lại được | P1 | BE:admin |
+| TC-ADM-01 | Xóa tài khoản (khôi phục được) | Admin | Người dùng → "Xóa tài khoản" một khách (nhập lý do); rồi "Khôi phục" | Khách bị đăng xuất ngay mọi nơi, không đăng nhập lại được; giao dịch còn nguyên; khôi phục → đăng nhập lại được | P1 | BE:admin, E2E:walkthrough |
 | TC-ADM-02 | Đổi vai trò | Admin | Gán / gỡ vai trò | Có hiệu lực ngay (phiên cũ bị thu hồi); không gỡ được admin cuối cùng | P2 | BE:admin, BE:rbac |
 | TC-ADM-03 | Mở khóa đăng nhập, đặt lại 2FA | Tài khoản đang bị khóa / mất điện thoại | Admin mở khóa; đặt lại 2FA | Đăng nhập lại được; có audit | P2 | BE:login-lockout, BE:two-factor |
 | TC-ADM-04 | Danh mục, địa điểm, sơ đồ ghế | Admin | Tạo / sửa danh mục, địa điểm, khu, ghế | Hiện đúng ở form ban tổ chức | P2 | BE:catalog, BE:inventory |
 | TC-ADM-05 | Mã giảm giá | Admin | Tạo mã % và mã số tiền, giới hạn lượt | Áp dụng đúng (TC-PAY-01); hết lượt thì báo | P2 | BE:payments |
 | TC-ADM-06 | Nhật ký (audit) và báo cáo | Admin | Mở Nhật ký, Báo cáo | Có các hành động quan trọng (duyệt, hoàn tiền, đổi cấu hình hàng chờ…); số liệu báo cáo khớp | P3 | BE:reports, BE:admin |
+| TC-ADM-08 | Xóa vĩnh viễn một tài khoản | Admin; khách không còn đơn dở, vé sắp diễn, hoàn tiền đang chờ | Người dùng → "Xóa vĩnh viễn" (nhập lý do) | Họ tên, email, số điện thoại bị xóa hẳn, đăng xuất mọi nơi; đơn hàng, thanh toán, vé giữ lại ẩn danh; có audit. Còn ràng buộc (quản trị, đơn dở, vé sắp diễn…) → từ chối kèm lý do; không tự xóa mình | P1 | BE:admin |
 | TC-ADM-07 | Sức chứa địa điểm là giới hạn | Địa điểm có sức chứa | Thêm khu đứng / sinh ghế vượt sức chứa; hạ sức chứa dưới tổng các khu; ban tổ chức nhập tổng người tham dự lớn hơn sức chứa | Dòng "Các khu: X chỗ / sức chứa Y · còn thêm được Z"; vượt thì bị từ chối kèm số liệu (422 `VENUE_CAPACITY_EXCEEDED`) | P2 | E2E:venue-capacity, BE:venue-capacity, WEB:venueCapacity |
 
 ## 15. Phân quyền và bảo mật (SEC)
@@ -229,9 +230,20 @@ Vé đã thanh toán không hủy, không hoàn theo yêu cầu của khách hay
 | TC-LOAD-02 | Số người dùng cùng lúc cấu hình được | Stack load test | `k6 run -e VUS=… -e SHAPE=…` cho 5 kịch bản | Đạt ngưỡng ghi trong `docs/testing.md`; 0% lỗi | P2 | K6:browse, K6:seatmap, K6:contention, K6:mixed, K6:queue |
 | TC-LOAD-03 | Dữ liệu sau khi chạy tải | Sau mọi lần chạy k6 | `node loadtest/verify.mjs` | Không ghế nào bán hai lần, tồn kho khớp, vé phát đủ, hàng chờ không vượt N | P1 | `loadtest/verify.mjs` |
 
+## 18. Theo dõi hệ thống (MON)
+
+| Mã | Kịch bản | Tiền điều kiện | Các bước | Kết quả mong đợi | Ưu tiên | Tự động |
+|---|---|---|---|---|---|---|
+| TC-MON-01 | Trang Tình trạng hệ thống | Admin | Quản trị → "Tình trạng hệ thống" | Dòng trạng thái chung; request / phút, lỗi 5xx, p95, kết nối real-time, job chờ, ổ đĩa; thành phần, hàng đợi, nghiệp vụ, đường dẫn chậm nhất; tự cập nhật mỗi 15 giây | P1 | E2E:system, BE:monitoring |
+| TC-MON-02 | Chỉ người có quyền | Khách, ban tổ chức | Mở `/admin/system` hoặc gọi API | Không có menu; API trả 403 | P1 | BE:monitoring |
+| TC-MON-03 | Cảnh báo qua email | Lỗi 5xx vượt 5% trong 5 phút | (Test tự động mô phỏng) | Đúng một email "Cảnh báo"; nhắc lại sau 30 phút; email "Đã hết" khi hết; lịch sử trên trang | P1 | BE:monitoring, BE-unit:monitoring |
+| TC-MON-04 | Worker ngừng chạy | `docker compose stop worker` | Chờ 3 phút | Trang đỏ "Worker không chạy"; admin nhận email; bật lại → "Đã hết" | P2 | BE:monitoring |
+| TC-MON-05 | Lỗi JavaScript của web | — | Một trang gặp lỗi khi chạy | Lỗi hiện trong "Lỗi JavaScript trên web", gộp theo nội dung, không có query string, không có người dùng | P2 | E2E:system, BE:monitoring, WEB:clientErrors |
+| TC-MON-06 | Redis không trả lời | Tắt Redis | Mở trang | Trang vẫn mở; Redis "Không trả lời"; số liệu không đọc được để trống, không lỗi | P3 | BE:monitoring |
+
 ---
 
-## 18. Checklist nhanh trước khi demo (khoảng 20 phút)
+## 19. Checklist nhanh trước khi demo (khoảng 20 phút)
 
 Chạy đúng thứ tự, mỗi dòng là một test case P1 ở trên:
 
@@ -254,7 +266,7 @@ cd frontend && npm run lint && npm run typecheck && npm test && npm run build
 cd e2e && npm test
 ```
 
-## 19. Tổng hợp độ phủ
+## 20. Tổng hợp độ phủ
 
 | Nhóm | Số test case | Có test tự động | Chỉ test tay |
 |---|---|---|---|
@@ -269,10 +281,11 @@ cd e2e && npm test
 | CHK | 6 | 6 | 0 |
 | REV | 4 | 4 | 0 |
 | ORG | 15 | 15 | 0 |
-| ADM | 7 | 7 | 0 |
+| ADM | 8 | 8 | 0 |
 | SEC | 6 | 6 | 0 |
 | UI | 6 | 2 | 4 |
 | LOAD | 3 | 3 | 0 |
-| **Tổng** | **113** | **105** | **8** |
+| MON | 6 | 6 | 0 |
+| **Tổng** | **120** | **112** | **8** |
 
-Test tự động hiện có: backend 421 test, web 141 test, E2E 29 kịch bản, k6 5 kịch bản (chi tiết `docs/testing.md`). Những ca "chỉ test tay" cần thiết bị hoặc dịch vụ thật (điện thoại, đồng hồ máy, cài đặt hệ điều hành) hoặc là cảm nhận giao diện.
+Test tự động hiện có: backend 444 test, web 147 test, E2E 30 kịch bản, k6 5 kịch bản (chi tiết `docs/testing.md`). Những ca "chỉ test tay" cần thiết bị hoặc dịch vụ thật (điện thoại, đồng hồ máy, cài đặt hệ điều hành) hoặc là cảm nhận giao diện.

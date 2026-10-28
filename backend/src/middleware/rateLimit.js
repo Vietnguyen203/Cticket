@@ -64,6 +64,8 @@ const LIMITS = Object.freeze({
   review: { name: 'review', limit: 10, windowSeconds: 3600, key: (req) => req.user?.id },
   // Phase 21: joining / asking about the purchase queue (the waiting page asks every 5 seconds).
   purchaseQueue: { name: 'purchase-queue', limit: 60, windowSeconds: 60, key: (req) => req.user?.id },
+  // Phase 23: JavaScript errors sent by the web, per IP (each page sends at most 5).
+  clientErrors: { name: 'client-errors', limit: 30, windowSeconds: 60 },
 });
 
 /** For tests only. */

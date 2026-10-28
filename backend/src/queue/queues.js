@@ -100,6 +100,7 @@ async function enqueue(queueName, jobName, data, options = {}) {
       await require('./processors').run(queueName, { name: jobName, data, attemptsMade: 0 });
     } catch (err) {
       logger.error({ err, queue: queueName, job: jobName }, 'Inline job failed');
+      require('../modules/monitoring/metrics').recordJobFailure(); // Phase 23
     }
     return;
   }
@@ -130,9 +131,12 @@ async function closeQueues() {
   }
 }
 
+/** 'bullmq' (a worker process runs the jobs) or 'inline' (Phase 23: the system page shows which). */
+const queueMode = () => settings.mode;
+
 /** For tests only: switch between inline and real BullMQ. */
 function setQueueMode(mode) {
   settings.mode = mode;
 }
 
-module.exports = { QUEUE, PREFIX, JOB_OPTIONS, enqueue, enqueueAfterCommit, getQueue, closeQueues, setQueueMode };
+module.exports = { QUEUE, PREFIX, JOB_OPTIONS, enqueue, enqueueAfterCommit, getQueue, closeQueues, setQueueMode, queueMode };

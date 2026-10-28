@@ -253,7 +253,8 @@ Muốn tạm dừng tự deploy: đặt `DEPLOY_ENABLED` = `false`.
 
 ## 10. Theo dõi
 
-- **UptimeRobot** hoặc **Better Stack** (miễn phí): monitor HTTP(s) tới `https://ve.example.com/health/ready` mỗi 1–5 phút, báo qua email khi lỗi.
+- **Trang "Tình trạng hệ thống"** (Phase 23, Quản trị → Tình trạng hệ thống): request / phút, tỉ lệ lỗi, độ trễ p95, cơ sở dữ liệu, Redis, worker, job nền, hoàn tiền VNPay kẹt, ổ đĩa, lỗi JavaScript trên web. Cảnh báo được email cho mọi admin (và các địa chỉ trong `ALERT_EMAILS` của `deploy/.env`) khi có sự cố, nhắc lại sau 30 phút và báo khi đã hết. Ngưỡng: `docs/phase-23-monitoring-design.md` mục 5.
+- **UptimeRobot** hoặc **Better Stack** (miễn phí): monitor HTTP(s) tới `https://ve.example.com/health/ready` mỗi 1–5 phút, báo qua email khi lỗi. Vẫn cần: khi cả máy chủ sập, trang theo dõi bên trong không tự báo được.
 - Ổ đĩa: `df -h`. Docker tự xoay vòng log (10 MB × 3 mỗi container). `deploy.sh` chỉ giữ image của 3 bản gần nhất.
 - Log:
 
