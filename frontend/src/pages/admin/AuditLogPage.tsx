@@ -43,7 +43,7 @@ export function AuditLogPage() {
 
   return (
     <>
-      <PageHeader title="Audit log" subtitle="Lịch sử thay đổi quan trọng: ai làm, lúc nào, giá trị cũ → mới." />
+      <PageHeader title="Audit log" subtitle="" />
       <form onSubmit={apply} className="mb-4 grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
         <select value={draft.entityType} onChange={(e) => setDraft({ ...draft, entityType: e.target.value })} aria-label="Loại đối tượng" className="rounded-lg border border-slate-300 bg-surface px-3 py-2">
           <option value="">Mọi đối tượng</option>

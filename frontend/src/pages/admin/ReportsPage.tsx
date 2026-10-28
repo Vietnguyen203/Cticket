@@ -36,7 +36,7 @@ export function ReportsPage() {
 
   return (
     <>
-      <PageHeader title="Doanh thu" subtitle="Toàn hệ thống, theo ngày thanh toán (giờ Việt Nam). Tối đa 366 ngày." />
+      <PageHeader title="Doanh thu" subtitle="" />
       <Card className="mb-5 !p-4">
         <form onSubmit={apply} className="flex flex-wrap items-end gap-3">
           <label className="text-sm">

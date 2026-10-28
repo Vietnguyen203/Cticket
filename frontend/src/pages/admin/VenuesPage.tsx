@@ -58,7 +58,7 @@ export function VenuesPage() {
     <>
       <PageHeader
         title="Địa điểm"
-        subtitle="Nhà hát, sân vận động… với các khu ngồi / khu đứng và sơ đồ ghế."
+        subtitle=""
         actions={!creating && <Button onClick={() => setCreating(true)}>Thêm địa điểm</Button>}
       />
 
@@ -101,7 +101,7 @@ export function VenuesPage() {
         }}
         options={[
           ['ACTIVE', 'Đang dùng'],
-          ['PENDING', 'Chờ duyệt (ban tổ chức đề xuất)'],
+          ['PENDING', 'Chờ duyệt'],
           ['INACTIVE', 'Ngừng dùng'],
           ['ALL', 'Tất cả'],
         ]}

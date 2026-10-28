@@ -42,7 +42,7 @@ export function ReviewsPage() {
 
   return (
     <>
-      <PageHeader title="Đánh giá" subtitle="Đánh giá được đăng ngay; ẩn những đánh giá vi phạm (bắt buộc lý do, có ghi audit log)." />
+      <PageHeader title="Đánh giá" subtitle="" />
       {message && (
         <div className="mb-4">
           <Alert tone={message.tone}>{message.text}</Alert>

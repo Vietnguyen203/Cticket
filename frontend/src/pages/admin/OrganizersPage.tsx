@@ -31,7 +31,7 @@ export function OrganizersPage() {
 
   return (
     <>
-      <PageHeader title="Nhà tổ chức" subtitle="Duyệt đơn đăng ký làm nhà tổ chức sự kiện, tạm khóa khi vi phạm." />
+      <PageHeader title="Nhà tổ chức" subtitle="" />
       <Tabs
         value={status}
         onChange={(value) => {

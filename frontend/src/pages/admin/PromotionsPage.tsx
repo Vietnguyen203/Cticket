@@ -26,7 +26,7 @@ export function PromotionsPage() {
     <>
       <PageHeader
         title="Mã giảm giá"
-        subtitle="Hai khách cùng dùng lượt cuối thì chỉ một người được (khóa dòng mã khi checkout)."
+        subtitle=""
         actions={editing === null && <Button onClick={() => setEditing('new')}>Tạo mã</Button>}
       />
       {editing && (

@@ -22,7 +22,7 @@ export function OrdersPage() {
 
   return (
     <>
-      <PageHeader title="Đơn hàng" subtitle="Tra cứu đơn, xem thanh toán, hoàn tiền và vé; cấp lại mã QR." />
+      <PageHeader title="Đơn hàng" subtitle="" />
       <Tabs
         value={status}
         onChange={(value) => {

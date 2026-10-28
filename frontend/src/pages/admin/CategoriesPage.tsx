@@ -37,7 +37,7 @@ export function CategoriesPage() {
     <>
       <PageHeader
         title="Danh mục"
-        subtitle="Nhóm sự kiện (âm nhạc, thể thao…). Đổi tên áp dụng ngay cho mọi sự kiện dùng danh mục đó. Xóa một danh mục thì nó được gỡ khỏi các sự kiện đang dùng."
+        subtitle=""
       />
       <Card className="mb-4">
         <form onSubmit={onCreate} className="flex flex-col gap-3 sm:flex-row sm:items-end">
