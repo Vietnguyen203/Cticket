@@ -9,7 +9,7 @@ Dự án có 4 tầng kiểm thử, từ nhanh / hẹp tới chậm / rộng:
 | End-to-end (trình duyệt) | Playwright (Chromium, desktop + điện thoại) | **29 kịch bản** | máy dev, CI | ≈ 1 phút |
 | Tải (load) | k6 | **5 kịch bản**, số người dùng chọn khi chạy | chạy tay | 1–5 phút / kịch bản |
 
-Danh sách kịch bản test theo chức năng (111 test case, gồm cả những case kiểm tra tay) và test tự động tương ứng: [`docs/test-scenarios.md`](test-scenarios.md). Test tay bằng thao tác trên web, từng bước theo thứ tự (115 bước, 15 phiên): [`docs/ui-test-guide.md`](ui-test-guide.md).
+Danh sách kịch bản test theo chức năng (113 test case, gồm cả những case kiểm tra tay) và test tự động tương ứng: [`docs/test-scenarios.md`](test-scenarios.md). Test tay bằng thao tác trên web, từng bước theo thứ tự (118 bước, 16 phiên): [`docs/ui-test-guide.md`](ui-test-guide.md).
 
 Mỗi lần push hoặc mở pull request, **GitHub Actions** chạy 3 tầng đầu (`.github/workflows/ci.yml`). Load test chạy tay vì lâu và số đo phụ thuộc máy.
 

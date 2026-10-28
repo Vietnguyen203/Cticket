@@ -178,7 +178,7 @@ Vé đã thanh toán không hủy, không hoàn theo yêu cầu của khách hay
 | TC-ORG-05 | Buổi diễn, hạng vé theo khu | Sự kiện nháp | Tab "Buổi diễn & vé": lưu buổi diễn (địa điểm, ngày, giờ 24 giờ); lưu tổng số người tham dự; gán hạng cho từng khu có sẵn (khu ngồi: toàn bộ ghế; khu đứng: số vé) | Danh sách kiểm tra "sẵn sàng gửi duyệt" ở đầu trang không còn mục đỏ | P1 | E2E:organizer, BE:inventory, WEB:readiness, WEB:allocation |
 | TC-ORG-06 | Gửi duyệt → admin duyệt → mở bán | Đủ điều kiện | "Gửi duyệt"; admin "Duyệt và mở bán" | Sự kiện xuất hiện công khai, chọn chỗ được | P1 | E2E:organizer, BE:events |
 | TC-ORG-07 | Sửa khi đang bán | Sự kiện đang bán | Sửa mô tả / ảnh / hàng chờ | Lưu được, kể cả sự kiện không có danh mục; tên, giờ, danh mục bị khóa; "Có thay đổi chưa lưu" khi chưa lưu | P2 | BE:events |
-| TC-ORG-08 | Báo cáo bán hàng | Có đơn | Tab "Doanh thu" | Số vé, doanh thu, hoàn tiền, phí hủy đúng | P2 | E2E:refund-report, BE:reports, WEB:reports |
+| TC-ORG-08 | Báo cáo bán hàng | Có đơn | Tab "Doanh thu" | Số vé, doanh thu, hoàn tiền đúng (phí hủy chỉ còn ở đơn cũ) | P2 | E2E:refund-report, BE:reports, WEB:reports |
 | TC-ORG-09 | Xóa sự kiện | Sự kiện có đơn | "Xóa" → gõ lại đúng tên | Chỉ xóa khi gõ đúng tên; có audit | P3 | BE:event-deletion |
 | TC-ORG-10 | Đề xuất địa điểm mới | — | Đề xuất địa điểm khi tạo suất | Admin duyệt sự kiện thì địa điểm được duyệt theo | P3 | BE:venue-proposals |
 | TC-ORG-11 | Nghệ sĩ khách mời | Sự kiện nháp hoặc đang bán | Thẻ "Nghệ sĩ khách mời": "+ Thêm nghệ sĩ", nhập tên, xóa một ô; "Lưu danh sách nghệ sĩ" | Trang sự kiện có mục "Nghệ sĩ khách mời" (các thẻ tên, đúng thứ tự nhập, tên trùng chỉ một lần); không sửa được khi đang chờ duyệt | P2 | E2E:lineup, BE:event-lineup, WEB:lineup |
@@ -243,7 +243,7 @@ Chạy đúng thứ tự, mỗi dòng là một test case P1 ở trên:
 6. TC-TKT-01, TC-TKT-02: xem QR, tải PDF.
 7. TC-CHK-02, TC-CHK-03: điện thoại quét vé: xanh rồi đỏ.
 8. TC-QUE-02, TC-QUE-03: bật hàng chờ N = 1, hai người, người sau tự vào.
-9. TC-REF-01: hủy đơn theo chính sách, thấy hoàn tiền.
+9. TC-REF-01, TC-REF-06: đơn đã trả không có nút hủy; hủy một sự kiện thử thì đơn được hoàn 100%.
 10. TC-SEC-01: tài khoản khách không vào được trang quản trị.
 
 Toàn bộ test tự động (trước khi bàn giao):
@@ -258,12 +258,12 @@ cd e2e && npm test
 
 | Nhóm | Số test case | Có test tự động | Chỉ test tay |
 |---|---|---|---|
-| AUTH | 10 | 9 | 1 |
+| AUTH | 13 | 12 | 1 |
 | CAT | 7 | 5 | 2 |
 | BKG | 9 | 8 | 1 |
 | QUE | 10 | 10 | 0 |
-| PAY | 11 | 11 | 0 |
-| REF | 7 | 7 | 0 |
+| PAY | 12 | 12 | 0 |
+| REF | 5 | 5 | 0 |
 | WTL | 4 | 4 | 0 |
 | TKT | 6 | 6 | 0 |
 | CHK | 6 | 6 | 0 |
@@ -273,6 +273,6 @@ cd e2e && npm test
 | SEC | 6 | 6 | 0 |
 | UI | 6 | 2 | 4 |
 | LOAD | 3 | 3 | 0 |
-| **Tổng** | **111** | **103** | **8** |
+| **Tổng** | **113** | **105** | **8** |
 
-Test tự động hiện có: backend 430 test, web 136 test, E2E 29 kịch bản, k6 5 kịch bản (chi tiết `docs/testing.md`). Những ca "chỉ test tay" cần thiết bị hoặc dịch vụ thật (điện thoại, đồng hồ máy, cài đặt hệ điều hành) hoặc là cảm nhận giao diện.
+Test tự động hiện có: backend 421 test, web 141 test, E2E 29 kịch bản, k6 5 kịch bản (chi tiết `docs/testing.md`). Những ca "chỉ test tay" cần thiết bị hoặc dịch vụ thật (điện thoại, đồng hồ máy, cài đặt hệ điều hành) hoặc là cảm nhận giao diện.
