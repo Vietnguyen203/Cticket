@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { LayoutZone, ScheduleTicketType } from '../api/admin'
-import { allocation, freeSeats, freeSeatsOfZones, planWith, planWithout, seatRangeLabel, tierCode, zoneLines } from './allocation'
+import { allocation, freeSeats, freeSeatsOfZones, planWith, planWithAll, planWithout, seatRangeLabel, tierCode, tierRows, zoneLines } from './allocation'
 
 const seat = (zoneId: string, rowLabel: string, n: number) => ({ id: `${zoneId}-${rowLabel}${n}`, zoneId, code: `${rowLabel}${n}`, rowLabel, seatNumber: n, seatType: 'STANDARD' })
 const rows = (zoneId: string, labels: string[], perRow: number) => labels.flatMap((r) => Array.from({ length: perRow }, (_, i) => seat(zoneId, r, i + 1)))
@@ -85,5 +85,45 @@ describe('tiers given to the zones the venue already has', () => {
     expect(tierCode('VIP', [])).toBe('VIP')
     expect(tierCode('Khu đặc biệt', [])).toBe('KHUDACBIET')
     expect(tierCode('A', ['a', 'A-2'])).toBe('A-3')
+  })
+})
+
+describe('one "Xác nhận" for every zone with a price', () => {
+  const lines = zoneLines(zones, empty, [])
+  const draft = (price: string, typed: string | null = null, name?: string) => ({ name: name ?? 'Hạng', price, typed, maxPerOrder: '' })
+
+  test('counts not typed share what is left of the total, zone after zone', () => {
+    const { rows, chosen, overTotal } = tierRows(lines, {}, 25)
+    expect(rows.map((r) => [r.line.zone.id, r.count])).toEqual([
+      ['A', '10'],
+      ['P', '15'],
+      ['B', '0'],
+    ])
+    expect(chosen).toEqual([]) // no price yet: nothing to assign
+    expect(overTotal).toBeNull()
+  })
+
+  test('only the zones with a price are assigned; each checked, and together within the total', () => {
+    const ok = tierRows(lines, { A: draft('1000000'), P: draft('300000', '15') }, 25)
+    expect(ok.chosen.map((r) => [r.line.zone.id, r.places, r.problem])).toEqual([
+      ['A', 10, null],
+      ['P', 15, null],
+    ])
+    expect(ok.overTotal).toBeNull()
+
+    const over = tierRows(lines, { A: draft('1000000'), P: draft('300000', '20') }, 25)
+    expect(over.overTotal).toContain('cộng lại 30 người, chỉ còn 25')
+    expect(tierRows(lines, { A: draft('1', '11') }, 99).chosen[0].problem).toBe('Khu còn 10 ghế trống.')
+    expect(tierRows(lines, { P: draft('1', '0') }, 99).chosen[0].problem).toBe('Nhập số vé (số nguyên dương).')
+    expect(tierRows(lines, { A: draft('1', null, '  ') }, 99).chosen[0].problem).toBe('Nhập tên hạng.')
+  })
+
+  test('the seats of several tiers go in one seat plan, the others kept', () => {
+    const plan = { totalAssignedSeats: 1, assignments: [{ seatId: 'A-A1', ticketTypeId: 'vip' }] }
+    expect(planWithAll(plan, [{ ticketTypeId: 'a', seatIds: ['A-A2'] }, { ticketTypeId: 'b', seatIds: ['B-C1', 'B-C2'] }])).toEqual([
+      { ticketTypeId: 'vip', seatIds: ['A-A1'] },
+      { ticketTypeId: 'a', seatIds: ['A-A2'] },
+      { ticketTypeId: 'b', seatIds: ['B-C1', 'B-C2'] },
+    ])
   })
 })

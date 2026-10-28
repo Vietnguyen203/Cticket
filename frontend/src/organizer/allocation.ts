@@ -89,11 +89,74 @@ export function tierCode(zoneCode: string, taken: string[]): string {
   return `${base}-${n}`
 }
 
+/** What the organizer typed for one zone (the count follows the total until it is typed). */
+export interface TierDraft {
+  name: string
+  price: string
+  typed: string | null
+  maxPerOrder: string
+}
+
+/** One zone's line worked out: the count shown, and what is wrong with it if it is to be assigned. */
+export interface TierRow {
+  line: ZoneLine
+  draft: TierDraft
+  count: string
+  places: number
+  /** a price is typed: this zone is assigned by "Xác nhận" */
+  chosen: boolean
+  problem: string | null
+}
+
+const vn = (x: number) => x.toLocaleString('vi-VN')
+
+/**
+ * The tier lines of the zones with free places, for one "Xác nhận": counts
+ * not typed share what is left of the total, zone after zone; the zones with
+ * a price are the ones assigned, and together they must fit in what is left.
+ */
+export function tierRows(lines: ZoneLine[], drafts: Record<string, TierDraft>, remaining: number) {
+  const rows: TierRow[] = []
+  let left = Math.max(0, remaining)
+  for (const line of lines.filter((l) => l.free > 0)) {
+    const draft = drafts[line.zone.id] ?? { name: line.zone.name, price: '', typed: null, maxPerOrder: '' }
+    const count = draft.typed ?? String(Math.min(line.free, left))
+    const places = Number(count)
+    if (Number.isInteger(places) && places > 0) left = Math.max(0, left - places)
+    const chosen = draft.price !== ''
+    // Checked once the zone is to be assigned (a price) or its count was typed.
+    const problem = !chosen && draft.typed === null
+      ? null
+      : !draft.name.trim()
+        ? 'Nhập tên hạng.'
+        : !Number.isInteger(places) || places < 1
+          ? line.seated
+            ? 'Nhập số ghế (số nguyên dương).'
+            : 'Nhập số vé (số nguyên dương).'
+          : places > line.free
+            ? `Khu còn ${vn(line.free)} ${line.seated ? 'ghế trống' : 'chỗ'}.`
+            : places > remaining
+              ? `Chỉ còn ${vn(Math.max(0, remaining))} người chưa xếp (tổng số người tham dự).`
+              : null
+    rows.push({ line, draft, count, places, chosen, problem })
+  }
+  const chosen = rows.filter((row) => row.chosen)
+  const total = chosen.reduce((sum, row) => sum + (Number.isInteger(row.places) && row.places > 0 ? row.places : 0), 0)
+  const overTotal =
+    total > remaining ? `Các khu đã nhập giá cộng lại ${vn(total)} người, chỉ còn ${vn(Math.max(0, remaining))} người chưa xếp (tổng số người tham dự).` : null
+  return { rows, chosen, overTotal }
+}
+
 /** The whole seat plan with `seatIds` added for a tier (the API replaces the plan). */
 export function planWith(plan: SeatPlanDetail, ticketTypeId: string, seatIds: string[]) {
+  return planWithAll(plan, [{ ticketTypeId, seatIds }])
+}
+
+/** The whole seat plan with the seats of several tiers added: one save for many zones. */
+export function planWithAll(plan: SeatPlanDetail, additions: Array<{ ticketTypeId: string; seatIds: string[] }>) {
   const byType = new Map<string, string[]>()
   for (const { seatId, ticketTypeId: type } of plan.assignments) byType.set(type, [...(byType.get(type) ?? []), seatId])
-  byType.set(ticketTypeId, [...(byType.get(ticketTypeId) ?? []), ...seatIds])
+  for (const { ticketTypeId, seatIds } of additions) byType.set(ticketTypeId, [...(byType.get(ticketTypeId) ?? []), ...seatIds])
   return [...byType.entries()].map(([type, ids]) => ({ ticketTypeId: type, seatIds: ids }))
 }
 
