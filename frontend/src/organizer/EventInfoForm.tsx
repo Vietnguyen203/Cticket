@@ -135,7 +135,7 @@ export function EventInfoForm({ event, onSubmit, submitLabel }: { event?: EventD
         className="sm:w-1/2"
       />
       <p className="text-sm text-slate-500">
-        Khách không hủy, không trả vé đã mua. Hủy sự kiện hoặc suất diễn thì mọi đơn đã thanh toán được hoàn 100% tự động.{' '}
+        {' '}
         <Link to="/dieu-khoan#huy-va-hoan-tien" target="_blank" className="font-semibold text-brand-700 hover:underline">
           Xem Điều kiện giao dịch chung (Điều 5, Điều 6)
         </Link>
