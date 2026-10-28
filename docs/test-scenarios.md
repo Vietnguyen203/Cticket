@@ -98,6 +98,7 @@ Ký hiệu file test tự động:
 | TC-QUE-08 | Tắt hàng chờ | Đang có người chờ | Ban tổ chức tắt hàng chờ | Mọi người vào thẳng trang chọn chỗ | P2 | BE:purchase-queue |
 | TC-QUE-09 | Đang trả qua VNPay khi đơn quá hạn | Hàng chờ N = 1, A đang ở trang VNPay | Để đơn quá hạn | Lượt của A vẫn giữ tới khi VNPay được hỏi xong; không có 2 người cùng mua (rà soát lỗi BUG-02) | P3 | BE:purchase-queue |
 | TC-QUE-10 | Đông người | — | Chạy k6 1.000 người, N = 50 | Không lúc nào quá 50 người đang mua; ai cũng được vào và mua được; 0% lỗi | P2 | K6:queue, BE:purchase-queue (200 người cùng vào) |
+| TC-QUE-11 | "Vào ngay" trong phòng chờ | Hàng chờ N = 1, A đang mua, B đang chờ | B bấm "Vào ngay"; rồi A hết lượt / thanh toán | Đủ người: báo "Đang có 1 / 1 người mua cùng lúc", B giữ vị trí 1, nút khóa 10 giây; còn chỗ: vào thẳng sơ đồ ghế; người sau bấm trước cũng không vượt được B | P2 | BE:purchase-queue, E2E:queue, WEB:waitingRoom |
 
 ## 7. Thanh toán (PAY)
 
@@ -274,7 +275,7 @@ cd e2e && npm test
 | AUTH | 14 | 13 | 1 |
 | CAT | 7 | 5 | 2 |
 | BKG | 9 | 8 | 1 |
-| QUE | 10 | 10 | 0 |
+| QUE | 11 | 11 | 0 |
 | PAY | 12 | 12 | 0 |
 | REF | 5 | 5 | 0 |
 | WTL | 4 | 4 | 0 |
@@ -287,6 +288,6 @@ cd e2e && npm test
 | UI | 6 | 2 | 4 |
 | LOAD | 3 | 3 | 0 |
 | MON | 6 | 6 | 0 |
-| **Tổng** | **121** | **113** | **8** |
+| **Tổng** | **122** | **114** | **8** |
 
-Test tự động hiện có: backend 445 test, web 148 test, E2E 30 kịch bản, k6 5 kịch bản (chi tiết `docs/testing.md`). Những ca "chỉ test tay" cần thiết bị hoặc dịch vụ thật (điện thoại, đồng hồ máy, cài đặt hệ điều hành) hoặc là cảm nhận giao diện.
+Test tự động hiện có: backend 447 test, web 155 test, E2E 31 kịch bản, k6 5 kịch bản (chi tiết `docs/testing.md`). Những ca "chỉ test tay" cần thiết bị hoặc dịch vụ thật (điện thoại, đồng hồ máy, cài đặt hệ điều hành) hoặc là cảm nhận giao diện.

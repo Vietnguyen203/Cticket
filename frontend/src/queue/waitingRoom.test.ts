@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { QueueView } from '../api/queue'
-import { formatWait, mustWait, queueProgress } from './waitingRoom'
+import { formatWait, mustWait, queueProgress, tryNowMessage } from './waitingRoom'
 
 const view = (state: QueueView['state'], enabled = true): QueueView => ({
   enabled,
@@ -35,5 +35,12 @@ describe('purchase queue (Phase 21)', () => {
     expect(mustWait(view('WAITING', false), false)).toBe(false)
     expect(mustWait(view('WAITING'), true)).toBe(false)
     expect(mustWait(undefined, false)).toBe(false)
+  })
+})
+
+describe('"Vào ngay" refused', () => {
+  test('says how full it is, and that the place is kept', () => {
+    expect(tryNowMessage(1, 1)).toBe('Đang có 1 / 1 người mua cùng lúc, chưa vào ngay được. Bạn vẫn giữ vị trí trong hàng và sẽ tự vào khi tới lượt.')
+    expect(tryNowMessage(null, 100)).toMatch(/^Đang đủ người mua cùng lúc, chưa vào ngay được\./)
   })
 })

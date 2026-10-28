@@ -128,6 +128,32 @@ async function status(userId, eventId) {
   return at ? toView(settings, at) : OPEN;
 }
 
+/**
+ * POST /events/:id/queue/try ("Vào ngay"): look at the queue again now
+ * instead of waiting for the next check. Room (fewer than N buying) → the line
+ * moves on at once, in order: whoever is first gets in, so do I if my place
+ * fits in the room. No room → I stay in my place, and am told how full it is.
+ * Never a way past the people ahead of me.
+ * @returns the usual view, plus `buying` (people buying now, of `capacity`)
+ */
+async function tryNow(userId, eventId) {
+  const settings = await publicSettings(eventId);
+  if (!isQueued(settings)) return { ...OPEN, buying: null };
+  const result = await tryRedis(
+    'purchase queue try',
+    async () => {
+      // The script lets people in first (expired turns out, then the line in order while there is room).
+      let at = await runScript('queueStatus', settings, userId);
+      if (at.state === STATE.NONE) at = await runScript('queueJoin', settings, userId);
+      const [active] = keysOf(settings.event_id);
+      const buying = Number(await redis.zcount(active, `(${Date.now()}`, '+inf'));
+      return { at, buying };
+    },
+    null,
+  );
+  return result ? { ...toView(settings, result.at), buying: result.buying } : { ...OPEN, buying: null };
+}
+
 /** DELETE /events/:id/queue: give up my turn or my place. */
 async function leave(userId, eventId) {
   const settings = await publicSettings(eventId);
@@ -244,6 +270,7 @@ module.exports = {
   estimateWaitSeconds,
   join,
   status,
+  tryNow,
   leave,
   assertTurn,
   extendTurn,

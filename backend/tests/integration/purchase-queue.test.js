@@ -7,7 +7,7 @@ const { QUEUE } = require('../../src/queue/queues');
 const processors = require('../../src/queue/processors');
 const purchaseQueueRepository = require('../../src/modules/purchase-queue/purchase-queue.repository');
 const { useFakeMailbox } = require('../helpers/auth');
-const { bearer, createAdmin, createOrganizer, createCategory } = require('../helpers/catalog');
+const { bearer, createAdmin, createOrganizer, createCategory, createEvent } = require('../helpers/catalog');
 const { createConfiguredEvent, publishEvent } = require('../helpers/inventory');
 const { createCustomers, book, cancelOrder, makeDue } = require('../helpers/orders');
 const { TERMS_VERSION } = require('../../src/config/constants');
@@ -57,6 +57,19 @@ describe('settings', () => {
     const res = await join(buyer.token, event.id).expect(200);
     expect(queueOf(res)).toMatchObject({ enabled: false, state: 'ACTIVE' });
     await book(app, buyer.token, schedule.id, { seatIds: [seat.A01] }).expect(201);
+  });
+
+  test('set up when the event is created (still within the limits); off unless asked', async () => {
+    const queued = await createEvent(app, organizer.token, { categoryIds: [category.id], queueEnabled: true, queueCapacity: 50, queueSessionMinutes: 15 });
+    expect(queued.queue).toEqual({ enabled: true, capacity: 50, sessionMinutes: 15 });
+    const plain = await createEvent(app, organizer.token, { categoryIds: [category.id] });
+    expect(plain.queue).toEqual({ enabled: false, capacity: 100, sessionMinutes: 10 });
+    const bad = await request(app)
+      .post('/api/v1/events')
+      .set(bearer(organizer.token))
+      .send({ title: 'Quá giới hạn', categoryIds: [category.id], queueEnabled: true, queueSessionMinutes: 2 })
+      .expect(400);
+    expect(bad.body.error.code).toBe('VALIDATION_ERROR');
   });
 
   test('the organizer switches it on after publishing (audited); the event page shows it; limits checked', async () => {
@@ -150,6 +163,25 @@ describe('one at a time (capacity 1)', () => {
     expect(await runJob('admit-queues')).toBeGreaterThanOrEqual(1);
     expect(Number(await redis.zscore(`queue:${event.id}:active`, b.id))).toBeGreaterThan(Date.now());
     expect(await stateOf(a.token, event.id)).toMatchObject({ state: 'NONE' });
+  });
+
+  test('"Vào ngay": refused while it is full (place kept), straight in once there is room, never ahead of others', async () => {
+    const { event } = await onSale({ queueCapacity: 1 });
+    const [a, b, c] = await createCustomers(3);
+    for (const buyer of [a, b, c]) await join(buyer.token, event.id).expect(200);
+    const tryNow = (buyer) => request(app).post(`/api/v1/events/${event.id}/queue/try`).set(bearer(buyer.token)).expect(200);
+
+    // Full (A buying): B stays first in line, C second; told how full it is.
+    expect(queueOf(await tryNow(b))).toMatchObject({ state: 'WAITING', place: 1, buying: 1, capacity: 1 });
+    expect(queueOf(await tryNow(c))).toMatchObject({ state: 'WAITING', place: 2, buying: 1 });
+
+    // A's turn runs out: room for one. C asking first does not pass B: B gets the room.
+    await endTurn(event.id, a.id);
+    expect(queueOf(await tryNow(c))).toMatchObject({ state: 'WAITING', place: 1, buying: 1 });
+    expect(await stateOf(b.token, event.id)).toMatchObject({ state: 'ACTIVE' });
+    // B leaves: C is next and goes in when asking.
+    await leave(b.token, event.id).expect(200);
+    expect(queueOf(await tryNow(c))).toMatchObject({ state: 'ACTIVE' });
   });
 
   test('a newcomer never goes in ahead of someone waiting, even when a turn just ended', async () => {

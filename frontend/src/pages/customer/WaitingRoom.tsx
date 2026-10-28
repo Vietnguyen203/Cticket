@@ -1,23 +1,54 @@
+import { useState } from 'react'
+import { toApiError } from '../../api/errors'
 import type { QueueView } from '../../api/queue'
-import { Button, Card } from '../../components/ui'
-import { formatWait, queueProgress } from '../../queue/waitingRoom'
+import { Alert, Button, Card } from '../../components/ui'
+import { formatWait, queueProgress, tryNowMessage } from '../../queue/waitingRoom'
+import { useCooldown } from '../../utils/useCooldown'
+
+/** "Vào ngay" can be pressed again after this long (the line is checked every 5 s anyway). */
+const TRY_AGAIN_SECONDS = 10
 
 /**
  * Phase 21: shown instead of the seat map while I wait for my turn in the
  * event's purchase queue. The page moves on by itself when it is my turn.
+ * "Vào ngay": the server looks again at once; with room I go straight in
+ * (the seat map appears), otherwise I am told and keep my place.
  */
 export function WaitingRoom({
   eventTitle,
   view,
   firstPlace,
   onLeave,
+  onTryNow,
 }: {
   eventTitle: string
   view: QueueView
   firstPlace: number | null
   onLeave: () => void
+  onTryNow: () => Promise<{ admitted: boolean; buying: number | null }>
 }) {
   const progress = queueProgress(firstPlace, view.place)
+  const [trying, setTrying] = useState(false)
+  const [refused, setRefused] = useState<string | null>(null)
+  const cooldown = useCooldown(TRY_AGAIN_SECONDS)
+
+  async function tryNow() {
+    setTrying(true)
+    setRefused(null)
+    try {
+      const { admitted, buying } = await onTryNow()
+      // Admitted: the seat page shows the seat map in place of this one.
+      if (!admitted) {
+        setRefused(tryNowMessage(buying, view.capacity ?? null))
+        cooldown.start()
+      }
+    } catch (err) {
+      setRefused(toApiError(err).message)
+      cooldown.start()
+    } finally {
+      setTrying(false)
+    }
+  }
   return (
     <div className="mx-auto max-w-lg px-4 py-10">
       <Card className="space-y-5 text-center">
@@ -56,9 +87,19 @@ export function WaitingRoom({
           <li>• Tới lượt, sơ đồ ghế tự hiện ra. Bạn có {view.sessionMinutes ?? 10} phút để chọn và giữ chỗ.</li>
         </ul>
 
-        <Button variant="secondary" onClick={onLeave}>
-          Rời hàng chờ
-        </Button>
+        {refused && (
+          <div className="text-left">
+            <Alert tone="warning">{refused}</Alert>
+          </div>
+        )}
+        <div className="flex flex-wrap justify-center gap-2">
+          <Button onClick={() => void tryNow()} loading={trying} disabled={cooldown.remaining > 0}>
+            {cooldown.remaining > 0 ? `Vào ngay (thử lại sau ${cooldown.remaining} giây)` : 'Vào ngay'}
+          </Button>
+          <Button variant="secondary" onClick={onLeave}>
+            Rời hàng chờ
+          </Button>
+        </div>
       </Card>
     </div>
   )

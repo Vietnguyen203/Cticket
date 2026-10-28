@@ -32,6 +32,11 @@ export async function getQueueStatus(eventId: string): Promise<QueueView> {
   return (await api.get(`/events/${eventId}/queue`)).data.data.queue
 }
 
+/** "Vào ngay": the queue looked at again now. `buying`: people buying now (of `capacity`). */
+export async function tryQueueNow(eventId: string): Promise<QueueView & { buying: number | null }> {
+  return (await api.post(`/events/${eventId}/queue/try`)).data.data.queue
+}
+
 export async function leaveQueue(eventId: string): Promise<void> {
   await api.delete(`/events/${eventId}/queue`)
 }
