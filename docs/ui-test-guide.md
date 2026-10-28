@@ -185,6 +185,7 @@ Hồ sơ "Ban tổ chức", "Khách A", "Khách B". Không ai đang có đơn gi
 | 7.2 · QUE-02 ★ | **A** mở trang chọn chỗ của sự kiện 1 | "Đến lượt bạn mua vé" kèm thời gian lượt còn lại; sơ đồ ghế hiện bình thường | |
 | 7.3 · QUE-02 ★ | **B** mở trang chọn chỗ (sau A) | "Bạn đang trong hàng chờ mua vé", vị trí **1**, "Bạn là người tiếp theo"; không có sơ đồ ghế | |
 | 7.4 · QUE-05 | B tải lại trang | Vẫn vị trí 1 | |
+| 7.4b · QUE-11 | B bấm "Vào ngay" (A vẫn đang mua) | Báo "Đang có 1 / 1 người mua cùng lúc, chưa vào ngay được"; B vẫn vị trí 1; nút "Vào ngay" khóa 10 giây | |
 | 7.5 · QUE-01 | Ban tổ chức: thẻ "Doanh thu" | "đang mua 1 / 1", "đang chờ 1" (cập nhật sau vài giây) | |
 | 7.6 · QUE-03 ★ | A giữ ghế **C01** → "Tiếp tục thanh toán" → "Giả lập thanh toán thành công" | A có vé. Trong vài giây, trang của B (**không tải lại**) tự chuyển sang "Đến lượt bạn mua vé" và hiện sơ đồ | |
 | 7.7 · QUE-03 ★ | B giữ ghế **C02** | Sang trang đơn, đồng hồ giữ chỗ chạy | |
@@ -338,7 +339,7 @@ Mức độ: Cao (sai tiền, bán trùng, lộ dữ liệu) / Trung bình (sai 
 | 4. Tìm và xem | 6 | | | |
 | 5. Mua vé | 14 | | | |
 | 6. Đổi ghế, hết giờ | 6 | | | |
-| 7. Hàng chờ | 9 | | | |
+| 7. Hàng chờ | 10 | | | |
 | 8. Danh sách chờ | 7 | | | |
 | 9. Không hủy, không hoàn | 5 | | | |
 | 10. Soát vé | 9 | | | |
@@ -348,6 +349,6 @@ Mức độ: Cao (sai tiền, bán trùng, lộ dữ liệu) / Trung bình (sai 
 | 14. Phân quyền | 3 | | | |
 | 15. Giao diện | 6 | | | |
 | 16. Hủy sự kiện, hoàn tiền | 3 | | | |
-| **Tổng** | **121** | | | |
+| **Tổng** | **122** | | | |
 
 Người test: ………… Ngày: ………… Phiên bản (`git log -1 --format=%h`): …………

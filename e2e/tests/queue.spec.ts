@@ -31,6 +31,10 @@ test('purchase queue: one buys, the other waits, then goes in by himself', async
   await expect(bobPage.getByRole('heading', { name: 'Bạn đang trong hàng chờ mua vé' })).toBeVisible()
   await expect(bobPage.getByTestId('queue-place')).toHaveText('1')
   await expect(bobPage.getByText('Bạn là người tiếp theo')).toBeVisible()
+  // "Vào ngay" while Alice is buying: refused, Bob keeps his place.
+  await bobPage.getByRole('button', { name: 'Vào ngay' }).click()
+  await expect(bobPage.getByText('Đang có 1 / 1 người mua cùng lúc, chưa vào ngay được.', { exact: false })).toBeVisible()
+  await expect(bobPage.getByTestId('queue-place')).toHaveText('1')
   await expect(orgPage.getByTestId('queue-stats')).toContainText('đang chờ 1', { timeout: 15_000 })
 
   // Alice holds a seat and pays: her turn goes to Bob.

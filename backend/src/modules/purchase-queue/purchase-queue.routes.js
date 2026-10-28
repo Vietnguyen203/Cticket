@@ -17,6 +17,8 @@ const manager = [authenticate, authorize.any('event:update:own', 'event:manage:a
 const purchaseQueueRouter = Router();
 purchaseQueueRouter.post('/:id/queue', ...buyer, controller.join);
 purchaseQueueRouter.get('/:id/queue', ...buyer, controller.status);
+// "Vào ngay" in the waiting room: the queue looked at again now (same per-user limit as the others).
+purchaseQueueRouter.post('/:id/queue/try', ...buyer, controller.tryNow);
 purchaseQueueRouter.delete('/:id/queue', ...buyer, controller.leave);
 purchaseQueueRouter.get('/:id/queue/stats', ...manager, controller.stats);
 

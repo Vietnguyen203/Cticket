@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { getQueueStatus, joinQueue, leaveQueue, type QueueView } from '../api/queue'
+import { getQueueStatus, joinQueue, leaveQueue, tryQueueNow, type QueueView } from '../api/queue'
 import { realtime } from '../realtime'
 
 const POLL_MS = 5000
@@ -11,6 +11,8 @@ export interface PurchaseQueue {
   firstPlace: number | null
   /** Ask again now (e.g. the API said it is not my turn) */
   refresh: () => void
+  /** "Vào ngay": in at once when there is room; else the view stays WAITING. Resolves with the people buying now. */
+  tryNow: () => Promise<{ admitted: boolean; buying: number | null }>
   leave: () => Promise<void>
 }
 
@@ -84,6 +86,13 @@ export function usePurchaseQueue(eventId: string | undefined, enabled: boolean):
     if (eventId) await leaveQueue(eventId)
   }, [eventId])
 
+  const tryNow = useCallback(async () => {
+    if (!eventId) return { admitted: false, buying: null }
+    const { buying, ...next } = await tryQueueNow(eventId)
+    setView(next)
+    return { admitted: next.state === 'ACTIVE' || !next.enabled, buying }
+  }, [eventId])
+
   // Switched off / signed out: nothing to wait for, whatever was last seen.
-  return { view: eventId && enabled ? view : undefined, firstPlace, refresh, leave }
+  return { view: eventId && enabled ? view : undefined, firstPlace, refresh, tryNow, leave }
 }

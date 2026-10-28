@@ -127,6 +127,7 @@ Lịch chạy mới trong `backend/src/worker.js`, mỗi **5 giây**: với mỗ
 |---|---|---|---|
 | `POST` | `/events/:id/queue` | khách đã đăng nhập | `{ enabled, state, place, ahead, turnEndsAt, estimatedWaitSeconds }` |
 | `GET` | `/events/:id/queue` | khách | như trên; `state: NONE` nếu chưa vào hàng |
+| `POST` | `/events/:id/queue/try` | khách | nút **"Vào ngay"** (thêm sau): xét lại hàng ngay. Còn chỗ (dưới N người đang mua) thì hàng tiến lên theo thứ tự, người đầu hàng vào trước, nên ai đủ chỗ thì vào thẳng; đủ người thì giữ nguyên vị trí. Trả thêm `buying` (số người đang mua). Không bao giờ vượt người đứng trước |
 | `DELETE` | `/events/:id/queue` | khách | 204 |
 | `GET` | `/events/:id/queue/stats` | ban tổ chức của sự kiện, admin | `{ enabled, capacity, active, waiting }` |
 

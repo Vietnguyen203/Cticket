@@ -127,6 +127,7 @@ export function SeatSelectPage() {
         eventTitle={event.data?.title ?? 'Sự kiện'}
         view={queue.view}
         firstPlace={queue.firstPlace}
+        onTryNow={queue.tryNow}
         onLeave={() => void queue.leave().finally(() => navigate(`/events/${slug}`))}
       />
     )
