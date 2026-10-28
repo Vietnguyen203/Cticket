@@ -1,5 +1,6 @@
-import { useId, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react'
+import { useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react'
 import { AlertIcon, CheckCircleIcon, ChevronDownIcon, EyeIcon, EyeOffIcon, InfoIcon, XCircleIcon } from './icons'
+import { caretAfterDigits, groupDigits, onlyDigits } from '../utils/digits'
 
 /**
  * Shared building blocks (docs/ui-redesign.md, section 4), styled with the
@@ -107,6 +108,50 @@ export function TextField({ label, error, hint, icon, id, className = '', ...res
         />
       </div>
     </FieldFrame>
+  )
+}
+
+/**
+ * A whole number (price, capacity, limit) shown with "." between thousands as
+ * it is typed: 1500000 reads 1.500.000. `value` and `onChange` carry the bare
+ * digits ("1500000"), so a parent reads it with Number(value) as before.
+ */
+export function NumberField({
+  value,
+  onChange,
+  ...rest
+}: Omit<TextFieldProps, 'type' | 'value' | 'onChange' | 'min' | 'max' | 'step'> & {
+  value: string
+  onChange: (e: { target: { value: string } }) => void
+}) {
+  // Keep the caret after the same digit once the dots move: React writes the
+  // new value (caret at the end), then the caret is put back.
+  const pending = useRef<{ input: HTMLInputElement; digitsBefore: number } | null>(null)
+  const placeCaret = () => {
+    const next = pending.current
+    pending.current = null
+    if (!next || document.activeElement !== next.input) return
+    const caret = caretAfterDigits(next.input.value, next.digitsBefore)
+    next.input.setSelectionRange(caret, caret)
+  }
+  useLayoutEffect(placeCaret)
+  return (
+    <TextField
+      {...rest}
+      type="text"
+      inputMode="numeric"
+      autoComplete="off"
+      value={groupDigits(value)}
+      onChange={(e) => {
+        const input = e.currentTarget
+        const digitsBefore = onlyDigits(input.value.slice(0, input.selectionStart ?? input.value.length)).length
+        pending.current = { input, digitsBefore }
+        onChange({ target: { value: onlyDigits(input.value) } })
+        // Nothing to redraw (a letter typed): React only puts the old value back.
+        queueMicrotask(placeCaret)
+      }}
+      className={`${rest.className ?? ''} tabular-nums`}
+    />
   )
 }
 

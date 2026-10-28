@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router'
 import { createVenue, listVenues, type VenueStatus } from '../../api/admin'
 import { ApiError, toApiError } from '../../api/errors'
 import { EmptyRow, PageHeader, Pagination, StatusBadge, TableCard, Tabs } from '../../admin/components'
-import { Alert, Button, Card, TextField } from '../../components/ui'
+import { Alert, Button, Card, NumberField, TextField } from '../../components/ui'
 import { useAsync } from '../../utils/useAsync'
 
 const EMPTY = { name: '', addressLine: '', city: '', capacity: '' }
@@ -80,7 +80,7 @@ export function VenuesPage() {
               error={fieldErrors.addressLine}
               className="sm:col-span-2"
             />
-            <TextField label="Sức chứa (không bắt buộc)" name="capacity" type="number" min={1} value={form.capacity} onChange={set('capacity')} error={fieldErrors.capacity} />
+            <NumberField label="Sức chứa (không bắt buộc)" name="capacity" value={form.capacity} onChange={set('capacity')} error={fieldErrors.capacity} />
             <div className="flex items-end justify-end gap-2">
               <Button type="button" variant="secondary" onClick={() => setCreating(false)}>
                 Thôi
