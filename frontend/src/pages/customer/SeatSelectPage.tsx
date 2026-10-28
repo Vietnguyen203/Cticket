@@ -390,58 +390,63 @@ function SeatRows({ seats, state, ticketTypes, dispatch }: { seats: Seat[]; stat
       <div
         ref={rowsRef}
         onScroll={update}
-        className={`space-y-1.5 overflow-x-auto pb-2 ${hidden ? '[mask-image:linear-gradient(to_right,#000_calc(100%-2.5rem),transparent)]' : ''}`}
+        className={`overflow-x-auto pb-2 ${hidden ? '[mask-image:linear-gradient(to_right,#000_calc(100%-2.5rem),transparent)]' : ''}`}
       >
-        {rows.map((rowLabel) => (
-          <div key={rowLabel} className="flex items-center gap-1 whitespace-nowrap">
-            <span className="sticky left-0 z-[1] w-7 shrink-0 bg-surface text-xs font-semibold text-slate-500">{rowLabel}</span>
-            {seats
-              .filter((s) => s.rowLabel === rowLabel)
-              .sort((a, b) => a.seatNumber - b.seatNumber)
-              .map((seat) => {
-                const live = state.seats[seat.seatId]?.status ?? seat.status
-                const selected = state.selected.includes(seat.seatId)
-                // BKG-02: a seat my held order holds (HELD on everyone's map), which I may unpick or pick back.
-                const mine = isMine(state, seat.seatId) && live === 'HELD'
-                const typeIndex = reserved.findIndex((tt) => tt.id === seat.ticketTypeId)
-                const typeColor = TYPE_COLORS[typeIndex % TYPE_COLORS.length]
-                const sellable = (live === 'AVAILABLE' || mine) && typeIndex >= 0
-                const color = selected
-                  ? 'animate-pop bg-brand-800 text-white ring-2 ring-brand-300'
-                  : mine
-                    ? `${typeColor} text-white opacity-60 outline-2 outline-dashed outline-red-500`
-                    : live === 'HELD'
-                      ? 'bg-amber-200 text-amber-800'
-                      : sellable
-                        ? `${typeColor} text-white hover:-translate-y-px hover:brightness-110 hover:shadow-card`
-                        : 'bg-slate-300 text-slate-500'
-                const typeName = reserved[typeIndex]?.name ?? 'không bán'
-                const statusText = mine
-                  ? selected
-                    ? 'ghế của bạn'
-                    : 'ghế của bạn, sẽ bỏ ra khi cập nhật'
-                  : live === 'AVAILABLE'
-                    ? 'còn trống'
-                    : live === 'HELD'
-                      ? 'đang có người giữ'
-                      : 'không còn'
-                return (
-                  <button
-                    key={seat.seatId}
-                    type="button"
-                    disabled={!sellable && !selected}
-                    aria-pressed={selected}
-                    aria-label={`Ghế ${seat.code}, ${typeName}, ${statusText}`}
-                    title={`${seat.code} · ${typeName}${seat.price ? ` · ${formatVnd(seat.price)}` : ''}`}
-                    onClick={() => dispatch({ type: 'toggleSeat', seatId: seat.seatId })}
-                    className={`h-8 w-8 shrink-0 rounded-md text-[11px] font-medium transition duration-150 ease-out enabled:active:scale-90 sm:h-9 sm:w-9 ${color} disabled:cursor-not-allowed`}
-                  >
-                    {seat.seatNumber}
-                  </button>
-                )
-              })}
-          </div>
-        ))}
+        {/* Centred under the stage; a row wider than the card scrolls (w-max + mx-auto). */}
+        <div className="mx-auto w-max space-y-1.5">
+          {rows.map((rowLabel) => (
+            <div key={rowLabel} className="flex items-center gap-1 whitespace-nowrap">
+              <span className="sticky left-0 z-[1] w-7 shrink-0 bg-surface text-xs font-semibold text-slate-500">{rowLabel}</span>
+              {seats
+                .filter((s) => s.rowLabel === rowLabel)
+                .sort((a, b) => a.seatNumber - b.seatNumber)
+                .map((seat) => {
+                  const live = state.seats[seat.seatId]?.status ?? seat.status
+                  const selected = state.selected.includes(seat.seatId)
+                  // BKG-02: a seat my held order holds (HELD on everyone's map), which I may unpick or pick back.
+                  const mine = isMine(state, seat.seatId) && live === 'HELD'
+                  const typeIndex = reserved.findIndex((tt) => tt.id === seat.ticketTypeId)
+                  const typeColor = TYPE_COLORS[typeIndex % TYPE_COLORS.length]
+                  const sellable = (live === 'AVAILABLE' || mine) && typeIndex >= 0
+                  const color = selected
+                    ? 'animate-pop bg-brand-800 text-white ring-2 ring-brand-300'
+                    : mine
+                      ? `${typeColor} text-white opacity-60 outline-2 outline-dashed outline-red-500`
+                      : live === 'HELD'
+                        ? 'bg-amber-200 text-amber-800'
+                        : sellable
+                          ? `${typeColor} text-white hover:-translate-y-px hover:brightness-110 hover:shadow-card`
+                          : 'bg-slate-300 text-slate-500'
+                  const typeName = reserved[typeIndex]?.name ?? 'không bán'
+                  const statusText = mine
+                    ? selected
+                      ? 'ghế của bạn'
+                      : 'ghế của bạn, sẽ bỏ ra khi cập nhật'
+                    : live === 'AVAILABLE'
+                      ? 'còn trống'
+                      : live === 'HELD'
+                        ? 'đang có người giữ'
+                        : 'không còn'
+                  return (
+                    <button
+                      key={seat.seatId}
+                      type="button"
+                      disabled={!sellable && !selected}
+                      aria-pressed={selected}
+                      aria-label={`Ghế ${seat.code}, ${typeName}, ${statusText}`}
+                      title={`${seat.code} · ${typeName}${seat.price ? ` · ${formatVnd(seat.price)}` : ''}`}
+                      onClick={() => dispatch({ type: 'toggleSeat', seatId: seat.seatId })}
+                      className={`h-8 w-8 shrink-0 rounded-md text-[11px] font-medium transition duration-150 ease-out enabled:active:scale-90 sm:h-9 sm:w-9 ${color} disabled:cursor-not-allowed`}
+                    >
+                      {seat.seatNumber}
+                    </button>
+                  )
+                })}
+              {/* As wide as the row letter: the seats themselves are centred, not seats + letter. */}
+              <span aria-hidden="true" className="w-7 shrink-0" />
+            </div>
+          ))}
+        </div>
       </div>
       {overflowing && <p className="mt-1 text-xs text-slate-500">Hàng ghế dài hơn màn hình: vuốt ngang để xem hết.</p>}
     </>
