@@ -64,6 +64,45 @@ describe('users (USR-03, USR-04, USR-05)', () => {
     expect(audit.body.data.auditLogs[1]).toMatchObject({ userEmail: admin.email, newValue: { status: 'SUSPENDED', reason: 'Spam bán lại vé' } });
   });
 
+  test('delete for good: personal data gone, logged out, orders kept anonymised; reason required; audited', async () => {
+    const user = await createLoggedInUser(app, mailbox);
+    const userId = await userIdOf(user.email);
+    const del = (body, token = admin.token) => request(app).delete(`/api/v1/admin/users/${userId}`).set(bearer(token)).send(body);
+    // A paid order of a show already over (no ticket "still to come" blocks the deletion).
+    await query(
+      `INSERT INTO orders (user_id, schedule_id, order_code, status, subtotal, total_amount, paid_at)
+       SELECT $1, es.id, 'ETP-DEL-' || substr(md5(random()::text), 1, 8), 'COMPLETED', 1000, 1000, now() - interval '30 days'
+       FROM event_schedules es LIMIT 1`,
+      [userId],
+    );
+    const ordersBefore = (await query(`SELECT count(*)::int AS n FROM orders WHERE user_id = $1`, [userId])).rows[0].n;
+
+    await del({}).expect(400); // a reason is required
+    await del({ reason: 'Tài khoản rác' }, user.session.accessToken).expect(403);
+    await del({ reason: 'Tài khoản rác' }).expect(200);
+
+    const row = (await query(`SELECT email, first_name, phone, status FROM users WHERE id = $1`, [userId])).rows[0];
+    expect(row).toMatchObject({ status: 'DELETED', first_name: 'Người dùng', phone: null });
+    expect(row.email).toMatch(/@deleted\.invalid$/);
+    expect((await query(`SELECT count(*)::int AS n FROM orders WHERE user_id = $1`, [userId])).rows[0].n).toBe(ordersBefore);
+    await me(user.session.accessToken).expect(401);
+    await login(app, user.email, user.password).expect(401);
+
+    expect((await del({ reason: 'Lần nữa' })).body.error.code).toBe('ACCOUNT_DELETED');
+    const audit = await query(`SELECT user_id, new_value FROM audit_logs WHERE action = 'ACCOUNT_DELETED_BY_ADMIN' AND entity_id = $1`, [userId]);
+    expect(audit.rows).toEqual([expect.objectContaining({ new_value: { status: 'DELETED', reason: 'Tài khoản rác' } })]);
+  });
+
+  test('delete for good: never oneself; blocked like a self-deletion (an admin, an open order)', async () => {
+    const adminId = await userIdOf(admin.email);
+    const self = await request(app).delete(`/api/v1/admin/users/${adminId}`).set(bearer(admin.token)).send({ reason: 'thử' });
+    expect(self.body.error.code).toBe('CANNOT_CHANGE_SELF');
+
+    const other = await createAdmin(app);
+    const blocked = await request(app).delete(`/api/v1/admin/users/${await userIdOf(other.email)}`).set(bearer(admin.token)).send({ reason: 'thử' }).expect(409);
+    expect(blocked.body.error).toMatchObject({ code: 'ACCOUNT_DELETION_BLOCKED', details: { reasons: ['ADMIN'] } });
+  });
+
   test('roles: CUSTOMER always kept; a removed role is gone at once, an added one at the next refresh', async () => {
     const organizer = await createOrganizer(app, mailbox, admin.token);
     const userId = await userIdOf(organizer.email);

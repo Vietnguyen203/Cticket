@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { listUsers, resetUserTwoFactor, setUserRoles, setUserStatus, unlockUserLogin, type AdminUser } from '../../api/admin'
+import { deleteUserPermanently, listUsers, resetUserTwoFactor, setUserRoles, setUserStatus, unlockUserLogin, type AdminUser } from '../../api/admin'
 import { toApiError } from '../../api/errors'
 import type { Role } from '../../api/types'
 import { ConfirmDialog, EmptyRow, PageHeader, Pagination, StatusBadge, TableCard } from '../../admin/components'
 import { useAuth } from '../../auth/AuthContext'
-import { Alert, Button } from '../../components/ui'
+import { Alert, Badge, Button } from '../../components/ui'
 import { formatDateTime } from '../../utils/format'
 import { useAsync } from '../../utils/useAsync'
 
@@ -19,17 +19,38 @@ const ROLE_HINTS: Partial<Record<Role, string>> = {
 const STATUS_LABELS: Record<string, string> = {
   ACTIVE: 'Hoạt động',
   PENDING_VERIFICATION: 'Chưa xác minh email',
-  SUSPENDED: 'Đã khóa',
+  SUSPENDED: 'Đã xóa (khôi phục được)',
   INACTIVE: 'Ngừng',
-  DELETED: 'Đã xóa tài khoản',
+  DELETED: 'Đã xóa vĩnh viễn',
 }
 
-/** USR-03/04/05: find users, suspend / reactivate, set roles. */
+/** Why "Xóa vĩnh viễn" is refused now (API ACCOUNT_DELETION_BLOCKED details.reasons). */
+const BLOCKED: Record<string, string> = {
+  ADMIN: 'đang có quyền Quản trị (bỏ quyền này trước)',
+  ORGANIZER_EVENTS: 'là ban tổ chức đã có sự kiện',
+  OPEN_ORDER: 'có đơn đang giữ chỗ / chờ thanh toán',
+  UPCOMING_TICKETS: 'còn vé cho buổi diễn chưa diễn ra',
+  PENDING_REFUND: 'có khoản hoàn tiền chưa xong',
+}
+
+function blockedMessage(err: unknown): Error {
+  const apiError = toApiError(err)
+  const reasons = (apiError.details as { reasons?: string[] } | undefined)?.reasons
+  if (apiError.code !== 'ACCOUNT_DELETION_BLOCKED' || !reasons?.length) return apiError
+  return new Error(`Chưa xóa vĩnh viễn được: người này ${reasons.map((r) => BLOCKED[r] ?? r).join('; ')}. Có thể "Xóa tài khoản" trước.`)
+}
+
+/**
+ * USR-03/04/05: find users, set roles, delete accounts. "Xóa tài khoản" stops
+ * the account (logged out, no sign-in) and can be undone; "Xóa vĩnh viễn"
+ * removes the personal data for good. Transactions are kept either way.
+ */
 export function UsersPage() {
   const { user: me } = useAuth()
   const [draft, setDraft] = useState('')
   const [filters, setFilters] = useState({ q: '', role: '', status: '', page: 1 })
-  const [suspending, setSuspending] = useState<AdminUser | null>(null)
+  const [removing, setRemoving] = useState<AdminUser | null>(null)
+  const [erasing, setErasing] = useState<AdminUser | null>(null)
   const [resetting, setResetting] = useState<AdminUser | null>(null)
   const [editingRoles, setEditingRoles] = useState<AdminUser | null>(null)
   const [message, setMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
@@ -56,10 +77,10 @@ export function UsersPage() {
     }
   }
 
-  async function reactivate(user: AdminUser) {
+  async function restore(user: AdminUser) {
     try {
       await setUserStatus(user.id, 'ACTIVE')
-      setMessage({ tone: 'success', text: `Đã mở khóa ${user.email}.` })
+      setMessage({ tone: 'success', text: `Đã khôi phục tài khoản ${user.email}.` })
       list.reload()
     } catch (err) {
       setMessage({ tone: 'error', text: toApiError(err).message })
@@ -68,7 +89,7 @@ export function UsersPage() {
 
   return (
     <>
-      <PageHeader title="Người dùng" subtitle="Khóa tài khoản vi phạm (đăng xuất ngay trên mọi thiết bị) và phân quyền." />
+      <PageHeader title="Người dùng" subtitle="" />
       <form
         onSubmit={(e) => {
           e.preventDefault()
@@ -136,6 +157,15 @@ export function UsersPage() {
                 <td>
                   {user.status === 'PENDING_VERIFICATION' ? (
                     <span className="text-xs text-slate-500">{STATUS_LABELS[user.status]}</span>
+                  ) : user.status === 'SUSPENDED' ? (
+                    <>
+                      <Badge tone="danger" className="whitespace-nowrap">
+                        Đã xóa
+                      </Badge>
+                      <p className="mt-1 text-xs text-slate-500">khôi phục được</p>
+                    </>
+                  ) : user.status === 'DELETED' ? (
+                    <Badge className="whitespace-nowrap">Đã xóa vĩnh viễn</Badge>
                   ) : (
                     <StatusBadge status={user.status} />
                   )}
@@ -153,8 +183,17 @@ export function UsersPage() {
                   {isMe ? (
                     <span className="text-xs text-slate-500">Bạn</span>
                   ) : user.status === 'DELETED' ? (
-                    // Deleted by its owner: personal data gone, nothing left to manage.
+                    // Deleted for good (by its owner or an admin): personal data gone, nothing left to manage.
                     <span className="text-xs text-slate-500">—</span>
+                  ) : user.status === 'SUSPENDED' ? (
+                    <>
+                      <Button variant="ghost" onClick={() => void restore(user)}>
+                        Khôi phục
+                      </Button>
+                      <Button variant="ghost" className="text-red-600 hover:bg-red-50" onClick={() => setErasing(user)}>
+                        Xóa vĩnh viễn
+                      </Button>
+                    </>
                   ) : (
                     <>
                       <Button variant="ghost" onClick={() => setEditingRoles(user)}>
@@ -170,15 +209,12 @@ export function UsersPage() {
                           Đặt lại 2FA
                         </Button>
                       )}
-                      {user.status === 'SUSPENDED' ? (
-                        <Button variant="ghost" onClick={() => void reactivate(user)}>
-                          Mở khóa
-                        </Button>
-                      ) : (
-                        <Button variant="ghost" className="text-red-600 hover:bg-red-50" onClick={() => setSuspending(user)}>
-                          Khóa
-                        </Button>
-                      )}
+                      <Button variant="ghost" className="text-red-600 hover:bg-red-50" onClick={() => setRemoving(user)}>
+                        Xóa tài khoản
+                      </Button>
+                      <Button variant="ghost" className="text-red-600 hover:bg-red-50" onClick={() => setErasing(user)}>
+                        Xóa vĩnh viễn
+                      </Button>
                     </>
                   )}
                 </td>
@@ -190,22 +226,42 @@ export function UsersPage() {
       </TableCard>
       <Pagination meta={list.data?.meta} onPage={(page) => setFilters({ ...filters, page })} />
 
-      {suspending && (
+      {removing && (
         <ConfirmDialog
           open
-          title={`Khóa tài khoản ${suspending.email}?`}
-          message="Người này bị đăng xuất ngay trên mọi thiết bị và không đăng nhập được cho tới khi mở khóa."
-          confirmLabel="Khóa tài khoản"
+          title={`Xóa tài khoản ${removing.email}?`}
+          message="Người này bị đăng xuất ngay trên mọi thiết bị và không đăng nhập được nữa. Dữ liệu và các giao dịch (đơn hàng, thanh toán, vé) vẫn được giữ; khôi phục lại được bất cứ lúc nào."
+          confirmLabel="Xóa tài khoản"
           danger
           askReason
-          onClose={() => setSuspending(null)}
+          onClose={() => setRemoving(null)}
           onConfirm={async (reason) => {
             try {
-              await setUserStatus(suspending.id, 'SUSPENDED', reason)
+              await setUserStatus(removing.id, 'SUSPENDED', reason)
             } catch (err) {
               throw toApiError(err)
             }
-            setMessage({ tone: 'success', text: `Đã khóa ${suspending.email}.` })
+            setMessage({ tone: 'success', text: `Đã xóa tài khoản ${removing.email} (khôi phục được).` })
+            list.reload()
+          }}
+        />
+      )}
+      {erasing && (
+        <ConfirmDialog
+          open
+          title={`Xóa vĩnh viễn ${erasing.email}?`}
+          message="Không hoàn tác được. Họ tên, email, số điện thoại, thiết bị đăng nhập và nội dung đánh giá bị xóa hẳn; người này bị đăng xuất khỏi mọi thiết bị. Đơn hàng, thanh toán, hoàn tiền và vé được giữ lại ở dạng ẩn danh để đối soát và kế toán. Email được giải phóng: người này có thể đăng ký lại."
+          confirmLabel="Xóa vĩnh viễn"
+          danger
+          askReason
+          onClose={() => setErasing(null)}
+          onConfirm={async (reason) => {
+            try {
+              await deleteUserPermanently(erasing.id, reason)
+            } catch (err) {
+              throw blockedMessage(err)
+            }
+            setMessage({ tone: 'success', text: `Đã xóa vĩnh viễn ${erasing.email}. Giao dịch được giữ lại ở dạng ẩn danh.` })
             list.reload()
           }}
         />

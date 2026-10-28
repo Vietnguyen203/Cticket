@@ -16,6 +16,11 @@ async function changeUserStatus(req, res) {
   return sendSuccess(res, { user });
 }
 
+/** "Xóa vĩnh viễn" (orders and payments stay, anonymised). */
+async function deleteUser(req, res) {
+  return sendSuccess(res, await adminUsersService.deletePermanently(requestContext(req), req.user.id, req.valid.params.id, req.valid.body));
+}
+
 async function setUserRoles(req, res) {
   const user = await adminUsersService.setRoles(requestContext(req), req.user.id, req.valid.params.id, req.valid.body);
   return sendSuccess(res, { user });
@@ -64,6 +69,7 @@ async function unlockUserLogin(req, res) {
 module.exports = {
   listUsers,
   changeUserStatus,
+  deleteUser,
   setUserRoles,
   resetUserTwoFactor,
   unlockUserLogin,

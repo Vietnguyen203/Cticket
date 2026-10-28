@@ -588,21 +588,21 @@ test('the ★ steps of the UI test guide', async ({ browser, api }) => {
     })
 
     // --- Phiên 13: quản trị
-    await step('13.2', 'Admin khóa khách B: B bị đăng xuất', () => adminPage, async () => {
+    await step('13.2', 'Admin xóa tài khoản khách B: B bị đăng xuất', () => adminPage, async () => {
       await adminPage.goto('/admin/users')
       await adminPage.getByLabel('Tìm người dùng').fill(emailB)
       await adminPage.getByRole('button', { name: 'Tìm', exact: true }).click()
       const row = adminPage.getByRole('row').filter({ hasText: emailB })
-      await row.getByRole('button', { name: 'Khóa', exact: true }).click()
+      await row.getByRole('button', { name: 'Xóa tài khoản', exact: true }).click()
       const dialog = adminPage.getByRole('dialog')
-      await dialog.getByRole('textbox').fill('Thử khóa tài khoản')
-      await dialog.getByRole('button', { name: 'Khóa tài khoản' }).click()
-      await expect(row.getByRole('button', { name: 'Mở khóa', exact: true })).toBeVisible()
+      await dialog.getByRole('textbox').fill('Thử xóa tài khoản')
+      await dialog.getByRole('button', { name: 'Xóa tài khoản' }).click()
+      await expect(row.getByRole('button', { name: 'Khôi phục', exact: true })).toBeVisible()
       await pageB.goto('/tickets')
       await expect(pageB).toHaveURL(/\/login/, { timeout: 15_000 })
     })
-    await step('13.3', 'Admin mở khóa: B đăng nhập lại được', () => adminPage, async () => {
-      await adminPage.getByRole('row').filter({ hasText: emailB }).getByRole('button', { name: 'Mở khóa', exact: true }).click()
+    await step('13.3', 'Admin khôi phục: B đăng nhập lại được', () => adminPage, async () => {
+      await adminPage.getByRole('row').filter({ hasText: emailB }).getByRole('button', { name: 'Khôi phục', exact: true }).click()
       await signIn(pageB, emailB, PASSWORD, '/tickets')
       await expect(pageB.getByRole('heading', { name: 'Vé của tôi' })).toBeVisible()
     })

@@ -132,22 +132,33 @@ async function deleteAccount(context, userId, { password }) {
   const user = await users.findById(pool, userId);
   if (!user || user.status === USER_STATUS.DELETED) throw new AppError('UNAUTHENTICATED');
   if (!(await bcrypt.compare(password, user.password_hash))) throw new AppError('WRONG_PASSWORD');
-  // A hash of random bytes nobody knows: no password can ever match it.
-  const unusable = await bcrypt.hash(randomBytes(32).toString('hex'), env.BCRYPT_COST);
-
+  const unusable = await unusablePasswordHash();
   await withTransaction(async (client) => {
     await users.lockUser(client, userId);
-    const reasons = toReasons(await repository.blockers(client, userId));
-    if (reasons.length > 0) throw new AppError('ACCOUNT_DELETION_BLOCKED', undefined, { details: { reasons } });
-
-    await repository.deletePersonalRows(client, userId);
-    await repository.anonymise(client, userId, unusable);
-    await auth.clearLoginLock(client, user.email);
-    await recordAudit(client, { context, action: 'ACCOUNT_DELETED', entityType: 'user', entityId: userId });
-    // Access tokens already issued stop at once (refresh tokens are gone above).
-    client.afterCommit(() => auth.revokeAllTokensOfUser(userId, { strict: true }));
+    await closeAccount(client, { userId, email: user.email, unusable, context, audit: { action: 'ACCOUNT_DELETED' } });
   });
   return { deleted: true };
 }
 
-module.exports = { exportData, deletionCheck, deleteAccount };
+/** A hash of random bytes nobody knows: no password can ever match it. */
+const unusablePasswordHash = () => bcrypt.hash(randomBytes(32).toString('hex'), env.BCRYPT_COST);
+
+/**
+ * The deletion itself, in the caller's transaction (user row locked):
+ * blockers checked again, personal rows deleted, the account anonymised,
+ * every session ended once committed. Orders, payments, refunds and tickets
+ * stay, anonymised (see the top of this file). Used by DELETE /users/me and
+ * by an admin's "Xóa vĩnh viễn" (admin module).
+ */
+async function closeAccount(client, { userId, email, unusable, context, audit }) {
+  const reasons = toReasons(await repository.blockers(client, userId));
+  if (reasons.length > 0) throw new AppError('ACCOUNT_DELETION_BLOCKED', undefined, { details: { reasons } });
+  await repository.deletePersonalRows(client, userId);
+  await repository.anonymise(client, userId, unusable);
+  await auth.clearLoginLock(client, email);
+  await recordAudit(client, { context, entityType: 'user', entityId: userId, ...audit });
+  // Access tokens already issued stop at once (refresh tokens are gone above).
+  client.afterCommit(() => auth.revokeAllTokensOfUser(userId, { strict: true }));
+}
+
+module.exports = { exportData, deletionCheck, deleteAccount, closeAccount, unusablePasswordHash };

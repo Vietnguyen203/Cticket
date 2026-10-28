@@ -11,6 +11,8 @@ const canManageUsers = [authenticate, authorize('user:manage')];
 
 router.get('/users', ...canManageUsers, validate({ query: schemas.listUsersQuery }), controller.listUsers);
 router.patch('/users/:id/status', ...canManageUsers, validate({ params: schemas.idParams, body: schemas.changeUserStatus }), controller.changeUserStatus);
+// Delete an account for good (its orders and payments stay, anonymised).
+router.delete('/users/:id', ...canManageUsers, validate({ params: schemas.idParams, body: schemas.deleteUser }), controller.deleteUser);
 router.put('/users/:id/roles', ...canManageUsers, validate({ params: schemas.idParams, body: schemas.setUserRoles }), controller.setUserRoles);
 // Phase 15: someone lost their phone (and their recovery codes).
 router.post(
