@@ -42,6 +42,8 @@ x-app-env: &app-env
   MAIL_FROM: ${MAIL_FROM:?Set MAIL_FROM in deploy/.env}
   # Phase 23: monitoring alerts also go to these addresses (besides every admin).
   ALERT_EMAILS: ${ALERT_EMAILS:-}
+  # On for a real server; a rehearsal on a laptop may set MONITORING_ALERTS=false in deploy/.env.
+  MONITORING_ALERTS: ${MONITORING_ALERTS:-true}
   # Phase 17: VNPay (docs/deployment.md, section 13). Empty TMN code = VNPay off.
   VNPAY_TMN_CODE: ${VNPAY_TMN_CODE:-}
   VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET:-}
